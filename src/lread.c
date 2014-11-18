@@ -64,6 +64,10 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #define file_tell ftell
 #endif
 
+#ifdef HAVE_LTDL
+#include <ltdl.h>
+#endif
+
 /* Hash table read constants.  */
 static Lisp_Object Qhash_table, Qdata;
 static Lisp_Object Qtest;
@@ -996,6 +1000,49 @@ This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
 	}
     }
   return Fnreverse (lst);
+}
+
+DEFUN ("load-module", Fload_module, Sload_module, 1, 1, 0,
+       doc: /* Dymamically load a compiled module. */)
+  (Lisp_Object file)
+{
+#ifdef HAVE_LTDL
+    static int lt_init_done = 0;
+    lt_dlhandle handle;
+    void (*module_init) ();
+    void *gpl_sym;
+
+    if (!lt_init_done)
+      {
+        int ret = lt_dlinit ();
+        if (ret)
+          {
+            const char* s = lt_dlerror ();
+            error ("ltdl init fail: %s", s);
+          }
+        lt_init_done = 1;
+      }
+
+    CHECK_STRING (file);
+
+    handle = lt_dlopen (SDATA (file));
+    if (!handle)
+      error ("Cannot load file %s", SDATA (file));
+
+    gpl_sym = lt_dlsym (handle, "plugin_is_GPL_compatible");
+    if (!gpl_sym)
+      error ("Module %s is not GPL compatible", SDATA (file));
+
+    module_init = (void (*) ()) lt_dlsym (handle, "init");
+    if (!module_init)
+      error ("Module %s does not have an init function.", SDATA (file));
+
+    module_init ();
+
+    return Qt;
+#else
+    return Qnil;
+#endif
 }
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
@@ -4491,6 +4538,7 @@ syms_of_lread (void)
   defsubr (&Sget_file_char);
   defsubr (&Smapatoms);
   defsubr (&Slocate_file_internal);
+  defsubr (&Sload_module);
 
   DEFVAR_LISP ("obarray", Vobarray,
 	       doc: /* Symbol table for use by `intern' and `read'.
