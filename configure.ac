@@ -325,6 +325,8 @@ OPTION_DEFAULT_ON([gsettings],[don't compile with GSettings support])
 OPTION_DEFAULT_ON([selinux],[don't compile with SELinux support])
 OPTION_DEFAULT_ON([gnutls],[don't use -lgnutls for SSL/TLS support])
 OPTION_DEFAULT_ON([zlib],[don't compile with zlib decompression support])
+OPTION_DEFAULT_ON([ltdl], [don't compile with dynamic module loading support])
+
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
  [use a file notification library (LIB one of: yes, gfile, inotify, w32, no)])],
@@ -3148,6 +3150,18 @@ if test "${HAVE_ZLIB}" = "yes"; then
 fi
 AC_SUBST(LIBZ)
 
+HAVE_LTDL=no
+LIBLTDL=
+if test "${with_ltdl}" != "no"; then
+  AC_CHECK_HEADER(ltdl.h, HAVE_LTDL=yes, HAVE_LTDL=no)
+  AC_CHECK_LIB(ltdl, lt_dlopen, HAVE_LTDL=yes, HAVE_LTDL=no)
+fi
+if test "${HAVE_LTDL}" = "yes"; then
+  AC_DEFINE(HAVE_LTDL, 1, [Define to 1 if you have the ltdl library (-lltdl).])
+  LIBLTDL="-lltdl -Wl,--export-dynamic"
+fi
+AC_SUBST(LIBLTDL)
+
 ### Use -lpng if available, unless `--with-png=no'.
 HAVE_PNG=no
 LIBPNG=
@@ -5018,7 +5032,7 @@ optsep=
 emacs_config_features=
 for opt in XAW3D XPM JPEG TIFF GIF PNG RSVG IMAGEMAGICK SOUND GPM DBUS \
   GCONF GSETTINGS NOTIFY ACL LIBSELINUX GNUTLS LIBXML2 FREETYPE M17N_FLT \
-  LIBOTF XFT ZLIB; do
+  LIBOTF XFT ZLIB LTDL; do
 
     case $opt in
       NOTIFY|ACL) eval val=\${${opt}_SUMMARY} ;;
@@ -5057,6 +5071,7 @@ echo "  Does Emacs use -lm17n-flt?                              ${HAVE_M17N_FLT}
 echo "  Does Emacs use -lotf?                                   ${HAVE_LIBOTF}"
 echo "  Does Emacs use -lxft?                                   ${HAVE_XFT}"
 echo "  Does Emacs directly use zlib?                           ${HAVE_ZLIB}"
+echo "  Does Emacs use -lltdl?                                  ${HAVE_LTDL}"
 
 echo "  Does Emacs use toolkit scroll bars?                     ${USE_TOOLKIT_SCROLL_BARS}"
 echo
