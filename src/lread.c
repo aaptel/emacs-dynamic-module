@@ -1110,6 +1110,8 @@ Return t if the file exists and loads successfully.  */)
   bool newer = 0;
   /* True means we are loading a compiled file.  */
   bool compiled = 0;
+  /* True means we are loading a dynamic module.  */
+  bool module = 0;
   Lisp_Object handler;
   bool safe_p = 1;
   const char *fmode = "r";
@@ -1162,6 +1164,9 @@ Return t if the file exists and loads successfully.  */)
 	{
 	  /* Don't insist on adding a suffix if FILE already ends with one.  */
 	  ptrdiff_t size = SBYTES (file);
+	  if (size > 3
+	      && !strcmp (SSDATA (file) + size - 3, ".so"))
+	    must_suffix = Qnil;
 	  if (size > 3
 	      && !strcmp (SSDATA (file) + size - 3, ".el"))
 	    must_suffix = Qnil;
@@ -1344,6 +1349,12 @@ Return t if the file exists and loads successfully.  */)
 	  UNGCPRO;
 	}
     }
+#ifdef HAVE_LTDL
+  else if (!memcmp (SDATA (found) + SBYTES (found) - 3, ".so", 3))
+      {
+          module = 1;
+      }
+#endif
   else
     {
       /* We are loading a source file (*.el).  */
@@ -1393,7 +1404,9 @@ Return t if the file exists and loads successfully.  */)
 
   if (NILP (nomessage) || force_load_messages)
     {
-      if (!safe_p)
+      if (module)
+        message_with_string ("Loading %s (dymamic module)...", file, 1);
+      else if (!safe_p)
 	message_with_string ("Loading %s (compiled; note unsafe, not compiled in Emacs)...",
 		 file, 1);
       else if (!compiled)
@@ -1413,7 +1426,14 @@ Return t if the file exists and loads successfully.  */)
   if (lisp_file_lexically_bound_p (Qget_file_char))
     Fset (Qlexical_binding, Qt);
 
-  if (! version || version >= 22)
+#ifdef HAVE_LTDL
+  if (module)
+    {
+      /* XXX: should the fd/stream be closed before loading the module? */
+      Fload_module (found);
+    }
+#endif
+  else if (! version || version >= 22)
     readevalloop (Qget_file_char, stream, hist_file_name,
 		  0, Qnil, Qnil, Qnil, Qnil);
   else
@@ -1442,7 +1462,9 @@ Return t if the file exists and loads successfully.  */)
 
   if (!noninteractive && (NILP (nomessage) || force_load_messages))
     {
-      if (!safe_p)
+      if (module)
+        message_with_string ("Loading %s (dymamic module)...done", file, 1);
+      else if (!safe_p)
 	message_with_string ("Loading %s (compiled; note unsafe, not compiled in Emacs)...done",
 		 file, 1);
       else if (!compiled)
@@ -4605,8 +4627,16 @@ Initialized during startup as described in Info node `(elisp)Library Search'.  *
 This list should not include the empty string.
 `load' and related functions try to append these suffixes, in order,
 to the specified file name if a Lisp suffix is allowed or required.  */);
+
+#ifdef HAVE_LTDL
+  Vload_suffixes = list3 (build_pure_c_string (".so"),
+                          build_pure_c_string (".elc"),
+                          build_pure_c_string (".el"));
+#else
   Vload_suffixes = list2 (build_pure_c_string (".elc"),
-			  build_pure_c_string (".el"));
+                          build_pure_c_string (".el"));
+#endif
+
   DEFVAR_LISP ("load-file-rep-suffixes", Vload_file_rep_suffixes,
 	       doc: /* List of suffixes that indicate representations of \
 the same file.
