@@ -321,7 +321,7 @@ reread_doc_file (Lisp_Object file)
 #endif
 
   if (NILP (file))
-    Fsnarf_documentation (Vdoc_file_name);
+    Fsnarf_documentation (Vdoc_file_name, Qnil);
   else
     Fload (file, Qt, Qt, Qt, Qnil);
 
@@ -356,14 +356,16 @@ string is passed through `substitute-command-keys'.  */)
     fun = XCDR (fun);
   if (SUBRP (fun))
     {
-      if (XSUBR (fun)->doc == 0)
-	return Qnil;
-      /* FIXME: This is not portable, as it assumes that string
-	 pointers have the top bit clear.  */
-      else if ((intptr_t) XSUBR (fun)->doc >= 0)
-	doc = build_string (XSUBR (fun)->doc);
+      Lisp_Object subrdoc = XSUBR (fun)->doc;
+
+      if (NILP (subrdoc))
+        return Qnil;
+      else if (STRINGP (subrdoc))
+        return subrdoc;
+      else if (INTEGERP (subrdoc) || CONSP (subrdoc))
+        doc = subrdoc;
       else
-	doc = make_number ((intptr_t) XSUBR (fun)->doc);
+        error ("invalid value in subr doc field");
     }
   else if (COMPILEDP (fun))
     {
@@ -495,7 +497,7 @@ aren't strings.  */)
 /* Scanning the DOC files and placing docstring offsets into functions.  */
 
 static void
-store_function_docstring (Lisp_Object obj, ptrdiff_t offset)
+store_function_docstring (Lisp_Object obj, Lisp_Object filename, ptrdiff_t offset, bool module)
 {
   /* Don't use indirect_function here, or defaliases will apply their
      docstrings to the base functions (Bug#2603).  */
@@ -506,8 +508,8 @@ store_function_docstring (Lisp_Object obj, ptrdiff_t offset)
   /* Lisp_Subrs have a slot for it.  */
   if (SUBRP (fun))
     {
-      intptr_t negative_offset = - offset;
-      XSUBR (fun)->doc = (char *) negative_offset;
+      Lisp_Object neg = make_number (-offset); /* XXX: no sure why.. */
+      XSUBR (fun)->doc = module ? Fcons (filename, neg) : neg;
     }
 
   /* If it's a lisp form, stick it in the form.  */
@@ -526,7 +528,7 @@ store_function_docstring (Lisp_Object obj, ptrdiff_t offset)
 	    XSETCAR (tem, make_number (offset));
 	}
       else if (EQ (tem, Qmacro))
-	store_function_docstring (XCDR (fun), offset);
+	store_function_docstring (XCDR (fun), filename, offset, module);
     }
 
   /* Bytecode objects sometimes have slots for it.  */
@@ -542,9 +544,24 @@ store_function_docstring (Lisp_Object obj, ptrdiff_t offset)
     }
 }
 
+static bool
+build_file_p (const char* file, ptrdiff_t len)
+{
+  /* file can be longer than len, can't use xstrdup */
+  char *ofile = xmalloc (len + 1);
+  memcpy (ofile, file, len);
+  ofile[len] = 0;
+
+  if (ofile[len-1] == 'c')
+    ofile[len-1] = 'o';
+
+  bool res = NILP (Fmember (build_string (ofile), Vbuild_files));
+  xfree (ofile);
+  return res;
+}
 
 DEFUN ("Snarf-documentation", Fsnarf_documentation, Ssnarf_documentation,
-       1, 1, 0,
+       1, 2, 0,
        doc: /* Used during Emacs initialization to scan the `etc/DOC...' file.
 This searches the `etc/DOC...' file for doc strings and
 records them in function and variable definitions.
@@ -552,7 +569,7 @@ The function takes one argument, FILENAME, a string;
 it specifies the file name (without a directory) of the DOC file.
 That file is found in `../etc' now; later, when the dumped Emacs is run,
 the same file name is found in the `doc-directory'.  */)
-  (Lisp_Object filename)
+  (Lisp_Object filename, Lisp_Object module)
 {
   int fd;
   char buf[1024 + 1];
@@ -573,30 +590,6 @@ the same file name is found in the `doc-directory'.  */)
 
   CHECK_STRING (filename);
 
-  if
-#ifndef CANNOT_DUMP
-    (!NILP (Vpurify_flag))
-#else /* CANNOT_DUMP */
-      (0)
-#endif /* CANNOT_DUMP */
-    {
-      static char const sibling_etc[] = "../etc/";
-      dirname = sibling_etc;
-      dirlen = sizeof sibling_etc - 1;
-    }
-  else
-    {
-      CHECK_STRING (Vdoc_directory);
-      dirname = SSDATA (Vdoc_directory);
-      dirlen = SBYTES (Vdoc_directory);
-    }
-
-  count = SPECPDL_INDEX ();
-  USE_SAFE_ALLOCA;
-  name = SAFE_ALLOCA (dirlen + SBYTES (filename) + 1);
-  strcpy (name, dirname);
-  strcat (name, SSDATA (filename)); 	/*** Add this line ***/
-
   /* Vbuild_files is nil when temacs is run, and non-nil after that.  */
   if (NILP (Vbuild_files))
     {
@@ -610,6 +603,44 @@ the same file name is found in the `doc-directory'.  */)
       Vbuild_files = Fpurecopy (Vbuild_files);
     }
 
+  if (NILP (module))
+    {
+      /* If we're not processing a module doc, the doc file becomes
+         the "global" DOC file */
+      Vdoc_file_name = filename;
+
+      if
+#ifndef CANNOT_DUMP
+        (!NILP (Vpurify_flag))
+#else /* CANNOT_DUMP */
+        (0)
+#endif /* CANNOT_DUMP */
+          {
+            static char const sibling_etc[] = "../etc/";
+            dirname = sibling_etc;
+            dirlen = sizeof sibling_etc - 1;
+          }
+      else
+        {
+          CHECK_STRING (Vdoc_directory);
+          dirname = SSDATA (Vdoc_directory);
+          dirlen = SBYTES (Vdoc_directory);
+        }
+    }
+  else
+    {
+      static char const empty_prefix_dir[] = "";
+      dirname = empty_prefix_dir;
+      dirlen = 0;
+    }
+
+  count = SPECPDL_INDEX ();
+  USE_SAFE_ALLOCA;
+  name = SAFE_ALLOCA (dirlen + SBYTES (filename) + 1);
+  strcpy (name, dirname);
+  strcat (name, SSDATA (filename)); 	/*** Add this line ***/
+
+
   fd = emacs_open (name, O_RDONLY, 0);
   if (fd < 0)
     {
@@ -618,7 +649,6 @@ the same file name is found in the `doc-directory'.  */)
 			 open_errno);
     }
   record_unwind_protect_int (close_file_unwind, fd);
-  Vdoc_file_name = filename;
   filled = 0;
   pos = 0;
   while (1)
@@ -641,18 +671,13 @@ the same file name is found in the `doc-directory'.  */)
           if (p[1] == 'S')
             {
               skip_file = 0;
-              if (end - p > 4 && end[-2] == '.'
-                  && (end[-1] == 'o' || end[-1] == 'c'))
+              if (NILP (module)
+                  && end - p > 4
+                  && end[-2] == '.'
+                  && (end[-1] == 'o' || end[-1] == 'c')
+                  && build_file_p (&p[2], end - p - 2))
                 {
-                  ptrdiff_t len = end - p - 2;
-                  char *fromfile = SAFE_ALLOCA (len + 1);
-                  memcpy (fromfile, &p[2], len);
-                  fromfile[len] = 0;
-                  if (fromfile[len-1] == 'c')
-                    fromfile[len-1] = 'o';
-
-                  skip_file = NILP (Fmember (build_string (fromfile),
-                                             Vbuild_files));
+		  skip_file = 1;
                 }
             }
 
@@ -672,6 +697,7 @@ the same file name is found in the `doc-directory'.  */)
 		  /* Install file-position as variable-documentation property
 		     and make it negative for a user-variable
 		     (doc starts with a `*').  */
+		  /* TODO: handle module var */
                   if (!NILP (Fboundp (sym))
                       || !NILP (Fmemq (sym, delayed_init)))
                     Fput (sym, Qvariable_documentation,
@@ -683,7 +709,7 @@ the same file name is found in the `doc-directory'.  */)
 	      else if (p[1] == 'F')
                 {
                   if (!NILP (Ffboundp (sym)))
-                    store_function_docstring (sym, pos + end + 1 - buf);
+                    store_function_docstring (sym, filename, pos + end + 1 - buf, !NILP (module));
                 }
 	      else if (p[1] == 'S')
 		; /* Just a source file name boundary marker.  Ignore it.  */

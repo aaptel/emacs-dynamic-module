@@ -1011,7 +1011,9 @@ DEFUN ("load-module", Fload_module, Sload_module, 1, 1, 0,
     lt_dlhandle handle;
     void (*module_init) ();
     void *gpl_sym;
+    Lisp_Object doc_name, args[2];
 
+    /* init libtool once per emacs process */
     if (!lt_init_done)
       {
         int ret = lt_dlinit ();
@@ -1038,6 +1040,12 @@ DEFUN ("load-module", Fload_module, Sload_module, 1, 1, 0,
       error ("Module %s does not have an init function.", SDATA (file));
 
     module_init ();
+
+    /* build doc file path and install it */
+    args[0] = Fsubstring (file, make_number (0), make_number (-3));
+    args[1] = build_string (".doc");
+    doc_name = Fconcat (2, args);
+    Fsnarf_documentation (doc_name, Qt);
 
     return Qt;
 #else
@@ -4138,6 +4146,7 @@ void
 defsubr (struct Lisp_Subr *sname)
 {
   Lisp_Object sym, tem;
+  sname->doc = Qnil;
   sym = intern_c_string (sname->symbol_name);
   XSETPVECTYPE (sname, PVEC_SUBR);
   XSETSUBR (tem, sname);
