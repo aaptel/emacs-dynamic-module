@@ -7,6 +7,9 @@
 
 int plugin_is_GPL_compatible;
 
+/* module feature name */
+static Lisp_Object Qfmod;
+
 /* define a new lisp function */
 
 EXFUN (Ffmod, 2);
@@ -46,8 +49,12 @@ DEFUN ("fmod-test3", Ffmod_test3, Sfmod_test3, 0, 0, 0,
 
 void init ()
 {
+  DEFSYM (Qfmod, "fmod");
+
   defsubr (&Sfmod);
   defsubr (&Sfmod_test1);
   defsubr (&Sfmod_test2);
   defsubr (&Sfmod_test3);
+
+  Fprovide (Qfmod, Qnil);
 }

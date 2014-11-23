@@ -4,7 +4,7 @@
 
 int plugin_is_GPL_compatible;
 
-static Lisp_Object Qreplace_regexp_in_string;
+static Lisp_Object Qelisp, Qreplace_regexp_in_string;
 
 #define MAKE_STRING(s) (make_string (s, sizeof(s)-1))
 
@@ -29,7 +29,10 @@ DEFUN ("elisp-test", Felisp_test, Selisp_test, 0, 0, 0,
 
 void init ()
 {
+  DEFSYM (Qelisp, "elisp");
   DEFSYM (Qreplace_regexp_in_string, "replace-regexp-in-string");
 
   defsubr (&Selisp_test);
+
+  Fprovide (Qelisp, Qnil);
 }

@@ -2,6 +2,7 @@
 #include <lisp.h>
 
 int plugin_is_GPL_compatible;
+static Lisp_Object Qopaque;
 
 struct opaque
 {
@@ -49,6 +50,8 @@ DEFUN ("opaque-get", Fopaque_get, Sopaque_get, 2, 2, 0,
 
 void init ()
 {
+  DEFSYM (Qopaque, "opaque");
+
   DEFSYM (Qa, "a");
   DEFSYM (Qb, "b");
   DEFSYM (Qc, "c");
@@ -56,4 +59,6 @@ void init ()
   defsubr (&Sopaque_make);
   defsubr (&Sopaque_free);
   defsubr (&Sopaque_get);
+
+  Fprovide (Qopaque, Qnil);
 }
