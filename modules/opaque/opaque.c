@@ -19,15 +19,21 @@ DEFUN ("opaque-make", Fopaque_make, Sopaque_make, 3, 3, 0,
   p->a = XINT (a);
   p->b = XINT (b);
   p->c = XINT (c);
+
+  /*
+    store p as a the first slot (index 0) of a Lisp_Save_Value (which
+    is a Lisp_Misc)
+  */
   return make_save_ptr ((void*)p);
 }
 
 EXFUN (Fopaque_free, 1);
 DEFUN ("opaque-free", Fopaque_free, Sopaque_free, 1, 1, 0,
-       doc: "Free opaque type.")
-  (Lisp_Object p)
+       doc: "Free opaque object OBJ.")
+  (Lisp_Object obj)
 {
-  free (XSAVE_POINTER (p, 0));
+  /* the pointer is in the first slot (index 0) */
+  free (XSAVE_POINTER (obj, 0));
   return Qnil;
 }
 
