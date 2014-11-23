@@ -65,7 +65,7 @@ DEFUN ("curl-fetch-url", Fcurl_fetch_url, Scurl_fetch_url, 2, 2, 0,
   CURLcode res;
   struct Lisp_CURL *c = XCURL (handle);
 
-  curl_easy_setopt (c->curl, CURLOPT_URL, "http://www.example.com/");
+  curl_easy_setopt (c->curl, CURLOPT_URL, SSDATA (url));
   curl_easy_setopt (c->curl, CURLOPT_WRITEFUNCTION, write_cb);
   curl_easy_setopt (c->curl, CURLOPT_WRITEDATA, (void*)&c->buf);
   curl_easy_setopt (c->curl, CURLOPT_USERAGENT, "curl-in-emacs/1.0");
