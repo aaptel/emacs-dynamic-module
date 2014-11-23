@@ -162,8 +162,8 @@ DEFUN ("yaml-parse-string", Fyaml_parse_string, Syaml_parse_string, 1, 1, 0,
 }
 
 
-EXFUN (Fyaml_parse, 0);
-DEFUN ("yaml-parse", Fyaml_parse, Syaml_parse, 0, 0, 0,
+EXFUN (Fyaml_parse_buffer, 0);
+DEFUN ("yaml-parse-buffer", Fyaml_parse_buffer, Syaml_parse_buffer, 0, 0, 0,
        doc: "Parse current buffer as yaml.")
   (void)
 {
@@ -226,7 +226,7 @@ void init ()
 
   defsubr (&Syaml_parse_file);
   defsubr (&Syaml_parse_string);
-  defsubr (&Syaml_parse);
+  defsubr (&Syaml_parse_buffer);
 
   Fprovide (Qyaml, Qnil);
 }
