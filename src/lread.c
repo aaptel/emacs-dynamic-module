@@ -986,7 +986,15 @@ required.
 This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
   (void)
 {
-  Lisp_Object lst = Qnil, suffixes = Vload_suffixes, suffix, ext;
+  Lisp_Object lst = Qnil, suffixes, suffix, ext;
+
+  /* module suffixes, then regular elisp suffixes */
+
+  Lisp_Object args[2];
+  args[0] = Vload_module_suffixes;
+  args[1] = Vload_suffixes;
+  suffixes = Fappend (2, args);
+
   while (CONSP (suffixes))
     {
       Lisp_Object exts = Vload_file_rep_suffixes;
@@ -1051,6 +1059,35 @@ DEFUN ("load-module", Fload_module, Sload_module, 1, 1, 0,
 #else
     return Qnil;
 #endif
+}
+
+
+/* Return true if STRING ends with SUFFIX.  */
+static bool string_suffix_p (Lisp_Object string, const char *suffix)
+{
+  const ptrdiff_t len = strlen (suffix);
+  return memcmp (SDATA (string) + SBYTES (string) - len, suffix, len) == 0;
+}
+
+/* Return true if STRING ends with any element of SUFFIXES.  */
+static bool string_suffixes_p (Lisp_Object string, Lisp_Object suffixes)
+{
+  ptrdiff_t length = SBYTES (string), suflen;
+  Lisp_Object tail, suffix;
+
+  for (tail = suffixes; CONSP (tail); tail = XCDR (tail))
+    {
+      suffix = XCAR (tail);
+      suflen = SBYTES (suffix);
+
+      if (suflen <= length)
+        {
+          if (memcmp (SDATA (string) + length - suflen, SDATA (suffix), suflen) == 0)
+            return true;
+        }
+    }
+
+  return false;
 }
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
@@ -1162,21 +1199,14 @@ Return t if the file exists and loads successfully.  */)
 
       if (! NILP (must_suffix))
 	{
-	  /* Don't insist on adding a suffix if FILE already ends with one.  */
-	  ptrdiff_t size = SBYTES (file);
-	  if (size > 3
-	      && !strcmp (SSDATA (file) + size - 3, ".so"))
-	    must_suffix = Qnil;
-	  if (size > 3
-	      && !strcmp (SSDATA (file) + size - 3, ".el"))
-	    must_suffix = Qnil;
-	  else if (size > 4
-		   && !strcmp (SSDATA (file) + size - 4, ".elc"))
-	    must_suffix = Qnil;
-	  /* Don't insist on adding a suffix
-	     if the argument includes a directory name.  */
-	  else if (! NILP (Ffile_name_directory (file)))
-	    must_suffix = Qnil;
+          /* Don't insist on adding a suffix if FILE already ends with
+             one or if FILE includes a directory name.  */
+          if (string_suffixes_p (file, Vload_module_suffixes)
+              || string_suffixes_p (file, Vload_suffixes)
+              || ! NILP (Ffile_name_directory (file)))
+            {
+              must_suffix = Qnil;
+            }
 	}
 
       if (!NILP (nosuffix))
@@ -1287,7 +1317,7 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qold_style_backquotes, Qnil);
   record_unwind_protect (load_warn_old_style_backquotes, file);
 
-  if (!memcmp (SDATA (found) + SBYTES (found) - 4, ".elc", 4)
+  if (string_suffix_p (found, ".elc")
       || (fd >= 0 && (version = safe_to_load_version (fd)) > 0))
     /* Load .elc files directly, but not when they are
        remote and have no handler!  */
@@ -1350,7 +1380,7 @@ Return t if the file exists and loads successfully.  */)
 	}
     }
 #ifdef HAVE_LTDL
-  else if (!memcmp (SDATA (found) + SBYTES (found) - 3, ".so", 3))
+  else if (string_suffixes_p (found, Vload_module_suffixes))
       {
           module = 1;
       }
@@ -4628,13 +4658,19 @@ This list should not include the empty string.
 `load' and related functions try to append these suffixes, in order,
 to the specified file name if a Lisp suffix is allowed or required.  */);
 
-#ifdef HAVE_LTDL
-  Vload_suffixes = list3 (build_pure_c_string (".so"),
-                          build_pure_c_string (".elc"),
-                          build_pure_c_string (".el"));
-#else
   Vload_suffixes = list2 (build_pure_c_string (".elc"),
                           build_pure_c_string (".el"));
+
+  DEFVAR_LISP ("load-module-suffixes", Vload_module_suffixes,
+               doc: /* List of suffixes for modules files.
+This list should not include the empty string. See `load-suffixes'.  */);
+
+#ifdef HAVE_LTDL
+  Vload_module_suffixes = list3 (build_pure_c_string (".dll"),
+                                 build_pure_c_string (".so"),
+                                 build_pure_c_string (".dylib"));
+#else
+  Vload_module_suffixes = Qnil;
 #endif
 
   DEFVAR_LISP ("load-file-rep-suffixes", Vload_file_rep_suffixes,
