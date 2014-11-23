@@ -58,7 +58,7 @@ DEFUN ("curl-make", Fcurl_make, Scurl_make, 0, 0, 0,
 
 EXFUN (Fcurl_fetch_url, 2);
 DEFUN ("curl-fetch-url", Fcurl_fetch_url, Scurl_fetch_url, 2, 2, 0,
-       doc: "Fetch and store the content of URL using HANDLE.\n\n"
+       doc: "Fetch and store the content of URL using HANDLE.\n"
        "Return t if successful otherwise return an error string.")
   (Lisp_Object handle, Lisp_Object url)
 {
