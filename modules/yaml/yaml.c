@@ -56,7 +56,7 @@ parse_element (struct context *ctx)
     case YAML_SCALAR_EVENT:
       res = parse_scalar (ctx, &e);
       if (s)
-          Fputhash (make_string (s, strlen (s)), res, ctx->anchors);
+        Fputhash (make_string (s, strlen (s)), res, ctx->anchors);
       break;
 
     case YAML_SEQUENCE_START_EVENT:
@@ -143,6 +143,25 @@ context_init (struct context *ctx)
   ctx->anchors = Fmake_hash_table (2, args);
 }
 
+EXFUN (Fyaml_parse_string, 1);
+DEFUN ("yaml-parse-string", Fyaml_parse_string, Syaml_parse_string, 1, 1, 0,
+       doc: "Parse STRING as yaml.")
+  (Lisp_Object string)
+{
+  struct context ctx;
+  Lisp_Object res = Qnil;
+
+  context_init (&ctx);
+
+  yaml_parser_initialize (&ctx.p);
+  yaml_parser_set_input_string (&ctx.p, SDATA (string), SBYTES (string));
+  res = parse_element (&ctx);
+  yaml_parser_delete (&ctx.p);
+
+  return res;
+}
+
+
 EXFUN (Fyaml_parse, 0);
 DEFUN ("yaml-parse", Fyaml_parse, Syaml_parse, 0, 0, 0,
        doc: "Parse current buffer as yaml.")
@@ -206,6 +225,7 @@ void init ()
   DEFSYM (Qyaml, "yaml");
 
   defsubr (&Syaml_parse_file);
+  defsubr (&Syaml_parse_string);
   defsubr (&Syaml_parse);
 
   Fprovide (Qyaml, Qnil);
