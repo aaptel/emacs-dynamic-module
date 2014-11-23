@@ -56,6 +56,15 @@ read_bytecode_char (bool unreadflag)
   return *read_bytecode_pointer++;
 }
 
+/* A module doc file must have a doc extension */
+static bool
+doc_is_from_module_p (const char* path)
+{
+  int len = strlen (path);
+  return len > 4 && (strcmp (path + len - 4, ".doc") == 0
+                     || (strcmp (path + len - 4, ".DOC") == 0));
+}
+
 /* Extract a doc string from a file.  FILEPOS says where to get it.
    If it is an integer, use that position in the standard DOC file.
    If it is (FILE . INTEGER), use FILE as the file name
@@ -211,7 +220,7 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
   SAFE_FREE ();
 
   /* Sanity checking.  */
-  if (CONSP (filepos))
+  if (CONSP (filepos) && !doc_is_from_module_p (name))
     {
       int test = 1;
       /* A dynamic docstring should be either at the very beginning of a "#@
