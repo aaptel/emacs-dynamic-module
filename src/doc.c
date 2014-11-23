@@ -118,11 +118,11 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
     return Qnil;
 
   /* Put the file name in NAME as a C string.
-     If it is relative, combine it with Vdoc_directory.  */
+     If it is relative and not from a module, combine it with Vdoc_directory.  */
 
   tem = Ffile_name_absolute_p (file);
   file = ENCODE_FILE (file);
-  if (NILP (tem))
+  if (NILP (tem) && !doc_is_from_module_p (SSDATA (file)))
     {
       Lisp_Object docdir = ENCODE_FILE (Vdoc_directory);
       minsize = SCHARS (docdir);
