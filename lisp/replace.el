@@ -1,6 +1,6 @@
 ;;; replace.el --- replace commands for Emacs
 
-;; Copyright (C) 1985-1987, 1992, 1994, 1996-1997, 2000-2014 Free
+;; Copyright (C) 1985-1987, 1992, 1994, 1996-1997, 2000-2015 Free
 ;; Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -67,11 +67,18 @@ That becomes the \"string to replace\".")
 to the minibuffer that reads the string to replace, or invoke replacements
 from Isearch by using a key sequence like `C-s C-s M-%'." "24.3")
 
-(defvar query-replace-from-to-separator
-  (propertize "\0"
-	      'display (propertize " \u2192 " 'face 'minibuffer-prompt)
-	      'separator t)
-  "String that separates FROM and TO in the history of replacement pairs.")
+(defcustom query-replace-from-to-separator
+  (propertize
+   (or (ignore-errors
+	 ;; Ignore errors when attempt to autoload char-displayable-p
+	 ;; fails while preparing to dump.
+	 (if (char-displayable-p ?\u2192) " \u2192 " " -> "))
+       " -> ")
+   'face 'minibuffer-prompt)
+  "String that separates FROM and TO in the history of replacement pairs."
+  :group 'matching
+  :type 'sexp
+  :version "25.1")
 
 (defcustom query-replace-from-history-variable 'query-replace-history
   "History list to use for the FROM argument of `query-replace' commands.
@@ -137,19 +144,27 @@ The return value can also be a pair (FROM . TO) indicating that the user
 wants to replace FROM with TO."
   (if query-replace-interactive
       (car (if regexp-flag regexp-search-ring search-ring))
+    ;; Reevaluating will check char-displayable-p that is
+    ;; unavailable while preparing to dump.
+    (custom-reevaluate-setting 'query-replace-from-to-separator)
     (let* ((history-add-new-input nil)
+	   (separator
+	    (when query-replace-from-to-separator
+	      (propertize "\0"
+			  'display query-replace-from-to-separator
+			  'separator t)))
 	   (query-replace-from-to-history
 	    (append
-	     (when query-replace-from-to-separator
+	     (when separator
 	       (mapcar (lambda (from-to)
 			 (concat (query-replace-descr (car from-to))
-				 query-replace-from-to-separator
+				 separator
 				 (query-replace-descr (cdr from-to))))
 		       query-replace-defaults))
 	     (symbol-value query-replace-from-history-variable)))
 	   (minibuffer-allow-text-properties t) ; separator uses text-properties
 	   (prompt
-	    (if (and query-replace-defaults query-replace-from-to-separator)
+	    (if (and query-replace-defaults separator)
 		(format "%s (default %s): " prompt (car query-replace-from-to-history))
 	      (format "%s: " prompt)))
 	   (from
@@ -166,10 +181,9 @@ wants to replace FROM with TO."
 	  (cons (caar query-replace-defaults)
 		(query-replace-compile-replacement
 		 (cdar query-replace-defaults) regexp-flag))
-	(let* ((to (if (and (string-match query-replace-from-to-separator from)
+	(let* ((to (if (and (string-match separator from)
 			    (get-text-property (match-beginning 0) 'separator from))
-		       (query-replace-compile-replacement
-			(substring-no-properties from (match-end 0)) regexp-flag)))
+		       (substring-no-properties from (match-end 0))))
 	       (from (if to (substring-no-properties from 0 (match-beginning 0))
 		       (substring-no-properties from))))
 	  (add-to-history query-replace-from-history-variable from nil t)
@@ -187,7 +201,7 @@ wants to replace FROM with TO."
 	      from
 	    (add-to-history query-replace-to-history-variable to nil t)
 	    (add-to-history 'query-replace-defaults (cons from to) nil t)
-	    (cons from to)))))))
+	    (cons from (query-replace-compile-replacement to regexp-flag))))))))
 
 (defun query-replace-compile-replacement (to regexp-flag)
   "Maybe convert a regexp replacement TO to Lisp.

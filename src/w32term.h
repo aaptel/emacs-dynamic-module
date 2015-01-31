@@ -1,5 +1,5 @@
 /* Definitions and headers for communication on the Microsoft Windows API.
-   Copyright (C) 1995, 2001-2014 Free Software Foundation, Inc.
+   Copyright (C) 1995, 2001-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -239,8 +239,8 @@ Lisp_Object display_x_get_resource (struct w32_display_info *,
 extern struct w32_display_info *w32_term_init (Lisp_Object,
 					       char *, char *);
 extern int w32_defined_color (struct frame *f, const char *color,
-                              XColor *color_def, int alloc);
-extern void x_set_window_size (struct frame *f, int change_grav,
+                              XColor *color_def, bool alloc_p);
+extern void x_set_window_size (struct frame *f, bool change_gravity,
 			       int width, int height, bool pixelwise);
 extern int x_display_pixel_height (struct w32_display_info *);
 extern int x_display_pixel_width (struct w32_display_info *);
@@ -257,7 +257,7 @@ extern void x_set_internal_border_width (struct frame *f,
 					 Lisp_Object value,
 					 Lisp_Object oldval);
 extern void x_activate_menubar (struct frame *);
-extern int x_bitmap_icon (struct frame *, Lisp_Object);
+extern bool x_bitmap_icon (struct frame *, Lisp_Object);
 extern void initialize_frame_menubar (struct frame *);
 extern void x_free_frame_resources (struct frame *);
 extern void x_real_positions (struct frame *, int *, int *);
@@ -493,8 +493,8 @@ struct scroll_bar {
   (XSETINT ((low),   ((DWORDLONG)(int64))        & 0xffffffff), \
    XSETINT ((high), ((DWORDLONG)(int64) >> 32) & 0xffffffff))
 #else  /* not _WIN64 */
-/* Building a 32-bit C integer from two 16-bit lisp integers.  */
-#define SCROLL_BAR_PACK(low, high) (XINT (high) << 16 | XINT (low))
+/* Building a 32-bit C unsigned integer from two 16-bit lisp integers.  */
+#define SCROLL_BAR_PACK(low, high) ((UINT_PTR)(XINT (high) << 16 | XINT (low)))
 
 /* Setting two lisp integers to the low and high words of a 32-bit C int.  */
 #define SCROLL_BAR_UNPACK(low, high, int32) \

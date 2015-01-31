@@ -1,5 +1,5 @@
 /* Lisp functions for making directory listings.
-   Copyright (C) 1985-1986, 1993-1994, 1999-2014 Free Software
+   Copyright (C) 1985-1986, 1993-1994, 1999-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -51,13 +51,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "msdos.h"	/* for fstatat */
 #endif
 
-static Lisp_Object Qdirectory_files;
-static Lisp_Object Qdirectory_files_and_attributes;
-static Lisp_Object Qfile_name_completion;
-static Lisp_Object Qfile_name_all_completions;
-static Lisp_Object Qfile_attributes;
-static Lisp_Object Qfile_attributes_lessp;
-
 static ptrdiff_t scmp (const char *, const char *, ptrdiff_t);
 static Lisp_Object file_attributes (int, char const *, Lisp_Object);
 
@@ -73,8 +66,9 @@ dirent_namelen (struct dirent *dp)
 }
 
 static DIR *
-open_directory (char const *name, int *fdp)
+open_directory (Lisp_Object dirname, int *fdp)
 {
+  char *name = SSDATA (dirname);
   DIR *d;
   int fd, opendir_errno;
 
@@ -105,8 +99,9 @@ open_directory (char const *name, int *fdp)
 
   unblock_input ();
 
+  if (!d)
+    report_file_errno ("Opening directory", dirname, opendir_errno);
   *fdp = fd;
-  errno = opendir_errno;
   return d;
 }
 
@@ -127,6 +122,35 @@ directory_files_internal_unwind (void *dh)
   unblock_input ();
 }
 
+/* Return the next directory entry from DIR; DIR's name is DIRNAME.
+   If there are no more directory entries, return a null pointer.
+   Signal any unrecoverable errors.  */
+
+static struct dirent *
+read_dirent (DIR *dir, Lisp_Object dirname)
+{
+  while (true)
+    {
+      errno = 0;
+      struct dirent *dp = readdir (dir);
+      if (dp || errno == 0)
+	return dp;
+      if (! (errno == EAGAIN || errno == EINTR))
+	{
+#ifdef WINDOWSNT
+	  /* The MS-Windows implementation of 'opendir' doesn't
+	     actually open a directory until the first call to
+	     'readdir'.  If 'readdir' fails to open the directory, it
+	     sets errno to ENOENT or EACCES, see w32.c.  */
+	  if (errno == ENOENT || errno == EACCES)
+	    report_file_error ("Opening directory", dirname);
+#endif
+	  report_file_error ("Reading directory", dirname);
+	}
+      QUIT;
+    }
+}
+
 /* Function shared by Fdirectory_files and Fdirectory_files_and_attributes.
    If not ATTRS, return a list of directory filenames;
    if ATTRS, return a list of directory filenames and their attributes.
@@ -137,15 +161,12 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
 			  Lisp_Object match, Lisp_Object nosort, bool attrs,
 			  Lisp_Object id_format)
 {
-  DIR *d;
-  int fd;
   ptrdiff_t directory_nbytes;
   Lisp_Object list, dirfilename, encoded_directory;
   struct re_pattern_buffer *bufp = NULL;
   bool needsep = 0;
   ptrdiff_t count = SPECPDL_INDEX ();
   struct gcpro gcpro1, gcpro2, gcpro3, gcpro4, gcpro5;
-  struct dirent *dp;
 #ifdef WINDOWSNT
   Lisp_Object w32_save = Qnil;
 #endif
@@ -183,17 +204,14 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   /* Note: ENCODE_FILE and DECODE_FILE can GC because they can run
      run_pre_post_conversion_on_str which calls Lisp directly and
      indirectly.  */
-  if (STRING_MULTIBYTE (dirfilename))
-    dirfilename = ENCODE_FILE (dirfilename);
-  encoded_directory = (STRING_MULTIBYTE (directory)
-		       ? ENCODE_FILE (directory) : directory);
+  dirfilename = ENCODE_FILE (dirfilename);
+  encoded_directory = ENCODE_FILE (directory);
 
   /* Now *bufp is the compiled form of MATCH; don't call anything
      which might compile a new regexp until we're done with the loop!  */
 
-  d = open_directory (SSDATA (dirfilename), &fd);
-  if (d == NULL)
-    report_file_error ("Opening directory", directory);
+  int fd;
+  DIR *d = open_directory (dirfilename, &fd);
 
   /* Unfortunately, we can now invoke expand-file-name and
      file-attributes on filenames, both of which can throw, so we must
@@ -230,28 +248,13 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
       || !IS_ANY_SEP (SREF (directory, directory_nbytes - 1)))
     needsep = 1;
 
-  /* Loop reading blocks until EOF or error.  */
-  for (;;)
+  /* Loop reading directory entries.  */
+  for (struct dirent *dp; (dp = read_dirent (d, directory)); )
     {
-      ptrdiff_t len;
-      bool wanted = 0;
-      Lisp_Object name, finalname;
+      ptrdiff_t len = dirent_namelen (dp);
+      Lisp_Object name = make_unibyte_string (dp->d_name, len);
+      Lisp_Object finalname = name;
       struct gcpro gcpro1, gcpro2;
-
-      errno = 0;
-      dp = readdir (d);
-      if (!dp)
-	{
-	  if (errno == EAGAIN || errno == EINTR)
-	    {
-	      QUIT;
-	      continue;
-	    }
-	  break;
-	}
-
-      len = dirent_namelen (dp);
-      name = finalname = make_unibyte_string (dp->d_name, len);
       GCPRO2 (finalname, name);
 
       /* Note: DECODE_FILE can GC; it should protect its argument,
@@ -264,9 +267,8 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
       immediate_quit = 1;
       QUIT;
 
-      if (NILP (match)
-	  || re_search (bufp, SSDATA (name), len, 0, len, 0) >= 0)
-	wanted = 1;
+      bool wanted = (NILP (match)
+		     || re_search (bufp, SSDATA (name), len, 0, len, 0) >= 0);
 
       immediate_quit = 0;
 
@@ -450,14 +452,11 @@ These are all file names in directory DIRECTORY which begin with FILE.  */)
 }
 
 static int file_name_completion_stat (int, struct dirent *, struct stat *);
-static Lisp_Object Qdefault_directory;
 
 static Lisp_Object
 file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 		      Lisp_Object predicate)
 {
-  DIR *d;
-  int fd;
   ptrdiff_t bestmatchsize = 0;
   int matchcount = 0;
   /* If ALL_FLAG is 1, BESTMATCH is the list of all matches, decoded.
@@ -490,37 +489,17 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
   /* Actually, this is not quite true any more: we do most of the completion
      work with decoded file names, but we still do some filtering based
      on the encoded file name.  */
-  encoded_file = STRING_MULTIBYTE (file) ? ENCODE_FILE (file) : file;
-
+  encoded_file = ENCODE_FILE (file);
   encoded_dir = ENCODE_FILE (Fdirectory_file_name (dirname));
-
-  d = open_directory (SSDATA (encoded_dir), &fd);
-  if (!d)
-    report_file_error ("Opening directory", dirname);
-
+  int fd;
+  DIR *d = open_directory (encoded_dir, &fd);
   record_unwind_protect_ptr (directory_files_internal_unwind, d);
 
-  /* Loop reading blocks */
-  /* (att3b compiler bug requires do a null comparison this way) */
-  while (1)
+  /* Loop reading directory entries.  */
+  for (struct dirent *dp; (dp = read_dirent (d, dirname)); )
     {
-      struct dirent *dp;
-      ptrdiff_t len;
+      ptrdiff_t len = dirent_namelen (dp);
       bool canexclude = 0;
-
-      errno = 0;
-      dp = readdir (d);
-      if (!dp)
-	{
-	  if (errno == EAGAIN || errno == EINTR)
-	    {
-	      QUIT;
-	      continue;
-	    }
-	  break;
-	}
-
-      len = dirent_namelen (dp);
 
       QUIT;
       if (len < SCHARS (encoded_file)
@@ -642,23 +621,14 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
       name = DECODE_FILE (name);
 
       {
-	Lisp_Object regexps;
+	Lisp_Object regexps, table = (completion_ignore_case
+				      ? Vascii_canon_table : Qnil);
 
 	/* Ignore this element if it fails to match all the regexps.  */
-	if (completion_ignore_case)
-	  {
-	    for (regexps = Vcompletion_regexp_list; CONSP (regexps);
-		 regexps = XCDR (regexps))
-	      if (fast_string_match_ignore_case (XCAR (regexps), name) < 0)
-		break;
-	  }
-	else
-	  {
-	    for (regexps = Vcompletion_regexp_list; CONSP (regexps);
-		 regexps = XCDR (regexps))
-	      if (fast_string_match (XCAR (regexps), name) < 0)
-		break;
-	  }
+	for (regexps = Vcompletion_regexp_list; CONSP (regexps);
+	     regexps = XCDR (regexps))
+	  if (fast_string_match_internal (XCAR (regexps), name, table) < 0)
+	    break;
 
 	if (CONSP (regexps))
 	  continue;
@@ -933,7 +903,6 @@ so last access time will always be midnight of that day.  */)
 static Lisp_Object
 file_attributes (int fd, char const *name, Lisp_Object id_format)
 {
-  Lisp_Object values[12];
   struct stat s;
   int lstat_result;
 
@@ -960,10 +929,6 @@ file_attributes (int fd, char const *name, Lisp_Object id_format)
   if (lstat_result < 0)
     return Qnil;
 
-  values[0] = (S_ISLNK (s.st_mode) ? emacs_readlinkat (fd, name)
-	       : S_ISDIR (s.st_mode) ? Qt : Qnil);
-  values[1] = make_number (s.st_nlink);
-
   if (!(NILP (id_format) || EQ (id_format, Qinteger)))
     {
       block_input ();
@@ -971,34 +936,35 @@ file_attributes (int fd, char const *name, Lisp_Object id_format)
       gname = stat_gname (&s);
       unblock_input ();
     }
-  if (uname)
-    values[2] = DECODE_SYSTEM (build_unibyte_string (uname));
-  else
-    values[2] = make_fixnum_or_float (s.st_uid);
-  if (gname)
-    values[3] = DECODE_SYSTEM (build_unibyte_string (gname));
-  else
-    values[3] = make_fixnum_or_float (s.st_gid);
-
-  values[4] = make_lisp_time (get_stat_atime (&s));
-  values[5] = make_lisp_time (get_stat_mtime (&s));
-  values[6] = make_lisp_time (get_stat_ctime (&s));
-
-  /* If the file size is a 4-byte type, assume that files of sizes in
-     the 2-4 GiB range wrap around to negative values, as this is a
-     common bug on older 32-bit platforms.  */
-  if (sizeof (s.st_size) == 4)
-    values[7] = make_fixnum_or_float (s.st_size & 0xffffffffu);
-  else
-    values[7] = make_fixnum_or_float (s.st_size);
 
   filemodestring (&s, modes);
-  values[8] = make_string (modes, 10);
-  values[9] = Qt;
-  values[10] = INTEGER_TO_CONS (s.st_ino);
-  values[11] = INTEGER_TO_CONS (s.st_dev);
 
-  return Flist (ARRAYELTS (values), values);
+  return CALLN (Flist,
+		(S_ISLNK (s.st_mode) ? emacs_readlinkat (fd, name)
+		 : S_ISDIR (s.st_mode) ? Qt : Qnil),
+		make_number (s.st_nlink),
+		(uname
+		 ? DECODE_SYSTEM (build_unibyte_string (uname))
+		 : make_fixnum_or_float (s.st_uid)),
+		(gname
+		 ? DECODE_SYSTEM (build_unibyte_string (gname))
+		 : make_fixnum_or_float (s.st_gid)),
+		make_lisp_time (get_stat_atime (&s)),
+		make_lisp_time (get_stat_mtime (&s)),
+		make_lisp_time (get_stat_ctime (&s)),
+
+		/* If the file size is a 4-byte type, assume that
+		   files of sizes in the 2-4 GiB range wrap around to
+		   negative values, as this is a common bug on older
+		   32-bit platforms.  */
+		make_fixnum_or_float (sizeof (s.st_size) == 4
+				      ? s.st_size & 0xffffffffu
+				      : s.st_size),
+
+		make_string (modes, 10),
+		Qt,
+		INTEGER_TO_CONS (s.st_ino),
+		INTEGER_TO_CONS (s.st_dev));
 }
 
 DEFUN ("file-attributes-lessp", Ffile_attributes_lessp, Sfile_attributes_lessp, 2, 2, 0,

@@ -1,6 +1,6 @@
 ;;; url-cookie.el --- URL cookie support
 
-;; Copyright (C) 1996-1999, 2004-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1999, 2004-2015 Free Software Foundation, Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
 
@@ -104,9 +104,10 @@ telling Microsoft that."
       (insert ";; Emacs-W3 HTTP cookies file\n"
 	      ";; Automatically generated file!!! DO NOT EDIT!!!\n\n"
 	      "(setq url-cookie-storage\n '")
-      (pp url-cookie-storage (current-buffer))
-      (insert ")\n(setq url-cookie-secure-storage\n '")
-      (pp url-cookie-secure-storage (current-buffer))
+      (let ((print-length nil) (print-level nil))
+	(pp url-cookie-storage (current-buffer))
+	(insert ")\n(setq url-cookie-secure-storage\n '")
+	(pp url-cookie-secure-storage (current-buffer)))
       (insert ")\n")
       (insert "\n;; Local Variables:\n"
               ";; version-control: never\n"

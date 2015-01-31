@@ -1,6 +1,6 @@
 ;;; cfengine.el --- mode for editing Cfengine files
 
-;; Copyright (C) 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: Dave Love <fx@gnu.org>
 ;; Maintainer: Ted Zlatanov <tzz@lifelogs.com>
@@ -1350,7 +1350,8 @@ to the action header."
                  (when buffer-file-name
                    (shell-quote-argument buffer-file-name)))))
 
-  (setq-local eldoc-documentation-function #'cfengine3-documentation-function)
+  (add-function :before-until (local 'eldoc-documentation-function)
+                #'cfengine3-documentation-function)
 
   (add-hook 'completion-at-point-functions
             #'cfengine3-completion-function nil t)

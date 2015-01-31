@@ -1,6 +1,7 @@
 ;;; startup.el --- process Emacs shell arguments  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992, 1994-2015 Free Software Foundation,
+;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -357,6 +358,8 @@ this variable usefully is to set it while building and dumping Emacs."
   :initialize 'custom-initialize-default
   :set (lambda (_variable _value)
 	  (error "Customizing `site-run-file' does not work")))
+
+(make-obsolete-variable 'system-name "use (system-name) instead" "25.1")
 
 (defcustom mail-host-address nil
   "Name of this machine, for purposes of naming users.
@@ -1463,9 +1466,7 @@ Each element in the list should be a list of strings or pairs
 	      (goto-char (point-min))))
      "\tMany people have contributed code included in GNU Emacs\n"
      :link ("Contributing"
-	    ,(lambda (_button)
-	      (view-file (expand-file-name "CONTRIBUTE" data-directory))
-	      (goto-char (point-min))))
+	    ,(lambda (_button) (info "(emacs)Contributing")))
      "\tHow to contribute improvements to Emacs\n"
      "\n"
      :link ("GNU and Freedom" ,(lambda (_button) (describe-gnu-project)))
@@ -2039,9 +2040,7 @@ Type \\[describe-distribution] for information on "))
 
   (insert-button "Contributing"
 		 'action
-		 (lambda (_button)
-		   (view-file (expand-file-name "CONTRIBUTE" data-directory))
-		   (goto-char (point-min)))
+		 (lambda (_button) (info "(emacs)Contributing"))
 		 'follow-link t)
   (insert "\tHow to contribute improvements to Emacs\n\n")
 

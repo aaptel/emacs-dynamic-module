@@ -1,3 +1,146 @@
+2015-01-29  Francesc Rocher  <francesc.rocher@gmail.com>
+
+	* images/splash.svg, images/splash.png:
+	* images/splash.pbm, images/splash.xpm, images/README:
+	Splash images refurbished.
+
+2015-01-28  Eli Zaretskii  <eliz@gnu.org>
+
+	* tutorials/TUTORIAL.he: Use u+05f4 HEBREW PUNCTUATION GERSHAYIM
+	instead of u+0022 QUOTATION MARK in Hebrew acronyms.
+
+2015-01-27  Ivan Shmakov  <ivan@siamics.net>
+
+	* NEWS: Mention the new tar-new-entry command.  (Bug#19274)
+
+2015-01-27  Thomas Fitzsimmons  <fitzsim@fitzsim.org>
+
+	* NEWS: Document EUDC improvements.
+
+2015-01-26  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* publicsuffix.txt: Install an updated version of the file from
+	https://publicsuffix.org/list/effective_tld_names.dat.
+
+2015-01-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Use gnustep-config if available
+	* NEWS: Document this.
+
+2015-01-22  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Don't downcase system diagnostics' first letters
+	* NEWS: Document this.
+
+2015-01-16  Artur Malabarba  <bruce.connor.am@gmail.com>
+
+	* NEWS: Document installing packages from directories.
+
+2015-01-15  Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Mention 'set-binary-mode'.
+
+2015-01-11  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Default to 'configure --enable-silent-rules'
+	* NEWS: Document this.
+
+2015-01-10  Daniel Colascione  <dancol@dancol.org>
+
+	* NEWS: Fix typo
+
+2015-01-04  Paul Eggert  <eggert@cs.ucla.edu>
+
+	batch write-region no longer says "Wrote FOO"
+	* NEWS: Document this.
+
+2014-12-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* PROBLEMS: Omit obsolete mention of FQDNs.
+
+2014-12-27  Álvar Ibeas  <ibeas@gmx.com>  (tiny change)
+
+	* tutorials/TUTORIAL.es: Improve style consistency.  Spelling fixes.
+
+2014-12-25  Karl Fogel  <kfogel@red-bean.com>
+
+	* NEWS: Mention new buffer display behavior for `shell'.
+	This follows up to Sam Steingold's change of 2014-12-23
+	in ../lisp/shell.el, in git commit e55a467ec0f758c311d3.
+
+2014-12-15  Artur Malabarba <bruce.connor.am@gmail.com>
+
+	* NEWS: Mention `let-alist.
+
+2014-12-14  Alan Mackenzie  <acm@muc.de>
+
+	* NEWS: Add entry for fast-but-imprecise-scrolling.
+
+2014-12-14  Cameron Desautels  <camdez@gmail.com>
+
+	* NEWS: Mention `custom-prompt-customize-unsaved-options'.
+
+	* TODO: Remove its entry.
+
+2014-12-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Convert Czech and Slovakian refcards to UTF-8
+	* refcards/cs-dired-ref.tex, refcards/cs-refcard.tex:
+	* refcards/cs-survival.tex, refcards/sk-dired-ref.tex:
+	* refcards/sk-refcard.tex, refcards/sk-survival.tex:
+	Convert from iso-latin-2 to utf-8.  Remove no-longer-necessary
+	coding comments and "\input utf8off" directives.
+
+2014-12-13  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Mention directory-name-p.
+
+2014-12-09  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Mention directory-files-recursively.
+
+2014-12-08  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Mention the new eww `S' command.
+
+2014-12-05  Stephen Leake  <stephen_leake@stephe-leake.org>
+
+	* CONTRIBUTE: Move to ../.
+
+2014-12-05  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Add some doc markers to the eww stuff.
+
+2014-12-04  Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Mention 'buffer-substring-with-bidi-context'.
+
+2014-12-02  Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Mention 'bidi-find-overridden-directionality'.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Lessen focus on ChangeLog files, as opposed to change log entries.
+	* CONTRIBUTE: Give advice about git commit messages and how
+	to generate proposed patches containing them.
+
+2014-11-27  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Mention dom.el.
+
+2014-11-24  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Mention NSM.
+
+2014-11-23  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* NEWS: Mention `url-request-noninteractive'.
+
+2014-11-19  Leo Liu  <sdl.web@gmail.com>
+
+	* NEWS: Mention new macro define-advice.
+
 2014-11-17  Paul Eggert  <eggert@cs.ucla.edu>
 
 	Improve time stamp handling, and be more consistent about it.
@@ -85,7 +228,7 @@
 
 	* NEWS: Mention ns-use-fullscreen-animation.
 
-2014-09-30  Bill Wohler	 <wohler@newt.com>
+2014-09-30  Bill Wohler  <wohler@newt.com>
 
 	Release MH-E version 8.6
 
@@ -6707,7 +6850,7 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 1993-1999, 2001-2014 Free Software Foundation, Inc.
+  Copyright (C) 1993-1999, 2001-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

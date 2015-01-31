@@ -1,6 +1,6 @@
 /* conf_post.h --- configure.ac includes this via AH_BOTTOM
 
-Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2014 Free Software
+Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2015 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -245,7 +245,9 @@ extern void _DebPrint (const char *fmt, ...);
 # define ATTRIBUTE_MALLOC
 #endif
 
-#if 4 < __GNUC__ + (3 <= __GNUC_MINOR__)
+#if (__clang__					\
+     ? __has_attribute (alloc_size)		\
+     : 4 < __GNUC__ + (3 <= __GNUC_MINOR__))
 # define ATTRIBUTE_ALLOC_SIZE(args) __attribute__ ((__alloc_size__ args))
 #else
 # define ATTRIBUTE_ALLOC_SIZE(args)
@@ -309,8 +311,8 @@ extern void _DebPrint (const char *fmt, ...);
    Other .c files should not define INLINE.
 
    C99 compilers compile functions like 'incr' as C99-style extern
-   inline functions.  Pre-C99 GCCs do something similar with
-   GNU-specific keywords.  Pre-C99 non-GCC compilers use static
+   inline functions.  Buggy GCC implementations do something similar with
+   GNU-specific keywords.  Buggy non-GCC compilers use static
    functions, which bloats the code but is good enough.  */
 
 #ifndef INLINE

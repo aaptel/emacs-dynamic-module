@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 1999-2014 Free Software
+@c Copyright (C) 1985-1987, 1993-1995, 1997, 1999-2015 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Programs
@@ -546,7 +546,7 @@ your selected @dfn{style} with the syntactic construct and adds this
 onto the indentation of the @dfn{anchor statement}.
 
 @table @kbd
-@item C-c . @key{RET} @var{style} @key{RET}
+@item C-c . @var{style} @key{RET}
 Select a predefined style @var{style} (@code{c-set-style}).
 @end table
 

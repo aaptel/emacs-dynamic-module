@@ -1,6 +1,6 @@
 ;;; backquote.el --- implement the ` Lisp construct
 
-;; Copyright (C) 1990, 1992, 1994, 2001-2014 Free Software Foundation,
+;; Copyright (C) 1990, 1992, 1994, 2001-2015 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Rick Sladkey <jrs@world.std.com>
@@ -120,9 +120,7 @@ Vectors work just like lists.  Nested backquotes are permitted."
 This simply recurses through the body."
   (let ((exp (backquote-listify (list (cons 0 (list 'quote (car s))))
                                 (backquote-process (cdr s) level))))
-    (if (eq (car-safe exp) 'quote)
-        (cons 0 (list 'quote s))
-      (cons 1 exp))))
+    (cons (if (eq (car-safe exp) 'quote) 0 1) exp)))
 
 (defun backquote-process (s &optional level)
   "Process the body of a backquote.

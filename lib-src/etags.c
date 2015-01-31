@@ -28,7 +28,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2014 Free Software
+Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2015 Free Software
 Foundation, Inc.
 
 This file is not considered part of GNU Emacs.
@@ -314,7 +314,7 @@ static long readline_internal (linebuffer *, FILE *);
 static bool nocase_tail (const char *);
 static void get_tag (char *, char **);
 
-static void analyse_regex (char *);
+static void analyze_regex (char *);
 static void free_regexps (void);
 static void regex_tag_multiline (void);
 static void error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
@@ -1207,7 +1207,7 @@ main (int argc, char **argv)
 	  lang = argbuffer[i].lang;
 	  break;
 	case at_regexp:
-	  analyse_regex (argbuffer[i].what);
+	  analyze_regex (argbuffer[i].what);
 	  break;
 	case at_filename:
 	      this_file = argbuffer[i].what;
@@ -1277,13 +1277,13 @@ main (int argc, char **argv)
 	    default:
 	      continue;		/* the for loop */
 	    }
-	  strcpy (cmd, "mv ");
-	  strcat (cmd, tagfile);
-	  strcat (cmd, " OTAGS;fgrep -v '\t");
-	  strcat (cmd, argbuffer[i].what);
-	  strcat (cmd, "\t' OTAGS >");
-	  strcat (cmd, tagfile);
-	  strcat (cmd, ";rm OTAGS");
+	  char *z = stpcpy (cmd, "mv ");
+	  z = stpcpy (z, tagfile);
+	  z = stpcpy (z, " OTAGS;fgrep -v '\t");
+	  z = stpcpy (z, argbuffer[i].what);
+	  z = stpcpy (z, "\t' OTAGS >");
+	  z = stpcpy (z, tagfile);
+	  strcpy (z, ";rm OTAGS");
 	  if (system (cmd) != EXIT_SUCCESS)
 	    fatal ("failed to execute shell command", (char *)NULL);
 	}
@@ -1307,10 +1307,10 @@ main (int argc, char **argv)
 	/* Maybe these should be used:
 	   setenv ("LC_COLLATE", "C", 1);
 	   setenv ("LC_ALL", "C", 1); */
-	strcpy (cmd, "sort -u -o ");
-	strcat (cmd, tagfile);
-	strcat (cmd, " ");
-	strcat (cmd, tagfile);
+	char *z = stpcpy (cmd, "sort -u -o ");
+	z = stpcpy (z, tagfile);
+	*z++ = ' ';
+	strcpy (z, tagfile);
 	exit (system (cmd));
       }
   return EXIT_SUCCESS;
@@ -3427,8 +3427,9 @@ C_entries (int c_ext, FILE *inf)
 	    case omethodtag:
 	    case omethodparm:
 	      objdef = omethodcolon;
-	      linebuffer_setlen (&token_name, token_name.len + 1);
-	      strcat (token_name.buffer, ":");
+	      int toklen = token_name.len;
+	      linebuffer_setlen (&token_name, toklen + 1);
+	      strcpy (token_name.buffer + toklen, ":");
 	      break;
 	    }
 	  if (structdef == stagseen)
@@ -5573,7 +5574,7 @@ scan_separators (char *name)
 /* Look at the argument of --regex or --no-regex and do the right
    thing.  Same for each line of a regexp file. */
 static void
-analyse_regex (char *regex_arg)
+analyze_regex (char *regex_arg)
 {
   if (regex_arg == NULL)
     {
@@ -5604,7 +5605,7 @@ analyse_regex (char *regex_arg)
 	  pfatal (regexfile);
 	linebuffer_init (&regexbuf);
 	while (readline_internal (&regexbuf, regexfp) > 0)
-	  analyse_regex (regexbuf.buffer);
+	  analyze_regex (regexbuf.buffer);
 	free (regexbuf.buffer);
 	fclose (regexfp);
       }
@@ -6362,12 +6363,12 @@ relative_filename (char *file, char *dir)
   while ((dp = strchr (dp + 1, '/')) != NULL)
     i += 1;
   res = xnew (3*i + strlen (fp + 1) + 1, char);
-  res[0] = '\0';
+  char *z = res;
   while (i-- > 0)
-    strcat (res, "../");
+    z = stpcpy (z, "../");
 
   /* Add the file name relative to the common root of file and dir. */
-  strcat (res, fp + 1);
+  strcpy (z, fp + 1);
   free (afn);
 
   return res;

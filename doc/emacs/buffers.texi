@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2014 Free Software
+@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2015 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Buffers
@@ -269,11 +269,16 @@ can also be used to copy text from one buffer to another.
 @section Killing Buffers
 
 @cindex killing buffers
+@cindex close buffer
+@cindex close file
   If you continue an Emacs session for a while, you may accumulate a
 large number of buffers.  You may then find it convenient to @dfn{kill}
-the buffers you no longer need.  On most operating systems, killing a
-buffer releases its space back to the operating system so that other
-programs can use it.  Here are some commands for killing buffers:
+the buffers you no longer need.  (Some other editors call this
+operation @dfn{close}, and talk about ``closing the buffer'' or
+``closing the file'' visited in the buffer.)  On most operating
+systems, killing a buffer releases its space back to the operating
+system so that other programs can use it.  Here are some commands for
+killing buffers:
 
 @table @kbd
 @item C-x k @var{bufname} @key{RET}

@@ -1,8 +1,125 @@
-2014-11-16  Glenn Morris  <rgm@gnu.org>
+2015-01-28  Glenn Morris  <rgm@gnu.org>
 
-	* update_autogen: Auto-detect VCS in use.
-	(vcs): New variable.
-	(status, commit, main): Handle git.
+	* update_autogen (commit): Prepend "# " to commit message.
+
+2015-01-24  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Fix a couple of AM_V_GEN bugs
+	* unidata/Makefile.in (unifiles): Use AM_V_at instead of AM_V_GEN,
+	since this doesn't generate a file.
+
+2015-01-15  Eli Zaretskii  <eliz@gnu.org>
+
+	* unidata/uvs.el (uvs-print-table-ivd): Call set-binary-mode on
+	stdout.
+
+2015-01-12  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Say "ELC foo.elc" instead of "GEN foo.elc"
+	* unidata/Makefile.in (AM_V_ELC, am__v_ELC_, am__v_ELC_0)
+	(am__v_ELC_1): New macros.
+	(%.elc): Use them.
+
+2015-01-08  Glenn Morris  <rgm@gnu.org>
+
+	* authors.el (authors-aliases): Add an entry to ignore.
+
+2015-01-04  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Less 'make' chatter for admin/grammars
+	* grammars/Makefile.in (AM_DEFAULT_VERBOSITY, AM_V_GEN)
+	(am__v_GEN_, am__v_GEN_0, am__v_GEN_1, AM_V_at, am__v_at_)
+	(am__v_at_0, am__v_at_1): New macros, from src/Makefile.in.
+	(${bovinedir}/%-by.el, ${bovinedir}/scm-by.el)
+	(${cedetdir}/semantic/%-wy.el, ${wisentdir}/%-wy.el)
+	(${wisentdir}/javat-wy.el, ${cedetdir}/srecode/srt-wy.el): Use them.
+
+	Less chatter in batch mode
+	* unidata/unidata-gen.el (unidata-gen-files):
+	Don't output messages like "Generating ..." in batch mode.
+
+2015-01-02  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Less 'make' chatter for unidata
+	* unidata/Makefile.in (AM_DEFAULT_VERBOSITY, AM_V_GEN, am__v_GEN_)
+	(am__v_GEN_0, am__v_GEN_1, AM_V_at, am__v_at_, am__v_at_0, am__v_at_1):
+	New macros, from ../src/Makefile.in.
+	(${top_srcdir}/src/macuvs.h, %.elc, unidata.txt)
+	(${unidir}/charprop.el, unifiles): Use them.
+	(PHONY_EXTRAS): New macro.
+	(.PHONY, ${unidir}/charprop.el): Use it.
+	(FORCE): Remove; all uses replaced by PHONY_EXTRAS manipulation.
+	(${unidir}/charprop.el, extraclean):
+	Use 'make' conditionals rather than shell.
+
+2015-01-01  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* update-copyright (emacsver): Change to emacsver.tex.in.
+
+2014-12-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* merge-gnulib (GNULIB_MODULES): Add stpcpy.
+
+2014-12-24  Glenn Morris  <rgm@gnu.org>
+
+	* authors.el (authors-obsolete-files-regexps)
+	(authors-ignored-files, authors-valid-file-names)
+	(authors-renamed-files-alist, authors-renamed-files-regexps):
+	Additions.
+
+2014-12-14  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* notes/unicode: Track leim/quail file renames.
+	Correct coding system of lisp/international/titdic-cnv.el.
+
+2014-12-14  Glenn Morris  <rgm@gnu.org>
+
+	* quick-install-emacs (PUBLIC_LIBSRC_SCRIPTS): Remove, and all uses.
+	* authors.el (authors-valid-file-names): Add grep-changelog.
+
+2014-12-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* notes/unicode: Don't mention Czech and Slovakian refcards.
+
+	* merge-gnulib (GNULIB_MODULES): Add stddef, for max_align_t.
+
+2014-12-06  Stephen Leake  <stephen_leake@stephe-leake.org>
+
+	* notes/commits: Delete; merge into ./CONTRIBUTE.
+
+	* notes/repo: Move commit, branch info into ./CONTRIBUTE.
+
+2014-12-01  Glenn Morris  <rgm@gnu.org>
+
+	* update_autogen: Fix bogosity introduced in 2014-11-16 merge.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Lessen focus on ChangeLog files, as opposed to change log entries.
+	This is in preparation for generating the former automatically
+	from the latter.
+	* notes/bugtracker, notes/copyright, notes/newfile:
+	ChangeLog -> change log
+	* notes/changelogs: Remove, merging old contents to ...
+	* notes/repo: ... here.
+
+2014-11-27  David Engster  <deng@randomsample.de>
+
+	* gitmerge.el: New file.
+	* notes/git-workflow: Add documentation for using it.
+
+2014-11-27  Oscar Fuentes  <ofv@wanadoo.es>
+
+	* CPP-DEFINES: Mention MINGW_W64.
+
+2014-11-22  Glenn Morris  <rgm@gnu.org>
+
+	* admin.el (set-version): No more need to update nt/*.rc.
+	* authors.el (authors-renamed-files-alist): Add .rc.in files.
+
+2014-11-16  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* update_autogen: Merge from emacs-24 (restoring bzr conditionals).
 
 2014-11-13  Andreas Schwab  <schwab@suse.de>
 
@@ -10,9 +127,10 @@
 
 2014-11-11  Eric S. Raymond  <esr@thyrsus.com>
 
-	* make-tarball.txt, update-copyright, admin/notes/bugtracker,
-	admin/notes/tags, admin/update-copyright, admin/update_autogen:
-	admin/repo.notes: git transition.
+	* make-tarball.txt, notes/bugtracker, notes/repo, notes/tags:
+	Git transition.
+	* update-copyright: Use git ls-files.
+	* update_autogen: Remove some bzr conditionals.
 
 2014-11-10  Eli Zaretskii  <eliz@gnu.org>
 
@@ -2446,7 +2564,7 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 2001-2014 Free Software Foundation, Inc.
+  Copyright (C) 2001-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

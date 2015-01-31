@@ -1,3 +1,40 @@
+2015-01-16  Eli Zaretskii  <eliz@gnu.org>
+
+	* Makefile.in (AM_V_CC, am__v_CC_, am__v_CC_0, am__v_CC_1)
+	(AM_V_CCLD, am__v_CCLD_, am__v_CCLD_0, am__v_CCLD_1, AM_V_RC)
+	(am__v_RC_, am__v_RC_0, am__v_RC_1): New macros.
+	(addpm${EXEEXT}, ddeclient${EXEEXT}, cmdproxy${EXEEXT})
+	(runemacs${EXEEXT}): Use $(AM_V_CCLD).
+	(emacs.res, ../src/emacs.res): Use $(AM_V_RC).
+
+2014-12-26  Eli Zaretskii  <eliz@gnu.org>
+
+	* gnulib.mk (stpcpy, string): Sync with the latest change in
+	lib/gnulib.mk.
+
+2014-12-13  Eli Zaretskii  <eliz@gnu.org>
+
+	* gnulib.mk (stddef.h): Sync with the latest change in lib/gnulib.mk.
+
+2014-11-27  Oscar Fuentes  <ofv@wanadoo.es>
+
+	* inc/ms-w32.h: Define MINGW_W64.
+	* nt/addpm.c, nt/addsection.c, nt/preprep.c: Use it.
+
+2014-11-24  Glenn Morris  <rgm@gnu.org>
+
+	* Makefile.in (../src/emacs.res): New target.
+
+2014-11-22  Glenn Morris  <rgm@gnu.org>
+
+	* emacs.rc.in, emacsclient.rc.in: Rename from emacs.rc, emacsclient.rc.
+	Let configure generate the real files, and set the version numbers.
+	* Makefile.in (distclean): Delete *.rc.
+	(emacs.res): Update deps for nt/emacsclient.rc now being in the
+	build directory, not the source directory.
+
+	* Makefile.in (emacs.res): Add dependency on icons/hand.cur.
+
 2014-11-18  Glenn Morris  <rgm@gnu.org>
 
 	* Makefile.in (addpm${EXEEXT}, ddeclient${EXEEXT})
@@ -787,7 +824,7 @@
 2012-10-01  Eli Zaretskii  <eliz@gnu.org>
 
 	* preprep.c (RVA_TO_PTR): Use 'unsigned char *' instead of
-	'void *', for pointer arithmetics.
+	'void *', for pointer arithmetic.
 	(OFFSET_TO_RVA, RVA_TO_OFFSET, RVA_TO_SECTION_OFFSET): Enclose all
 	macro arguments in parentheses.
 
@@ -1838,7 +1875,7 @@
 	* config.nt (HAVE_FACES): Remove, unused.
 
 2008-06-26  Juanma Barranquero  <lekktu@gmail.com>
-            Eli Zaretskii  <eliz@gnu.org>
+	    Eli Zaretskii  <eliz@gnu.org>
 
 	* nmake.defs (FONT_CFLAGS):
 	* gmake.defs (FONT_CFLAGS): Remove.
@@ -1854,7 +1891,7 @@
 	* config.nt: Remove reference to UNEXEC_SRC.
 
 2008-06-23  Juanma Barranquero  <lekktu@gmail.com>
-            Eli Zaretskii  <eliz@gnu.org>
+	    Eli Zaretskii  <eliz@gnu.org>
 
 	* gmake.defs (DEBUG_FLAG, DEBUG_LINK) [!NODEBUG]:
 	Don't hardcode -gstabs+, use DEBUG_INFO.
@@ -3487,7 +3524,7 @@
 ;; add-log-time-zone-rule: t
 ;; End:
 
-  Copyright (C) 1995-1999, 2001-2014 Free Software Foundation, Inc.
+  Copyright (C) 1995-1999, 2001-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

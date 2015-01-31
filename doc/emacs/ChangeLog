@@ -1,3 +1,97 @@
+2015-01-28  Eli Zaretskii  <eliz@gnu.org>
+
+	* cmdargs.texi (Action Arguments): Clarify into which buffer
+	'--insert' inserts.  (Bug#19694)
+
+	* programs.texi (Custom C Indent): Fix a typo.  (Bug#19647)
+
+2015-01-27  Ivan Shmakov  <ivan@siamics.net>
+
+	* files.texi (File Archives): Document "I" for tar-new-entry.
+	(Bug#19274)
+
+2014-12-31  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Less 'make' chatter for Emacs doc
+	* Makefile.in (AM_DEFAULT_VERBOSITY, AM_V_GEN, am__v_GEN_)
+	(am__v_GEN_0, am__v_GEN_1): New macros, from ../../src/Makefile.in.
+	(ENVADD, $(buildinfodir)/emacs.info, emacs.html):
+	Use them.
+
+2014-12-27  Eli Zaretskii  <eliz@gnu.org>
+
+	* buffers.texi (Kill Buffer): Improve indexing.
+
+2014-12-24  Stephen Leake  <stephen_leake@stephe-leake.org>
+
+	* trouble.texi: Move user-level information from CONTRIBUTE here.
+
+2014-12-14  Alan Mackenzie  <acm@muc.de>
+
+	* display.texi (Scrolling): fast-but-imprecise-scrolling.
+	Describe new variable.
+
+2014-12-14  Cameron Desautels  <camdez@gmail.com>
+
+	* custom.texi (Saving Customizations): Mention
+	`custom-prompt-customize-unsaved-options'.
+
+2014-12-08  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* misc.texi (Network Security): Mention the new protocol-level
+	`high' NSM checks.
+
+2014-12-08  Eric S. Raymond  <esr@snark.thyrsus.com>
+
+	* maintaining.texi: Suopport fo Arch has been moved to obosolete,
+	remove references that imply otherwise.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Lessen focus on ChangeLog files, as opposed to change log entries.
+	* maintaining.texi (Change Log): Mention that ChangeLog files may
+	be copied to or from a version control system.
+	* trouble.texi (Sending Patches): Point to the commit messages.
+
+2014-11-29  Eli Zaretskii  <eliz@gnu.org>
+
+	* maintaining.texi (Switching Branches): Mention "C-x v r".
+	Correct commands for switching branches in various VCSs.
+
+2014-11-27  Tassilo Horn  <tsdh@gnu.org>
+
+	* misc.texi (DocView Slicing): Describe how to slice with the
+	mouse.  Fix command mentioned by slice by BoundingBox paragraph.
+	(Bug#18040)
+
+2014-11-25  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* misc.texi (Network Security): Use "untrustworthy" instead of
+	"unsafe".
+
+2014-11-24  Eli Zaretskii  <eliz@gnu.org>
+
+	* misc.texi (Network Security): Improve wording and indexing of
+	last change.
+
+2014-11-24  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* misc.texi (Gnus Summary Buffer): Move the Network Security
+	Manager stuff here from the lispref manual.
+
+2014-11-21  Eli Zaretskii  <eliz@gnu.org>
+
+	* maintaining.texi (Version Control Systems): Move "@end itemize"
+	past the last @item.
+
+2014-11-21  H. Dieter Wilhelm  <dieter@duenenhof-wilhelm.de>
+
+	* maintaining.texi (Version Control Systems): Fix a typo.
+
+2014-11-20  Eric S. Raymond  <esr@snark.thyrsus.com>
+
+	* maintaining.texi: Document SRC support.
+
 2014-11-10  Glenn Morris  <rgm@gnu.org>
 
 	* Makefile.in (top_srcdir, version): New, set by configure.
@@ -10785,7 +10879,7 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 1993-1999, 2001-2014 Free Software Foundation, Inc.
+  Copyright (C) 1993-1999, 2001-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

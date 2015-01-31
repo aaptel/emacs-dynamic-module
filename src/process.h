@@ -1,5 +1,5 @@
 /* Definitions for asynchronous process control in GNU Emacs.
-   Copyright (C) 1985, 1994, 2001-2014 Free Software Foundation, Inc.
+   Copyright (C) 1985, 1994, 2001-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -162,6 +162,9 @@ struct Lisp_Process
     gnutls_session_t gnutls_state;
     gnutls_certificate_client_credentials gnutls_x509_cred;
     gnutls_anon_client_credentials_t gnutls_anon_cred;
+    gnutls_x509_crt_t gnutls_certificate;
+    unsigned int gnutls_peer_verification;
+    unsigned int gnutls_extra_peer_verification;
     int gnutls_log_level;
     int gnutls_handshakes_tried;
     bool_bf gnutls_p : 1;
@@ -193,15 +196,6 @@ pset_gnutls_cred_type (struct Lisp_Process *p, Lisp_Object val)
 /* True means don't run process sentinels.  This is used
    when exiting.  */
 extern bool inhibit_sentinels;
-
-extern Lisp_Object Qeuid, Qegid, Qcomm, Qstate, Qppid, Qpgrp, Qsess, Qttname;
-extern Lisp_Object Qminflt, Qmajflt, Qcminflt, Qcmajflt, Qutime, Qstime;
-extern Lisp_Object Qcutime, Qpri, Qnice, Qthcount, Qstart, Qvsize, Qrss, Qargs;
-extern Lisp_Object Quser, Qgroup, Qetime, Qpcpu, Qpmem, Qtpgid, Qcstime;
-extern Lisp_Object Qtime, Qctime;
-extern Lisp_Object QCspeed;
-extern Lisp_Object QCbytesize, QCstopbits, QCparity, Qodd, Qeven;
-extern Lisp_Object QCflowcontrol, Qhw, Qsw, QCsummary;
 
 /* Exit statuses for GNU programs that exec other programs.  */
 enum
@@ -242,5 +236,7 @@ extern void catch_child_signal (void);
 extern Lisp_Object network_interface_list (void);
 extern Lisp_Object network_interface_info (Lisp_Object);
 #endif
+
+extern Lisp_Object remove_slash_colon (Lisp_Object);
 
 INLINE_HEADER_END

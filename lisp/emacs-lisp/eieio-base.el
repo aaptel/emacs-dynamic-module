@@ -1,6 +1,6 @@
 ;;; eieio-base.el --- Base classes for EIEIO.  -*- lexical-binding:t -*-
 
-;;; Copyright (C) 2000-2002, 2004-2005, 2007-2014 Free Software
+;;; Copyright (C) 2000-2002, 2004-2005, 2007-2015 Free Software
 ;;; Foundation, Inc.
 
 ;; Author: Eric M. Ludlam  <zappo@gnu.org>
@@ -40,7 +40,7 @@
 ;; error if a slot is unbound.
 (defclass eieio-instance-inheritor ()
   ((parent-instance :initarg :parent-instance
-		    :type eieio-instance-inheritor-child
+		    :type eieio-instance-inheritor
 		    :documentation
 		    "The parent of this instance.
 If a slot of this class is referenced, and is unbound, then the parent
@@ -52,7 +52,7 @@ a parent instance.  When a slot in the child is referenced, and has
 not been set, use values from the parent."
   :abstract t)
 
-(defmethod slot-unbound ((object eieio-instance-inheritor)
+(cl-defmethod slot-unbound ((object eieio-instance-inheritor)
                          _class slot-name _fn)
   "If a slot OBJECT in this CLASS is unbound, try to inherit, or throw a signal.
 SLOT-NAME is the offending slot.  FN is the function signaling the error."
@@ -61,31 +61,16 @@ SLOT-NAME is the offending slot.  FN is the function signaling the error."
       ;; method if the parent instance's slot is unbound.
       (eieio-oref (oref object parent-instance) slot-name)
     ;; Throw the regular signal.
-    (call-next-method)))
+    (cl-call-next-method)))
 
-(defmethod clone ((obj eieio-instance-inheritor) &rest params)
+(cl-defmethod clone ((obj eieio-instance-inheritor) &rest _params)
   "Clone OBJ, initializing `:parent' to OBJ.
 All slots are unbound, except those initialized with PARAMS."
-  (let ((nobj (make-vector (length obj) eieio-unbound))
-	(nm (eieio--object-name obj))
-	(passname (and params (stringp (car params))))
-	(num 1))
-    (aset nobj 0 'object)
-    (setf (eieio--object-class nobj) (eieio--object-class obj))
-    ;; The following was copied from the default clone.
-    (if (not passname)
-	(save-match-data
-	  (if (string-match "-\\([0-9]+\\)" nm)
-	      (setq num (1+ (string-to-number (match-string 1 nm)))
-		    nm (substring nm 0 (match-beginning 0))))
-	  (setf (eieio--object-name nobj) (concat nm "-" (int-to-string num))))
-      (setf (eieio--object-name nobj) (car params)))
-    ;; Now initialize from params.
-    (if params (shared-initialize nobj (if passname (cdr params) params)))
+  (let ((nobj (cl-call-next-method)))
     (oset nobj parent-instance obj)
     nobj))
 
-(defmethod eieio-instance-inheritor-slot-boundp ((object eieio-instance-inheritor)
+(cl-defmethod eieio-instance-inheritor-slot-boundp ((object eieio-instance-inheritor)
 						slot)
   "Return non-nil if the instance inheritor OBJECT's SLOT is bound.
 See `slot-boundp' for details on binding slots.
@@ -118,7 +103,7 @@ Inheritors from this class must overload `tracking-symbol' which is
 a variable symbol used to store a list of all instances."
   :abstract t)
 
-(defmethod initialize-instance :AFTER ((this eieio-instance-tracker)
+(cl-defmethod initialize-instance :after ((this eieio-instance-tracker)
 				       &rest _slots)
   "Make sure THIS is in our master list of this class.
 Optional argument SLOTS are the initialization arguments."
@@ -127,7 +112,7 @@ Optional argument SLOTS are the initialization arguments."
     (if (not (memq this (symbol-value sym)))
 	(set sym (append (symbol-value sym) (list this))))))
 
-(defmethod delete-instance ((this eieio-instance-tracker))
+(cl-defmethod delete-instance ((this eieio-instance-tracker))
   "Remove THIS from the master list of this class."
   (set (oref this tracking-symbol)
        (delq this (symbol-value (oref this tracking-symbol)))))
@@ -155,7 +140,7 @@ Multiple calls to `make-instance' will return this object."))
 A singleton is a class which will only ever have one instance."
   :abstract t)
 
-(defmethod constructor :STATIC ((class eieio-singleton) _name &rest _slots)
+(cl-defmethod eieio-constructor ((class (subclass eieio-singleton)) &rest _slots)
   "Constructor for singleton CLASS.
 NAME and SLOTS initialize the new object.
 This constructor guarantees that no matter how many you request,
@@ -164,7 +149,7 @@ only one object ever exists."
   ;; with class allocated slots or default values.
   (let ((old (oref-default class singleton)))
     (if (eq old eieio-unbound)
-	(oset-default class singleton (call-next-method))
+	(oset-default class singleton (cl-call-next-method))
       old)))
 
 
@@ -213,7 +198,7 @@ object.  For this reason, only slots which do not have an `:initarg'
 specified will not be saved."
   :abstract t)
 
-(defmethod eieio-persistent-save-interactive ((this eieio-persistent) prompt
+(cl-defmethod eieio-persistent-save-interactive ((this eieio-persistent) prompt
 					      &optional name)
   "Prepare to save THIS.  Use in an `interactive' statement.
 Query user for file name with PROMPT if THIS does not yet specify
@@ -234,7 +219,7 @@ for CLASS.  Optional ALLOW-SUBCLASS says that it is ok for
 being pedantic."
   (unless class
     (message "Unsafe call to `eieio-persistent-read'."))
-  (when class (eieio--check-type class-p class))
+  (when class (cl-check-type class class))
   (let ((ret nil)
 	(buffstr nil))
     (unwind-protect
@@ -270,7 +255,7 @@ malicious code.
 Note: This function recurses when a slot of :type of some object is
 identified, and needing more object creation."
   (let ((objclass (nth 0 inputlist))
-	(objname (nth 1 inputlist))
+	;; (objname (nth 1 inputlist))
 	(slots (nthcdr 2 inputlist))
 	(createslots nil))
 
@@ -285,7 +270,7 @@ identified, and needing more object creation."
 	;; In addition, strip out quotes, list functions, and update
 	;; object constructors as needed.
 	(setq value (eieio-persistent-validate/fix-slot-value
-		     objclass name value))
+		     (eieio--class-v objclass) name value))
 
 	(push name createslots)
 	(push value createslots)
@@ -293,7 +278,7 @@ identified, and needing more object creation."
 
       (setq slots (cdr (cdr slots))))
 
-    (apply 'make-instance objclass objname (nreverse createslots))
+    (apply #'make-instance objclass (nreverse createslots))
 
     ;;(eval inputlist)
     ))
@@ -305,11 +290,13 @@ constructor functions are considered valid.
 Second, any text properties will be stripped from strings."
   (cond ((consp proposed-value)
 	 ;; Lists with something in them need special treatment.
-	 (let ((slot-idx (eieio-slot-name-index class nil slot))
+	 (let ((slot-idx (eieio--slot-name-index class
+                                                 nil slot))
 	       (type nil)
 	       (classtype nil))
-	   (setq slot-idx (- slot-idx 3))
-	   (setq type (aref (eieio--class-public-type (class-v class))
+	   (setq slot-idx (- slot-idx
+                             (eval-when-compile eieio--object-num-slots)))
+	   (setq type (aref (eieio--class-public-type class)
 			    slot-idx))
 
 	   (setq classtype (eieio-persistent-slot-type-is-class-p
@@ -346,8 +333,8 @@ Second, any text properties will be stripped from strings."
 		  (unless (and
 			   ;; Do we have a type?
 			   (consp classtype) (class-p (car classtype)))
-		    (error "In save file, list of object constructors found, but no :type specified for slot %S"
-			   slot))
+		    (error "In save file, list of object constructors found, but no :type specified for slot %S of type %S"
+			   slot classtype))
 
 		  ;; We have a predicate, but it doesn't satisfy the predicate?
 		  (dolist (PV (cdr proposed-value))
@@ -375,23 +362,41 @@ Second, any text properties will be stripped from strings."
   )
 
 (defun eieio-persistent-slot-type-is-class-p (type)
-  "Return the class refered to in TYPE.
+  "Return the class referred to in TYPE.
 If no class is referenced there, then return nil."
   (cond ((class-p type)
 	 ;; If the type is a class, then return it.
 	 type)
+	((and (eq 'list-of (car-safe type)) (class-p (cadr type)))
+	 ;; If it is the type of a list of a class, then return that class and
+	 ;; the type.
+	 (cons (cadr type) type))
 
-	((and (symbolp type) (string-match "-child$" (symbol-name type))
+        ((and (symbolp type) (get type 'cl-deftype-handler))
+         ;; Macro-expand the type according to cl-deftype definitions.
+         (eieio-persistent-slot-type-is-class-p
+          (funcall (get type 'cl-deftype-handler))))
+
+        ;; FIXME: foo-child should not be a valid type!
+	((and (symbolp type) (string-match "-child\\'" (symbol-name type))
 	      (class-p (intern-soft (substring (symbol-name type) 0
+					       (match-beginning 0)))))
+         (unless eieio-backward-compatibility
+           (error "Use of bogus %S type instead of %S"
+                  type (intern-soft (substring (symbol-name type) 0
 					       (match-beginning 0)))))
 	 ;; If it is the predicate ending with -child, then return
 	 ;; that class.  Unfortunately, in EIEIO, typep of just the
 	 ;; class is the same as if we used -child, so no further work needed.
 	 (intern-soft (substring (symbol-name type) 0
 				 (match-beginning 0))))
-
-	((and (symbolp type) (string-match "-list$" (symbol-name type))
+        ;; FIXME: foo-list should not be a valid type!
+	((and (symbolp type) (string-match "-list\\'" (symbol-name type))
 	      (class-p (intern-soft (substring (symbol-name type) 0
+					       (match-beginning 0)))))
+         (unless eieio-backward-compatibility
+           (error "Use of bogus %S type instead of (list-of %S)"
+                  type (intern-soft (substring (symbol-name type) 0
 					       (match-beginning 0)))))
 	 ;; If it is the predicate ending with -list, then return
 	 ;; that class and the predicate to use.
@@ -399,7 +404,7 @@ If no class is referenced there, then return nil."
 				       (match-beginning 0)))
 	       type))
 
-	((and (consp type) (eq (car type) 'or))
+	((eq (car-safe type) 'or)
 	 ;; If type is a list, and is an or, it is possibly something
 	 ;; like (or null myclass), so check for that.
 	 (let ((ans nil))
@@ -412,17 +417,17 @@ If no class is referenced there, then return nil."
 	 ;; No match, not a class.
 	 nil)))
 
-(defmethod object-write ((this eieio-persistent) &optional comment)
+(cl-defmethod object-write ((this eieio-persistent) &optional comment)
   "Write persistent object THIS out to the current stream.
 Optional argument COMMENT is a header line comment."
-  (call-next-method this (or comment (oref this file-header-line))))
+  (cl-call-next-method this (or comment (oref this file-header-line))))
 
-(defmethod eieio-persistent-path-relative ((this eieio-persistent) file)
+(cl-defmethod eieio-persistent-path-relative ((this eieio-persistent) file)
   "For object THIS, make absolute file name FILE relative."
   (file-relative-name (expand-file-name file)
 		      (file-name-directory (oref this file))))
 
-(defmethod eieio-persistent-save ((this eieio-persistent) &optional file)
+(cl-defmethod eieio-persistent-save ((this eieio-persistent) &optional file)
   "Save persistent object THIS to disk.
 Optional argument FILE overrides the file name specified in the object
 instance."
@@ -463,34 +468,38 @@ instance."
 
 
 ;;; Named object
-;;
-;; Named objects use the objects `name' as a slot, and that slot
-;; is accessed with the `object-name' symbol.
 
 (defclass eieio-named ()
-  ()
-  "Object with a name.
-Name storage already occurs in an object.  This object provides get/set
-access to it."
+  ((object-name :initarg :object-name :initform nil))
+  "Object with a name."
   :abstract t)
 
-(defmethod slot-missing ((obj eieio-named)
-			 slot-name operation &optional new-value)
-  "Called when a non-existent slot is accessed.
-For variable `eieio-named', provide an imaginary `object-name' slot.
-Argument OBJ is the named object.
-Argument SLOT-NAME is the slot that was attempted to be accessed.
-OPERATION is the type of access, such as `oref' or `oset'.
-NEW-VALUE is the value that was being set into SLOT if OPERATION were
-a set type."
-  (if (memq slot-name '(object-name :object-name))
-      (cond ((eq operation 'oset)
-	     (if (not (stringp new-value))
-		 (signal 'invalid-slot-type
-			 (list obj slot-name 'string new-value)))
-	     (eieio-object-set-name-string obj new-value))
-	    (t (eieio-object-name-string obj)))
-    (call-next-method)))
+(cl-defmethod eieio-object-name-string ((obj eieio-named))
+  "Return a string which is OBJ's name."
+  (or (slot-value obj 'object-name)
+      (symbol-name (eieio-object-class obj))))
+
+(cl-defmethod eieio-object-set-name-string ((obj eieio-named) name)
+  "Set the string which is OBJ's NAME."
+  (cl-check-type name string)
+  (eieio-oset obj 'object-name name))
+
+(cl-defmethod clone ((obj eieio-named) &rest params)
+  "Clone OBJ, initializing `:parent' to OBJ.
+All slots are unbound, except those initialized with PARAMS."
+  (let* ((newname (and (stringp (car params)) (pop params)))
+         (nobj (apply #'cl-call-next-method obj params))
+         (nm (slot-value obj 'object-name)))
+    (eieio-oset obj 'object-name
+                (or newname
+                    (save-match-data
+                      (if (and nm (string-match "-\\([0-9]+\\)" nm))
+                          (let ((num (1+ (string-to-number
+                                          (match-string 1 nm)))))
+                            (concat (substring nm 0 (match-beginning 0))
+                                    "-" (int-to-string num)))
+                        (concat nm "-1")))))
+    nobj))
 
 (provide 'eieio-base)
 

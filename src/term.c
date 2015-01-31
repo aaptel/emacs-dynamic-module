@@ -1,5 +1,5 @@
 /* Terminal control module for terminals described by TERMCAP
-   Copyright (C) 1985-1987, 1993-1995, 1998, 2000-2014 Free Software
+   Copyright (C) 1985-1987, 1993-1995, 1998, 2000-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -129,9 +129,6 @@ enum no_color_bit
 /* The largest frame width in any call to calculate_costs.  */
 
 static int max_frame_cols;
-
-static Lisp_Object Qtty_mode_set_strings;
-static Lisp_Object Qtty_mode_reset_strings;
 
 
 
@@ -2256,10 +2253,9 @@ A suspended tty may be resumed by calling `resume-tty' on it.  */)
       /* First run `suspend-tty-functions' and then clean up the tty
 	 state because `suspend-tty-functions' might need to change
 	 the tty state.  */
-      Lisp_Object args[2];
-      args[0] = intern ("suspend-tty-functions");
-      XSETTERMINAL (args[1], t);
-      Frun_hook_with_args (2, args);
+      Lisp_Object term;
+      XSETTERMINAL (term, t);
+      CALLN (Frun_hook_with_args, intern ("suspend-tty-functions"), term);
 
       reset_sys_modes (t->display_info.tty);
       delete_keyboard_wait_descriptor (fileno (f));
@@ -2356,13 +2352,10 @@ frame's terminal). */)
       set_tty_hooks (t);
       init_sys_modes (t->display_info.tty);
 
-      {
-        /* Run `resume-tty-functions'.  */
-        Lisp_Object args[2];
-        args[0] = intern ("resume-tty-functions");
-        XSETTERMINAL (args[1], t);
-        Frun_hook_with_args (2, args);
-      }
+      /* Run `resume-tty-functions'.  */
+      Lisp_Object term;
+      XSETTERMINAL (term, t);
+      CALLN (Frun_hook_with_args, intern ("resume-tty-functions"), term);
     }
 
   set_tty_hooks (t);
@@ -2709,12 +2702,6 @@ static const char *menu_help_message, *prev_menu_help_message;
 /* Pane number and item number of the menu item which generated the
    last menu help message.  */
 static int menu_help_paneno, menu_help_itemno;
-
-static Lisp_Object Qtty_menu_navigation_map, Qtty_menu_exit;
-static Lisp_Object Qtty_menu_prev_item, Qtty_menu_next_item;
-static Lisp_Object Qtty_menu_next_menu, Qtty_menu_prev_menu;
-static Lisp_Object Qtty_menu_select, Qtty_menu_ignore;
-static Lisp_Object Qtty_menu_mouse_movement;
 
 typedef struct tty_menu_struct
 {

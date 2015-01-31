@@ -1,6 +1,6 @@
 ;;; simple.el --- basic editing commands for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1993-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1993-2015 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -440,12 +440,12 @@ A non-nil INTERACTIVE argument means to run the `post-self-insert-hook'."
           (self-insert-command (prefix-numeric-value arg)))
       (unwind-protect
           (progn
-            (add-hook 'post-self-insert-hook postproc)
+            (add-hook 'post-self-insert-hook postproc nil t)
             (self-insert-command (prefix-numeric-value arg)))
         ;; We first used let-binding to protect the hook, but that was naive
         ;; since add-hook affects the symbol-default value of the variable,
         ;; whereas the let-binding might only protect the buffer-local value.
-        (remove-hook 'post-self-insert-hook postproc)))
+        (remove-hook 'post-self-insert-hook postproc t)))
       (cl-assert (not (member postproc post-self-insert-hook)))
       (cl-assert (not (member postproc (default-value 'post-self-insert-hook))))))
   nil)
@@ -1407,8 +1407,8 @@ display the result of expression evaluation."
     (minibuffer-with-setup-hook
         (lambda ()
           ;; FIXME: call emacs-lisp-mode?
-          (setq-local eldoc-documentation-function
-                      #'elisp-eldoc-documentation-function)
+          (add-function :before-until (local 'eldoc-documentation-function)
+                        #'elisp-eldoc-documentation-function)
           (add-hook 'completion-at-point-functions
                     #'elisp-completion-at-point nil t)
           (run-hooks 'eval-expression-minibuffer-setup-hook))
@@ -1612,7 +1612,7 @@ If the value is non-nil and not a number, we wait 2 seconds."
 
 (defun execute-extended-command--shorter (name typed)
   (let ((candidates '())
-        (max (length (or typed name)))
+        (max (length typed))
         (len 1)
         binding)
     (while (and (not binding)
@@ -1667,7 +1667,6 @@ invoking, give a prefix argument to `execute-extended-command'."
     (let ((prefix-arg prefixarg))
       (command-execute function 'record))
     ;; If enabled, show which key runs this command.
-    ;; (when binding
     ;; But first wait, and skip the message if there is input.
     (let* ((waited
             ;; If this command displayed something in the echo area;
@@ -1675,10 +1674,11 @@ invoking, give a prefix argument to `execute-extended-command'."
             ;; FIXME: Wait *after* running post-command-hook!
             ;; FIXME: Don't wait if execute-extended-command--shorter won't
             ;; find a better answer anyway!
-            (sit-for (cond
-                      ((zerop (length (current-message))) 0)
-                      ((numberp suggest-key-bindings) suggest-key-bindings)
-                      (t 2)))))
+            (when suggest-key-bindings
+              (sit-for (cond
+                        ((zerop (length (current-message))) 0)
+                        ((numberp suggest-key-bindings) suggest-key-bindings)
+                        (t 2))))))
       (when (and waited (not (consp unread-command-events)))
         (unless (or binding executing-kbd-macro (not (symbolp function))
                     (<= (length (symbol-name function)) 2))
@@ -1983,6 +1983,38 @@ With argument N, it uses the Nth previous element."
   (interactive "p")
   (or (zerop n)
       (goto-history-element (+ minibuffer-history-position n))))
+
+(defun next-line-or-history-element (&optional arg)
+  "Move cursor vertically down ARG lines, or to the next history element.
+When point moves over the bottom line of multi-line minibuffer, puts ARGth
+next element of the minibuffer history in the minibuffer."
+  (interactive "^p")
+  (or arg (setq arg 1))
+  (let ((old-point (point)))
+    (condition-case nil
+	(with-no-warnings
+	  (next-line arg))
+      (end-of-buffer
+       ;; Restore old position since `line-move-visual' moves point to
+       ;; the end of the line when it fails to go to the next line.
+       (goto-char old-point)
+       (next-history-element arg)))))
+
+(defun previous-line-or-history-element (&optional arg)
+  "Move cursor vertically up ARG lines, or to the previous history element.
+When point moves over the top line of multi-line minibuffer, puts ARGth
+previous element of the minibuffer history in the minibuffer."
+  (interactive "^p")
+  (or arg (setq arg 1))
+  (let ((old-point (point)))
+    (condition-case nil
+	(with-no-warnings
+	  (previous-line arg))
+      (beginning-of-buffer
+       ;; Restore old position since `line-move-visual' moves point to
+       ;; the beginning of the line when it fails to go to the previous line.
+       (goto-char old-point)
+       (previous-history-element arg)))))
 
 (defun next-complete-history-element (n)
   "Get next history element which completes the minibuffer before the point.
@@ -2764,7 +2796,7 @@ which is defined in the `warnings' library.\n")
     t))
 
 (defcustom password-word-equivalents
-  '("password" "passphrase" "pass phrase"
+  '("password" "passcode" "passphrase" "pass phrase"
     ; These are sorted according to the GNU en_US locale.
     "암호"		; ko
     "パスワード"	; ja
@@ -4094,6 +4126,144 @@ The argument is used for internal purposes; do not supply one."
 	(setq this-command 'kill-region)
 	(message "If the next command is a kill, it will append"))
     (setq last-command 'kill-region)))
+
+(defvar bidi-directional-controls-chars "\x202a-\x202e\x2066-\x2069"
+  "Character set that matches bidirectional formatting control characters.")
+
+(defvar bidi-directional-non-controls-chars "^\x202a-\x202e\x2066-\x2069"
+  "Character set that matches any character except bidirectional controls.")
+
+(defun squeeze-bidi-context-1 (from to category replacement)
+  "A subroutine of `squeeze-bidi-context'.
+FROM and TO should be markers, CATEGORY and REPLACEMENT should be strings."
+  (let ((pt (copy-marker from))
+	(limit (copy-marker to))
+	(old-pt 0)
+	lim1)
+    (setq lim1 limit)
+    (goto-char pt)
+    (while (< pt limit)
+      (if (> pt old-pt)
+	  (move-marker lim1
+		       (save-excursion
+			 ;; L and R categories include embedding and
+			 ;; override controls, but we don't want to
+			 ;; replace them, because that might change
+			 ;; the visual order.  Likewise with PDF and
+			 ;; isolate controls.
+			 (+ pt (skip-chars-forward
+				bidi-directional-non-controls-chars
+				limit)))))
+      ;; Replace any run of non-RTL characters by a single LRM.
+      (if (null (re-search-forward category lim1 t))
+	  ;; No more characters of CATEGORY, we are done.
+	  (setq pt limit)
+	(replace-match replacement nil t)
+	(move-marker pt (point)))
+      (setq old-pt pt)
+      ;; Skip directional controls, if any.
+      (move-marker
+       pt (+ pt (skip-chars-forward bidi-directional-controls-chars limit))))))
+
+(defun squeeze-bidi-context (from to)
+  "Replace characters between FROM and TO while keeping bidi context.
+
+This function replaces the region of text with as few characters
+as possible, while preserving the effect that region will have on
+bidirectional display before and after the region."
+  (let ((start (set-marker (make-marker)
+			   (if (> from 0) from (+ (point-max) from))))
+	(end (set-marker (make-marker) to))
+	;; This is for when they copy text with read-only text
+	;; properties.
+	(inhibit-read-only t))
+    (if (null (marker-position end))
+	(setq end (point-max-marker)))
+    ;; Replace each run of non-RTL characters with a single LRM.
+    (squeeze-bidi-context-1 start end "\\CR+" "\x200e")
+    ;; Replace each run of non-LTR characters with a single RLM.  Note
+    ;; that the \cR category includes both the Arabic Letter (AL) and
+    ;; R characters; here we ignore the distinction between them,
+    ;; because that distinction only affects Arabic Number (AN)
+    ;; characters, which are weak and don't affect the reordering.
+    (squeeze-bidi-context-1 start end "\\CL+" "\x200f")))
+
+(defun line-substring-with-bidi-context (start end &optional no-properties)
+  "Return buffer text between START and END with its bidi context.
+
+START and END are assumed to belong to the same physical line
+of buffer text.  This function prepends and appends to the text
+between START and END bidi control characters that preserve the
+visual order of that text when it is inserted at some other place."
+  (if (or (< start (point-min))
+	  (> end (point-max)))
+      (signal 'args-out-of-range (list (current-buffer) start end)))
+  (let ((buf (current-buffer))
+	substr para-dir from to)
+    (save-excursion
+      (goto-char start)
+      (setq para-dir (current-bidi-paragraph-direction))
+      (setq from (line-beginning-position)
+	    to (line-end-position))
+      (goto-char from)
+      ;; If we don't have any mixed directional characters in the
+      ;; entire line, we can just copy the substring without adding
+      ;; any context.
+      (if (or (looking-at-p "\\CR*$")
+	      (looking-at-p "\\CL*$"))
+	  (setq substr (if no-properties
+			   (buffer-substring-no-properties start end)
+			 (buffer-substring start end)))
+	(setq substr
+	      (with-temp-buffer
+		(if no-properties
+		    (insert-buffer-substring-no-properties buf from to)
+		  (insert-buffer-substring buf from to))
+		(squeeze-bidi-context 1 (1+ (- start from)))
+		(squeeze-bidi-context (- end to) nil)
+		(buffer-substring 1 (point-max)))))
+
+      ;; Wrap the string in LRI/RLI..PDI pair to achieve 2 effects:
+      ;; (1) force the string to have the same base embedding
+      ;; direction as the paragraph direction at the source, no matter
+      ;; what is the paragraph direction at destination; and (2) avoid
+      ;; affecting the visual order of the surrounding text at
+      ;; destination if there are characters of different
+      ;; directionality there.
+      (concat (if (eq para-dir 'left-to-right) "\x2066" "\x2067")
+	      substr "\x2069"))))
+
+(defun buffer-substring-with-bidi-context (start end &optional no-properties)
+  "Return portion of current buffer between START and END with bidi context.
+
+This function works similar to `buffer-substring', but it prepends and
+appends to the text bidi directional control characters necessary to
+preserve the visual appearance of the text if it is inserted at another
+place.  This is useful when the buffer substring includes bidirectional
+text and control characters that cause non-trivial reordering on display.
+If copied verbatim, such text can have a very different visual appearance,
+and can also change the visual appearance of the surrounding text at the
+destination of the copy.
+
+Optional argument NO-PROPERTIES, if non-nil, means copy the text without
+the text properties."
+  (let (line-end substr)
+    (if (or (< start (point-min))
+	    (> end (point-max)))
+	(signal 'args-out-of-range (list (current-buffer) start end)))
+    (save-excursion
+      (goto-char start)
+      (setq line-end (min end (line-end-position)))
+      (while (< start end)
+	(setq substr
+	      (concat substr
+		      (if substr "\n" "")
+		      (line-substring-with-bidi-context start line-end
+							no-properties)))
+	(forward-line 1)
+	(setq start (point))
+	(setq line-end (min end (line-end-position))))
+      substr)))
 
 ;; Yanking.
 
@@ -5371,7 +5541,7 @@ TRY-VSCROLL controls whether to vscroll tall lines: if either
 `auto-window-vscroll' or TRY-VSCROLL is nil, this function will
 not vscroll."
   (if noninteractive
-      (forward-line arg)
+      (line-move-1 arg noerror to-end)
     (unless (and auto-window-vscroll try-vscroll
 		 ;; Only vscroll for single line moves
 		 (= (abs arg) 1)
@@ -5434,14 +5604,22 @@ If NOERROR, don't signal an error if we can't move that many lines."
 		(>  (cdr temporary-goal-column) 0))
 	    (setq target-hscroll (cdr temporary-goal-column)))
       ;; Otherwise, we should reset `temporary-goal-column'.
-      (let ((posn (posn-at-point)))
+      (let ((posn (posn-at-point))
+	    x-pos)
 	(cond
 	 ;; Handle the `overflow-newline-into-fringe' case:
 	 ((eq (nth 1 posn) 'right-fringe)
 	  (setq temporary-goal-column (cons (- (window-width) 1) hscroll)))
 	 ((car (posn-x-y posn))
+	  (setq x-pos (car (posn-x-y posn)))
+	  ;; In R2L lines, the X pixel coordinate is measured from the
+	  ;; left edge of the window, but columns are still counted
+	  ;; from the logical-order beginning of the line, i.e. from
+	  ;; the right edge in this case.  We need to adjust for that.
+	  (if (eq (current-bidi-paragraph-direction) 'right-to-left)
+	      (setq x-pos (- (window-body-width nil t) 1 x-pos)))
 	  (setq temporary-goal-column
-		(cons (/ (float (car (posn-x-y posn)))
+		(cons (/ (float x-pos)
 			 (frame-char-width))
                       hscroll))))))
     (if target-hscroll

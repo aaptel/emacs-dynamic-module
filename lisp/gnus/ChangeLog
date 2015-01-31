@@ -1,11 +1,208 @@
+2015-01-30  Glenn Morris  <rgm@gnu.org>
+
+	* gnus-registry.el (gnus-registry-max-pruned-entries)
+	(gnus-registry-prune-factor, gnus-registry-default-sort-function):
+	Fix :version.
+	(gnus-registry-default-sort-function): Improve :type.
+
+2015-01-29  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* nnimap.el (nnimap-request-group): Allow running this function on
+	groups that don't exist in Gnus yet.
+	(nnimap-request-group): Revert previous patch since that made it
+	impossible to enter nnimap groups.
+
+	* message.el (message-smtpmail-send-it): Remove the mail header
+	separator before sending.
+
+2015-01-28  Elias Oltmanns  <eo@nebensachen.de>
+
+	* nnimap.el (nnimap-find-expired-articles): Fix handling of
+	(expiry-wait . never).
+
+2015-01-28  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* nnimap.el (nnimap-request-group): Clear the buffer before returning
+	the data.
+
+2015-01-27  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* nnir.el (nnir-imap-expr-to-imap): Check for literal+ capability in
+	IMAP.
+
+2015-01-27  Eric Abrahamsen  <eric@ericabrahamsen.net>
+
+	* nnir.el (nnir-run-imap): Enable non-ASCII IMAP searches.
+
+	* nnmairix.el ("nnmairix"): Declare nnmairix as virtual.
+
+	* gnus-bcklg.el (gnus-backlog-enter-article): No virtual groups should
+	be added to the backlog.
+
+2015-01-26  Trevor Murphy  <trevor.m.murphy@gmail.com>
+
+	* nnimap.el (nnimap-header-parameters): Refactor and request
+	X-GM-LABELS if it's been announced.
+	(nnimap-transform-headers): Gather and output GM-LABELS.
+
+2015-01-26  Peder O. Klingenberg  <peder@klingenberg.no>
+
+	* mm-decode.el (mm-display-part): Make non-string methods work.
+	Non-string methods are funcalled and work just fine, the test was
+	bogus.
+	* mm-decode.el (mm-display-external): Show "external" lisp viewers in
+	whole frame.
+
+2015-01-26  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* nnimap.el (nnimap-request-accept-article): Allow respooling using
+	nnimap.
+
+	* gnus-group.el (gnus-group-get-new-news-this-group): Explicitly
+	request rescans when being run interactively.
+
+	* nnimap.el (nnimap-request-group): Don't rescan the group here,
+	because that can be very slow in large groups.
+
+	* gnus-int.el (gnus-request-group-scan): New backend function.
+
+	* nnimap.el (nnimap-request-scan-group): Implement in on IMAP.
+
+2015-01-25  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* gnus-group.el (gnus-group-suspend): Close all backends.
+
+2015-01-15  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* nntp.el (nntp-send-authinfo): Error out if the password is wrong.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* registry.el: Don't use <class> as a variable.
+
+2014-12-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* message.el (message-make-fqdn):
+	* nnvirtual.el (nnvirtual-retrieve-headers)
+	(nnvirtual-update-xref-header): Prefer (system-name) to system-name,
+	and avoid naming locals 'system-name'.
+
+2014-12-29  Lars Ingebrigtsen  <larsi@gnus.org>
+
+	* mm-decode.el (mm-shr): Bind `shr-width' to `fill-column' so that
+	lines don't get overlong when responding.
+
+2014-12-19  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* gnus-group.el (gnus-read-ephemeral-bug-group):
+	Bind coding-system-for-read and coding-system-for-write only around
+	with-temp-file, and make buffer unibyte.  Don't write temp file twice.
+
+2014-12-18  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* registry.el (registry-db): Set default slot later.
+	This is because its value is not a literal integer.
+
+2014-12-18  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* mm-util.el (mm-with-unibyte-current-buffer): Mark obsolete and
+	add warning.
+
+	* gnus-art.el: Fix up compiler warnings.
+	(article-display-face, article-display-x-face): Remove unused `face'.
+	(gnus-article-browse-html-save-cid-content): Remove unused var `type'.
+	(article-date-ut): Remove unused var `first'.
+	(gnus-article-prepare): Remove unused var `gnus-article'.
+	(gnus-mime-save-part-and-strip): Remove unused var `param'.
+	(gnus-mime-inline-part): Remove unused vars `charset', `contents', and
+	`coding-system' along with corresponding dead code.
+	(gnus-mime-view-part-externally): Remove unused var
+	`mm-user-display-methods'.
+	(gnus-insert-mime-button): Let-bind gnus-tmp-id explicitly.
+	(gnus-display-mime): Remove unused var `handle'.
+	(gnus-mime-display-alternative): Remove unused var `props'.
+	(gnus-article-read-summary-keys): Remove unused var `up-to-top'.
+	(gnus-article-edit-done): Remove unused var `p'.
+	(gnus-url-mailto): Remove unused var `to'.
+	(gnus-treat-article): Let-bind gnus-treat-condition, part-number,
+	total-parts, and gnus-treat-type explicitly.  Remove unused var `elem'.
+
+2014-12-18  Eric Abrahamsen  <eric@ericabrahamsen.net>
+
+	* registry.el (registry-db): Consolidate the :max-hard and :max-soft
+	slots into a :max-size slot.
+	(registry-db-version): Add new variable for database version number.
+	(registry-prune): Use :max-size slot. Accept and use a sort-function
+	argument.
+	(registry-collect-prune-candidates): Add new function for finding
+	non-precious pruning candidates.
+	(registry-prune-hard-candidates, registry-prune-soft-candidates):
+	Remove obsolete functions.
+	(initialize-instance): Upgrade registry version when starting.
+
+	* gnus-registry.el (gnus-registry-prune-factor): Add new variable.
+	(gnus-registry-max-pruned-entries): Remove obsolete variable.
+	(gnus-registry-cache-file): Change default
+	filename extension to "eieio".
+	(gnus-registry-read): Add new function, split out from
+	`gnus-registry-load', that does the actual object reading.
+	(gnus-registry-load): Use it. Add condition case handler to check for
+	old filename extension and rename to the new one.
+	(gnus-registry-default-sort-function): New variable to specify a sort
+	function to use when pruning.
+	(gnus-registry-save, gnus-registry-insert): Use it.
+	(gnus-registry-sort-by-creation-time): Define a default sort function.
+
+2014-12-09  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* gnus-art.el (gnus-article-mime-handles): Refactor out into own
+	function for reuse.
+	(gnus-mime-buttonize-attachments-in-header): Adjust.
+
+2014-12-07  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* message.el (message-change-subject): Really check whether the subject
+	changed.
+
+2014-12-05  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* mailcap.el (mailcap-mime-data): Add doc-view-mode as a viewer for
+	PDFs.
+	(mailcap-view-mime): New function.
+
+2014-12-01  Glenn Morris  <rgm@gnu.org>
+
+	* gnus-cloud.el (gnus-cloud): Add :version tag.
+
+2014-11-29  John Mastro  <john.b.mastro@gmail.com>  (tiny change)
+
+	* auth-source.el (auth-source-macos-keychain-search-items): Return
+	result of `auth-source-macos-keychain-result-append' (bug#19074).
+
+2014-11-27  Katsumi Yamaoka  <yamaoka@jpl.org>
+
+	* gnus-art.el (gnus-use-idna):
+	* gnus-sum.el (gnus-summary-idna-message):
+	* message.el (message-use-idna):
+	Protect against nil value for idna-program.
+
+	* message.el (message-use-idna): Load Mule-UCS for XEmacs 21.4.
+
+2014-11-25  Glenn Morris  <rgm@gnu.org>
+
+	* gnus-start.el (gnus-save-newsrc-file-check-timestamp):
+	Add :version tag.
+
+2014-11-23  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* pop3.el (pop3-open-server): Warn unless encrypted.
+
+	* nnimap.el (nnimap-open-connection-1): Warn unless encrypted.
+
 2014-11-17  Albert Krewinkel  <albert@zeitkraut.de>
 
 	* message.el (message-valid-fqdn-regexp): Add non-internaional new
 	TLDs.
-
-2014-11-16  Adam Sjøgren  <asjo@koldfront.dk>
-
-	* mml2015.el (mml2015-display-key-image): New variable.
 
 2014-11-14  Lars Magne Ingebrigtsen  <larsi@gnus.org>
 
@@ -25914,7 +26111,7 @@
 
 See ChangeLog.2 for earlier changes.
 
-  Copyright (C) 2004-2014 Free Software Foundation, Inc.
+  Copyright (C) 2004-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

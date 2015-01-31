@@ -1,6 +1,6 @@
 ;;; octave.el --- editing octave source files under emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: Kurt Hornik <Kurt.Hornik@wu-wien.ac.at>
 ;;	   John Eaton <jwe@octave.org>
@@ -45,13 +45,13 @@
     (defun completion-table-with-cache (fun &optional ignore-case)
       ;; See eg bug#11906.
       (let* (last-arg last-result
-                      (new-fun
-                       (lambda (arg)
-                         (if (and last-arg (string-prefix-p last-arg arg ignore-case))
-                             last-result
-                           (prog1
-                               (setq last-result (funcall fun arg))
-                             (setq last-arg arg))))))
+             (new-fun
+              (lambda (arg)
+                (if (and last-arg (string-prefix-p last-arg arg ignore-case))
+                    last-result
+                  (prog1
+                      (setq last-result (funcall fun arg))
+                    (setq last-arg arg))))))
         (completion-table-dynamic new-fun)))))
 (eval-when-compile
   (unless (fboundp 'setq-local)
@@ -601,7 +601,8 @@ Key bindings:
   (add-hook 'before-save-hook 'octave-sync-function-file-names nil t)
   (setq-local beginning-of-defun-function 'octave-beginning-of-defun)
   (and octave-font-lock-texinfo-comment (octave-font-lock-texinfo-comment))
-  (setq-local eldoc-documentation-function 'octave-eldoc-function)
+  (add-function :before-until (local 'eldoc-documentation-function)
+                'octave-eldoc-function)
 
   (easy-menu-add octave-mode-menu))
 

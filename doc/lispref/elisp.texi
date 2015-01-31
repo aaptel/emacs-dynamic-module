@@ -98,7 +98,7 @@ This is the @cite{GNU Emacs Lisp Reference Manual}
 @end ifnottex
 corresponding to Emacs version @value{EMACSVER}.
 
-Copyright @copyright{} 1990--1996, 1998--2014 Free Software Foundation, Inc.
+Copyright @copyright{} 1990--1996, 1998--2015 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -1006,6 +1006,7 @@ Windows
 * Windows and Frames::      Relating windows to the frame they appear on.
 * Window Sizes::            Accessing a window's size.
 * Resizing Windows::        Changing the sizes of windows.
+* Preserving Window Sizes:: Preserving the size of windows.
 * Splitting Windows::       Splitting one window into two windows.
 * Deleting Windows::        Deleting a window gives its space to other windows.
 * Recombining Windows::     Preserving the frame layout when splitting and

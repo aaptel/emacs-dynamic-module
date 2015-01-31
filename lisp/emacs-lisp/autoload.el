@@ -1,6 +1,6 @@
 ;; autoload.el --- maintain autoloads in loaddefs.el  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1991-1997, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1991-1997, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: Roland McGrath <roland@gnu.org>
 ;; Keywords: maint
@@ -120,7 +120,8 @@ expression, in which case we want to handle forms differently."
            ;; Look for an interactive spec.
            (interactive (pcase body
                           ((or `((interactive . ,_) . ,_)
-                               `(,_ (interactive . ,_) . ,_)) t))))
+                               `(,_ (interactive . ,_) . ,_))
+                           t))))
         ;; Add the usage form at the end where describe-function-1
         ;; can recover it.
         (when (listp args) (setq doc (help-add-fundoc-usage doc args)))
@@ -140,11 +141,9 @@ expression, in which case we want to handle forms differently."
      ;; For complex cases, try again on the macro-expansion.
      ((and (memq car '(easy-mmode-define-global-mode define-global-minor-mode
                        define-globalized-minor-mode defun defmacro
-                       ;; FIXME: we'd want `defmacro*' here as well, so as
-                       ;; to handle its `declare', but when autoload is run
-                       ;; CL is not loaded so macroexpand doesn't know how
-                       ;; to expand it!
-		       easy-mmode-define-minor-mode define-minor-mode))
+		       easy-mmode-define-minor-mode define-minor-mode
+                       define-inline cl-defun cl-defmacro))
+           (macrop car)
 	   (setq expand (let ((load-file-name file)) (macroexpand form)))
 	   (memq (car expand) '(progn prog1 defalias)))
       (make-autoload expand file 'expansion)) ;Recurse on the expansion.
@@ -540,7 +539,7 @@ Return non-nil if and only if FILE adds no autoloads to OUTFILE
                                (autoload-find-file file))
         ;; Obey the no-update-autoloads file local variable.
         (unless no-update-autoloads
-          (message "Generating autoloads for %s..." file)
+	  (or noninteractive (message "Generating autoloads for %s..." file))
 	  (setq load-name
 		(if (stringp generated-autoload-load-name)
 		    generated-autoload-load-name
@@ -624,7 +623,8 @@ Return non-nil if and only if FILE adds no autoloads to OUTFILE
                        (nth 5 (file-attributes relfile))))
                     (insert ";;; Generated autoloads from " relfile "\n")))
                 (insert generate-autoload-section-trailer))))
-          (message "Generating autoloads for %s...done" file))
+	  (or noninteractive
+	      (message "Generating autoloads for %s...done" file)))
         (or visited
             ;; We created this buffer, so we should kill it.
             (kill-buffer (current-buffer))))

@@ -1,3 +1,7 @@
+2014-12-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* org-clock.el (org-clock-save): Prefer (system-name) to system-name.
+
 2014-10-29  Paul Eggert  <eggert@cs.ucla.edu>
 
 	Simplify use of current-time and friends.
@@ -25397,7 +25401,7 @@
 	(org-ascii-replace-entities): New function.
 
 2010-04-10  Carsten Dominik  <carsten.dominik@gmail.com>
-            Ulf Stegemann  <ulf@zeitform.de>
+	    Ulf Stegemann  <ulf@zeitform.de>
 
 	* org-entities.el: New file.
 
@@ -32829,7 +32833,7 @@
 ;; add-log-time-zone-rule: t
 ;; End:
 
-	Copyright (C) 2008-2014 Free Software Foundation, Inc.
+	Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

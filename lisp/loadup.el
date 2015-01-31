@@ -1,7 +1,7 @@
 ;;; loadup.el --- load up standardly loaded Lisp files for Emacs
 
-;; Copyright (C) 1985-1986, 1992, 1994, 2001-2014
-;;   Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992, 1994, 2001-2015 Free Software
+;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -145,7 +145,8 @@
   (file-error (load "ldefs-boot.el")))
 
 (load "emacs-lisp/nadvice")
-(load "minibuffer")
+(load "emacs-lisp/cl-preloaded")
+(load "minibuffer")            ;After loaddefs, for define-minor-mode.
 (load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
 (load "simple")
 

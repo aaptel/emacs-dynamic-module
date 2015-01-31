@@ -1,6 +1,6 @@
 ;;; tramp-cache.el --- file information caching for Tramp
 
-;; Copyright (C) 2000, 2005-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2000, 2005-2015 Free Software Foundation, Inc.
 
 ;; Author: Daniel Pittman <daniel@inanna.danann.net>
 ;;         Michael Albinus <michael.albinus@gmx.de>
@@ -136,7 +136,7 @@ Returns DEFAULT if not set."
 		       (tramp-time-diff (current-time) (car value))
 		       remote-file-name-inhibit-cache))
 		 (and (consp remote-file-name-inhibit-cache)
-		      (tramp-time-less-p
+		      (time-less-p
 		       remote-file-name-inhibit-cache (car value)))))
 	(setq value (cdr value))
       (setq value default))

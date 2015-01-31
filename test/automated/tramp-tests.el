@@ -1,6 +1,6 @@
 ;;; tramp-tests.el --- Tests of remote file access
 
-;; Copyright (C) 2013-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
@@ -953,7 +953,12 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	    (goto-char (point-min))
 	    (should
 	     (looking-at-p
-	      "\\(total.+[[:digit:]]+\n\\)?.+ \\.\n.+ \\.\\.\n.+ foo$"))))
+	      (concat
+	       ;; There might be a summary line.
+	       "\\(total.+[[:digit:]]+\n\\)?"
+	       ;; We don't know in which order "." and ".." appear.
+	       "\\(.+ \\.?\\.\n\\)\\{2\\}"
+	       ".+ foo$")))))
       (ignore-errors (delete-directory tmp-name1 'recursive)))))
 
 (ert-deftest tramp-test18-file-attributes ()
@@ -1469,12 +1474,26 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (vc-create-repo (car vc-handled-backends))
 	    ;; The structure of VC-FILESET is not documented.  Let's
 	    ;; hope it won't change.
-	    (vc-register
-	     nil (list (car vc-handled-backends)
-		       (list (file-name-nondirectory tmp-name2)))))
+	    (condition-case nil
+		(vc-register
+		 (list (car vc-handled-backends)
+		       (list (file-name-nondirectory tmp-name2))))
+	      ;; `vc-register' has changed its arguments in Emacs 25.1.
+	      (error
+	       (vc-register
+		nil (list (car vc-handled-backends)
+			  (list (file-name-nondirectory tmp-name2)))))))
 	  (should (vc-registered tmp-name2)))
 
 	(ignore-errors (delete-directory tmp-name1 'recursive)))))
+
+(defun tramp--test-smb-or-windows-nt-p ()
+  "Check, whether the locale or remote host runs MS Windows.
+This requires restrictions of file name syntax."
+  (or (eq system-type 'windows-nt)
+      (eq (tramp-find-foreign-file-name-handler
+	   tramp-test-temporary-file-directory)
+       'tramp-smb-file-name-handler)))
 
 (defun tramp--test-check-files (&rest files)
   "Runs a simple but comprehensive test over every file in FILES."
@@ -1484,7 +1503,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	(progn
 	  (make-directory tmp-name1)
 	  (make-directory tmp-name2)
-	  (dolist (elt files)
+	  (dolist (elt (delq nil files))
 	    (let ((file1 (expand-file-name elt tmp-name1))
 		  (file2 (expand-file-name elt tmp-name2)))
 	      (write-region elt nil file1)
@@ -1540,24 +1559,23 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
     (memq
      (tramp-find-foreign-file-name-handler tramp-test-temporary-file-directory)
      '(tramp-adb-file-name-handler
-       tramp-gvfs-file-name-handler
-       tramp-smb-file-name-handler))))
+       tramp-gvfs-file-name-handler))))
 
   ;; Newlines, slashes and backslashes in file names are not supported.
   ;; So we don't test.
   (tramp--test-check-files
-   " foo\tbar baz\t"
+   (if (tramp--test-smb-or-windows-nt-p) "foo bar baz" " foo\tbar baz\t")
    "$foo$bar$$baz$"
    "-foo-bar-baz-"
    "%foo%bar%baz%"
    "&foo&bar&baz&"
-   "?foo?bar?baz?"
-   "*foo*bar*baz*"
-   "'foo\"bar'baz\""
+   (unless (tramp--test-smb-or-windows-nt-p) "?foo?bar?baz?")
+   (unless (tramp--test-smb-or-windows-nt-p) "*foo*bar*baz*")
+   (if (tramp--test-smb-or-windows-nt-p) "'foo'bar'baz'" "'foo\"bar'baz\"")
    "#foo~bar#baz~"
-   "!foo|bar!baz|"
-   ":foo;bar:baz;"
-   "<foo>bar<baz>"
+   (if (tramp--test-smb-or-windows-nt-p) "!foo!bar!baz!" "!foo|bar!baz|")
+   (if (tramp--test-smb-or-windows-nt-p) ";foo;bar;baz;" ":foo;bar:baz;")
+   (unless (tramp--test-smb-or-windows-nt-p) "<foo>bar<baz>")
    "(foo)bar(baz)"
    "[foo]bar[baz]"
    "{foo}bar{baz}"))
@@ -1737,10 +1755,9 @@ Since it unloads Tramp, it shall be the last test to run."
 ;;   doesn't work well when an interactive password must be provided.
 ;; * Fix `tramp-test27-start-file-process' for `nc' and on MS
 ;;   Windows (`process-send-eof'?).
-;; * Fix `tramp-test28-shell-command' on MS Windows (nasty plink message).
-;; * Fix `tramp-test30-special-characters' for `adb', `nc' and `smb'.
-;; * Fix `tramp-test31-utf8' for MS Windows and `nc'/`telnet' (when
-;;   target is a dumb busybox).  Seems to be in `directory-files'.
+;; * Fix `tramp-test30-special-characters' for `adb' and `nc'.
+;; * Fix `tramp-test31-utf8' for `nc'/`telnet' (when target is a dumb
+;;   busybox).  Seems to be in `directory-files'.
 ;; * Fix Bug#16928.  Set expected error of `tramp-test32-asynchronous-requests'.
 ;; * Fix `tramp-test34-unload' (Not all symbols are unbound).  Set
 ;;   expected error.

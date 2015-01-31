@@ -1,6 +1,6 @@
 /* Buffer insertion/deletion and gap motion for GNU Emacs.
-
-Copyright (C) 1985-1986, 1993-1995, 1997-2014 Free Software Foundation, Inc.
+   Copyright (C) 1985-1986, 1993-1995, 1997-2015 Free Software
+   Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -50,8 +50,6 @@ static Lisp_Object combine_after_change_list;
 
 /* Buffer which combine_after_change_list is about.  */
 static Lisp_Object combine_after_change_buffer;
-
-Lisp_Object Qinhibit_modification_hooks;
 
 static void signal_before_change (ptrdiff_t, ptrdiff_t, ptrdiff_t *);
 
@@ -1202,10 +1200,10 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
 
   /* Update various buffer positions for the new text.  */
   GAP_SIZE -= len_byte;
-  ZV += len; Z+= len;
+  ZV += len; Z += len;
   ZV_BYTE += len_byte; Z_BYTE += len_byte;
   GPT += len; GPT_BYTE += len_byte;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor. */
+  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
 
   if (nchars_del > 0)
     adjust_markers_for_replace (from, from_byte, nchars_del, nbytes_del,
@@ -1228,7 +1226,7 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
   if (from < PT)
     adjust_point (len - nchars_del, len_byte - nbytes_del);
 
-  /* As byte combining will decrease Z, we must check this again. */
+  /* As byte combining will decrease Z, we must check this again.  */
   if (Z - GPT < END_UNCHANGED)
     END_UNCHANGED = Z - GPT;
 
@@ -1599,7 +1597,7 @@ del_range_byte (ptrdiff_t from_byte, ptrdiff_t to_byte, bool prepare)
 {
   ptrdiff_t from, to;
 
-  /* Make args be valid */
+  /* Make args be valid.  */
   if (from_byte < BEGV_BYTE)
     from_byte = BEGV_BYTE;
   if (to_byte > ZV_BYTE)
@@ -1681,7 +1679,7 @@ del_range_both (ptrdiff_t from, ptrdiff_t from_byte,
 /* Delete a range of text, specified both as character positions
    and byte positions.  FROM and TO are character positions,
    while FROM_BYTE and TO_BYTE are byte positions.
-   If RET_STRING, the deleted area is returned as a string. */
+   If RET_STRING, the deleted area is returned as a string.  */
 
 Lisp_Object
 del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
@@ -1779,8 +1777,6 @@ modify_text (ptrdiff_t start, ptrdiff_t end)
 
   bset_point_before_scroll (current_buffer, Qnil);
 }
-
-Lisp_Object Qregion_extract_function;
 
 /* Check that it is okay to modify the buffer between START and END,
    which are char positions.
@@ -1994,13 +1990,12 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
     {
       PRESERVE_VALUE;
       PRESERVE_START_END;
-      Frun_hooks (1, &Qfirst_change_hook);
+      run_hook (Qfirst_change_hook);
     }
 
   /* Now run the before-change-functions if any.  */
   if (!NILP (Vbefore_change_functions))
     {
-      Lisp_Object args[3];
       rvoe_arg.location = &Vbefore_change_functions;
       rvoe_arg.errorp = 1;
 
@@ -2011,10 +2006,8 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
       record_unwind_protect_ptr (reset_var_on_error, &rvoe_arg);
 
       /* Actually run the hook functions.  */
-      args[0] = Qbefore_change_functions;
-      args[1] = FETCH_START;
-      args[2] = FETCH_END;
-      Frun_hook_with_args (3, args);
+      CALLN (Frun_hook_with_args, Qbefore_change_functions,
+	     FETCH_START, FETCH_END);
 
       /* There was no error: unarm the reset_on_error.  */
       rvoe_arg.errorp = 0;
@@ -2082,7 +2075,6 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 
   if (!NILP (Vafter_change_functions))
     {
-      Lisp_Object args[4];
       rvoe_arg.location = &Vafter_change_functions;
       rvoe_arg.errorp = 1;
 
@@ -2090,11 +2082,9 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
       record_unwind_protect_ptr (reset_var_on_error, &rvoe_arg);
 
       /* Actually run the hook functions.  */
-      args[0] = Qafter_change_functions;
-      XSETFASTINT (args[1], charpos);
-      XSETFASTINT (args[2], charpos + lenins);
-      XSETFASTINT (args[3], lendel);
-      Frun_hook_with_args (4, args);
+      CALLN (Frun_hook_with_args, Qafter_change_functions,
+	     make_number (charpos), make_number (charpos + lenins),
+	     make_number (lendel));
 
       /* There was no error: unarm the reset_on_error.  */
       rvoe_arg.errorp = 0;

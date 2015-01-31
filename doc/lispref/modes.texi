@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2014 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2015 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Modes
@@ -1490,7 +1490,7 @@ A positive prefix argument enables the mode, any other prefix argument
 disables it.  From Lisp, an argument of @code{toggle} toggles the mode,
 whereas an omitted or @code{nil} argument enables the mode.
 This makes it easy to enable the minor mode in a major mode hook, for example.
-If @var{doc} is nil, the macro supplies a default documentation string
+If @var{doc} is @code{nil}, the macro supplies a default documentation string
 explaining the above.
 
 By default, it also defines a variable named @var{mode}, which is set to
@@ -3659,7 +3659,7 @@ For example:
 Notice how those lexers return the empty string when in front of
 parentheses.  This is because SMIE automatically takes care of the
 parentheses defined in the syntax table.  More specifically if the lexer
-returns nil or an empty string, SMIE tries to handle the corresponding
+returns @code{nil} or an empty string, SMIE tries to handle the corresponding
 text as a sexp according to syntax tables.
 
 @node SMIE Tricks

@@ -1,6 +1,7 @@
 ;;; desktop.el --- save partial status of Emacs when killed -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1995, 1997, 2000-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1995, 1997, 2000-2015 Free Software Foundation,
+;; Inc.
 
 ;; Author: Morten Welinder <terra@diku.dk>
 ;; Keywords: convenience
@@ -940,7 +941,7 @@ Frames with a non-nil `desktop-dont-save' parameter are not saved."
 	(and desktop-restore-frames
 	     (frameset-save nil
 			    :app desktop--app-id
-			    :name (concat user-login-name "@" system-name)
+			    :name (concat user-login-name "@" (system-name))
 			    :predicate #'desktop--check-dont-save))))
 
 ;;;###autoload
@@ -1190,7 +1191,6 @@ Using it may cause conflicts.  Use it anyway? " owner)))))
 	    (desktop-auto-save-enable)
 	    t))
       ;; No desktop file found.
-      (desktop-clear)
       (let ((default-directory desktop-dirname))
         (run-hooks 'desktop-no-desktop-file-hook))
       (message "No desktop file.")
@@ -1413,8 +1413,8 @@ after that many seconds of idle time."
             (if (consp desktop-buffer-mark)
                 (progn
                   (move-marker (mark-marker) (car desktop-buffer-mark))
-                  ;; FIXME: Should we call (de)activate-mark instead?
-                  (setq mark-active (car (cdr desktop-buffer-mark))))
+                  (if (car (cdr desktop-buffer-mark))
+                      (activate-mark 'dont-touch-tmm)))
               (move-marker (mark-marker) desktop-buffer-mark)))
 	  ;; Never override file system if the file really is read-only marked.
 	  (when desktop-buffer-read-only (setq buffer-read-only desktop-buffer-read-only))

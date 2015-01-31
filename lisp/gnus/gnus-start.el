@@ -1,6 +1,6 @@
 ;;; gnus-start.el --- startup functions for Gnus
 
-;; Copyright (C) 1996-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -447,6 +447,7 @@ See also `gnus-before-startup-hook'."
 When the newsrc.eld file is updated by multiple machines,
 checking the file's modification time is a good way to avoid
 overwriting updated data."
+  :version "25.1"
   :group 'gnus-newsrc
   :type 'boolean)
 

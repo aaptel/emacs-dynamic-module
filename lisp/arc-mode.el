@@ -1,6 +1,6 @@
 ;;; arc-mode.el --- simple editing of archives
 
-;; Copyright (C) 1995, 1997-1998, 2001-2014 Free Software Foundation,
+;; Copyright (C) 1995, 1997-1998, 2001-2015 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Morten Welinder <terra@gnu.org>
@@ -146,6 +146,14 @@ A local copy of the archive will be used when updating."
 (defcustom archive-extract-hook nil
   "Hook run when an archive member has been extracted."
   :type 'hook
+  :group 'archive)
+
+(defcustom archive-visit-single-files nil
+  "If non-nil, opening an archive with a single file visits that file.
+If nil, visiting such an archive displays the archive summary."
+  :version "25.1"
+  :type '(choice (const :tag "Visit the single file" t)
+                 (const :tag "Show the archive summary" nil))
   :group 'archive)
 ;; ------------------------------
 ;; Arc archive configuration
@@ -742,7 +750,12 @@ archive.
       (if (default-value 'enable-multibyte-characters)
 	  (set-buffer-multibyte 'to))
       (archive-summarize nil)
-      (setq buffer-read-only t))))
+      (setq buffer-read-only t)
+      (when (and archive-visit-single-files
+                 auto-compression-mode
+                 (= (length archive-files) 1))
+        (rename-buffer (concat " " (buffer-name)))
+        (archive-extract)))))
 
 ;; Archive mode is suitable only for specially formatted data.
 (put 'archive-mode 'mode-class 'special)

@@ -1,6 +1,6 @@
 /* MS-DOS specific C utilities.          -*- coding: cp850 -*-
 
-Copyright (C) 1993-1997, 1999-2014 Free Software Foundation, Inc.
+Copyright (C) 1993-1997, 1999-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1733,7 +1733,7 @@ IT_set_frame_parameters (struct frame *f, Lisp_Object alist)
 
   if (redraw)
     {
-      face_change_count++;	/* forces xdisp.c to recompute basic faces */
+      face_change = true;	/* forces xdisp.c to recompute basic faces */
       if (f == SELECTED_FRAME ())
 	redraw_frame (f);
     }

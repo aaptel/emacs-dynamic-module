@@ -1,6 +1,6 @@
 ;;; nnmairix.el --- Mairix back end for Gnus, the Emacs newsreader
 
-;; Copyright (C) 2007-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2015 Free Software Foundation, Inc.
 
 ;; Author: David Engster <dengste@eml.cc>
 ;; Keywords: mail searching
@@ -417,7 +417,7 @@ Other back ends might or might not work.")
 
 (nnoo-define-basics nnmairix)
 
-(gnus-declare-backend "nnmairix" 'mail 'address)
+(gnus-declare-backend "nnmairix" 'mail 'address 'virtual)
 
 (deffoo nnmairix-open-server (server &optional definitions)
   ;; just set server variables

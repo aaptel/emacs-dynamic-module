@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 1999-2014 Free Software
+@c Copyright (C) 1985-1987, 1993-1995, 1997, 1999-2015 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Files
@@ -1688,6 +1688,13 @@ likewise.  @kbd{v} extracts a file into a buffer in View mode
 (@pxref{View Mode}).  @kbd{o} extracts the file and displays it in
 another window, so you could edit the file and operate on the archive
 simultaneously.
+
+  The @kbd{I} key adds a new (regular) file to the archive.  The file
+is initially empty, but can readily be edited using the commands
+above.  The command inserts the new file before the current one, so
+that using it on the topmost line of the Tar buffer makes the new file
+the first one in the archive, and using it at the end of the buffer
+makes it the last one.
 
   @kbd{d} marks a file for deletion when you later use @kbd{x}, and
 @kbd{u} unmarks a file, as in Dired.  @kbd{C} copies a file from the

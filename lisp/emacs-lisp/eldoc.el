@@ -1,6 +1,6 @@
 ;;; eldoc.el --- Show function arglist or variable docstring in echo area  -*- lexical-binding:t; -*-
 
-;; Copyright (C) 1996-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2015 Free Software Foundation, Inc.
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Maintainer: friedman@splode.com
@@ -79,8 +79,8 @@ This has two preferred values: `upcase' or `downcase'.
 Actually, any name of a function which takes a string as an argument and
 returns another string is acceptable.
 
-Note that if `eldoc-documentation-function' is non-nil, this variable
-has no effect, unless the function handles it explicitly."
+Note that this variable has no effect, unless
+`eldoc-documentation-function' handles it explicitly."
   :type '(radio (function-item upcase)
 		(function-item downcase)
                 function)
@@ -102,8 +102,8 @@ If value is nil, messages are always truncated to fit in a single line of
 display in the echo area.  Function or variable symbol name may be
 truncated to make more of the arglist or documentation string visible.
 
-Note that if `eldoc-documentation-function' is non-nil, this variable
-has no effect, unless the function handles it explicitly."
+Note that this variable has no effect, unless
+`eldoc-documentation-function' handles it explicitly."
   :type '(radio (const :tag "Always" t)
                 (const :tag "Never" nil)
                 (const :tag "Yes, but truncate symbol names if it will\
@@ -186,7 +186,7 @@ expression point is on."
   :group 'eldoc :lighter eldoc-minor-mode-string
   (setq eldoc-last-message nil)
   (cond
-   ((not eldoc-documentation-function)
+   ((memq eldoc-documentation-function '(nil ignore))
     (message "There is no ElDoc support in this buffer")
     (setq eldoc-mode nil))
    (eldoc-mode
@@ -225,7 +225,9 @@ expression point is on."
 	     eldoc-idle-delay t
 	     (lambda ()
                (when (or eldoc-mode
-                         (and global-eldoc-mode eldoc-documentation-function))
+                         (and global-eldoc-mode
+                              (not (memq eldoc-documentation-function
+                                         '(nil ignore)))))
                  (eldoc-print-current-symbol-info))))))
 
   ;; If user has changed the idle delay, update the timer.
@@ -321,7 +323,7 @@ Otherwise work like `message'."
 
 
 ;;;###autoload
-(defvar eldoc-documentation-function nil
+(defvar eldoc-documentation-function #'ignore
   "Function to call to return doc string.
 The function of no args should return a one-line string for displaying
 doc about a function etc. appropriate to the context around point.
@@ -334,7 +336,12 @@ the variables `eldoc-argument-case' and `eldoc-echo-area-use-multiline-p',
 and the face `eldoc-highlight-function-argument', if they are to have any
 effect.
 
-This variable is expected to be set buffer-locally by modes that support ElDoc.")
+Major modes should modify this variable using `add-function', for example:
+  (add-function :before-until (local 'eldoc-documentation-function)
+                #'foo-mode-eldoc-function)
+so that the global documentation function (i.e. the default value of the
+variable) is taken into account if the major mode specific function does not
+return any documentation.")
 
 (defun eldoc-print-current-symbol-info ()
   ;; This is run from post-command-hook or some idle timer thing,

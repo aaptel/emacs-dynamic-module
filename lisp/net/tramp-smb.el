@@ -1,6 +1,6 @@
 ;;; tramp-smb.el --- Tramp access functions for SMB servers
 
-;; Copyright (C) 2002-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2015 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -513,7 +513,7 @@ pass to the OPERATION."
 		;; Reset the transfer process properties.
 		(tramp-set-connection-property v "process-name" nil)
 		(tramp-set-connection-property v "process-buffer" nil)
-		(when t1 (delete-directory tmpdir 'recurse))))
+		(when t1 (tramp-compat-delete-directory tmpdir 'recurse))))
 
 	    ;; Handle KEEP-DATE argument.
 	    (when keep-date
@@ -976,7 +976,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		 (lambda (x y)
 		   (if (string-match "t" switches)
 		       ;; Sort by date.
-		       (tramp-time-less-p (nth 3 y) (nth 3 x))
+		       (time-less-p (nth 3 y) (nth 3 x))
 		     ;; Sort by name.
 		     (string-lessp (nth 0 x) (nth 0 y))))))
 
@@ -1010,8 +1010,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		     (or (nth 3 attr) "nogroup") ; gid
 		     (or (nth 7 attr) (nth 2 x)) ; size
 		     (format-time-string
-		      (if (tramp-time-less-p
-			   (tramp-time-subtract (current-time) (nth 3 x))
+		      (if (time-less-p (time-subtract (current-time) (nth 3 x))
 			   tramp-half-a-year)
 			  "%b %e %R"
 			"%b %e  %Y")

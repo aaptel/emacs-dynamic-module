@@ -66,7 +66,7 @@
 @end ifclear
 
 @copying
-Copyright @copyright{} 1999--2014 Free Software Foundation, Inc.
+Copyright @copyright{} 1999--2015 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -2711,6 +2711,21 @@ following code in your @file{.emacs}:
   (setq tramp-remote-process-environment process-environment))
 @end lisp
 
+When running @code{process-file} or @code{start-file-process} on a
+remote @code{default-directory}, the default settings in
+@code{process-environment} are not used as it is the case for local
+processes.  However, if you need environment variables other than set
+in @code{tramp-remote-process-environment}, you can let-bind them to
+@code{process-environment}. Only those variables will be set then:
+
+@lisp
+(let ((process-environment (cons "HGPLAIN=1" process-environment)))
+  (process-file @dots{}))
+@end lisp
+
+This works only for environment variables which are not set already in
+@code{process-environment}.
+
 If you use other @value{emacsname} packages which do not run
 out-of-the-box on a remote host, please let us know.  We will try to
 integrate them as well.  @xref{Bug Reports}.
@@ -2828,7 +2843,7 @@ uid=0(root) gid=0(root) groups=0(root)
 @cindex gdb
 @cindex perldb
 
-@file{gud.el} offers an unified interface to several symbolic
+@file{gud.el} offers a unified interface to several symbolic
 debuggers
 @ifset emacs
 @ifinfo

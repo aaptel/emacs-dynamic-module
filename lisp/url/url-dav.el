@@ -1,6 +1,6 @@
 ;;; url-dav.el --- WebDAV support
 
-;; Copyright (C) 2001, 2004-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2001, 2004-2015 Free Software Foundation, Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -479,9 +479,9 @@ names (ie: DAV:resourcetype)."
 		     "  <DAV:allprop/>")
 		   depth nil namespaces))
 
-(defmacro url-dav-http-success-p (status)
+(define-inline url-dav-http-success-p (status)
   "Return whether STATUS was the result of a successful DAV request."
-  `(= (/ (or ,status 500) 100) 2))
+  (inline-quote (= (/ (or ,status 500) 100) 2)))
 
 
 ;;; Locking support
@@ -741,7 +741,7 @@ files in the collection as well."
 		 (if (and (not recursive)
 			  (/= (length props) 1))
 		     (signal 'file-error (list "Removing directory"
-					       "directory not empty" url)))))
+					       "Directory not empty" url)))))
 
      (mapc (lambda (result)
 	     (setq status (plist-get (cdr result) 'DAV:status))
@@ -760,7 +760,7 @@ files in the collection as well."
 		 url lock-token
 		 (setq props (url-dav-get-properties url))
 		 (if (eq (plist-get (cdar props) 'DAV:resourcetype) 'DAV:collection)
-		     (signal 'file-error (list "Removing old name" "is a collection" url)))))
+		     (signal 'file-error (list "Removing old name" "Is a collection" url)))))
 
     (mapc (lambda (result)
 	    (setq status (plist-get (cdr result) 'DAV:status))
@@ -787,7 +787,7 @@ If NOSORT is non-nil, the list is not sorted--its order is unpredictable.
 
     (when (and (= (length properties) 1)
 	       (not (url-dav-file-directory-p url)))
-      (signal 'file-error (list "Opening directory" "not a directory" url)))
+      (signal 'file-error (list "Opening directory" "Not a directory" url)))
 
     (while properties
       (setq child-props (pop properties)

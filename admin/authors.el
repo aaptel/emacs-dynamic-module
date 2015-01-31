@@ -1,6 +1,6 @@
 ;;; authors.el --- utility for maintaining Emacs's AUTHORS file -*-coding: utf-8 -*-
 
-;; Copyright (C) 2000-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2015 Free Software Foundation, Inc.
 
 ;; Author: Gerd Moellmann <gerd@gnu.org>
 ;; Maintainer: Kim F. Storm <storm@cua.dk>
@@ -40,6 +40,7 @@ files.")
 
 (defconst authors-aliases
   '(
+    (nil "A\\. N\\. Other")  ; unknown author 2014-12-03, later removed
     ("Aaron S. Hawley" "Aaron Hawley")
     ("Alexandru Harsanyi" "Alex Harsanyi")
     ("Andrew Csillag" "Drew Csillag")
@@ -240,7 +241,7 @@ If REALNAME is nil, ignore that author.")
 
 (defvar authors-obsolete-files-regexps
   '(".*loaddefs.el$"			; not obsolete, but auto-generated
-    "\\.\\(cvs\\|git\\)ignore$"		; obsolete or uninteresting
+    "\\.\\(bzr\\|cvs\\|git\\)ignore$"		; obsolete or uninteresting
     "\\.arch-inventory$"
     "automated/data/"		   ; not interesting
     ;; TODO lib/? Matches other things?
@@ -314,6 +315,7 @@ Changes to files matching one of the regexps in this list are not listed.")
     "CODINGS" "CHARSETS"
     "calc/INSTALL" "calc/Makefile" "calc/README.prev"
     "vms-pp.trans" "_emacs" "batcomp.com" "notes/cpp" ; admin/
+    "notes/BRANCH" "notes/exit-value"
     "emacsver.texi.in"
     "vpath.sed"
     "Cocoa/Emacs.base/Contents/Info.plist"
@@ -634,6 +636,7 @@ Changes to files in this list are not listed.")
     "images/page-down.xpm" "images/widen.pbm" "images/widen.xpm"
     "images/gnus/bar.xbm" "images/gnus/bar.xpm"
     "images/gnus/reverse-smile.xpm"
+    "notes/commits" "notes/changelogs"
     "revdiff"				; admin/
     "vcdiff" "rcs-checkin" "tindex.pl"
     "mainmake" "sed1.inp" "sed2.inp" "sed3.inp" ; msdos/
@@ -661,6 +664,7 @@ Changes to files in this list are not listed.")
     "org-lparse.el"
     "org-special-blocks.el" "org-taskjuggler.el"
     "progmodes/cap-words.el"
+    "w32-common-fns.el"
     ;; gnus
     "nnwfm.el" "nnlistserv.el" "nnkiboze.el" "nndb.el" "nnsoup.el"
     "netrc.el" "password.el" "sasl-cram.el" "sasl-digest.el" "sasl-ntlm.el"
@@ -691,7 +695,7 @@ Changes to files in this list are not listed.")
     "etags-vmslib.c" "fakemail.c" "getdate.c" "getopt.h" "getopt1.c"
     "getopt_.h" "getopt_int.h" "gettext.h" "leditcfns.c" "loadst.c"
     "make-path.c" "qsort.c" "sorted-doc.c" "tcp.c" "timer.c" "wakeup.c"
-    "yow.c"
+    "yow.c" "grep-changelog" "grep-changelog.1"
     ;; etc/
     "emacsclient.c" "etags.c" "hexl.c" "make-docfile.c" "movemail.c"
     "test-distrib.c" "testfile"
@@ -730,6 +734,8 @@ in the repository.")
     ("paths.h-dist" . "epaths.in")
     ("paths.h.in" . "epaths.in")
     ("paths.in" . "epaths.in")
+    ("emacs.rc" . "emacs.rc.in")
+    ("emacsclient.rc" . "emacsclient.rc.in")
     ("patch1" . "sed1.inp")
     ("INSTALL.MSYS" . "INSTALL")
     ("server.c" . "emacsserver.c")
@@ -799,6 +805,7 @@ in the repository.")
     ;; The one in lisp is eshell/eshell.el.
     ("eshell.el" . "automated/eshell.el")
     ("eshell/esh-test.el" . "automated/eshell.el")
+    ("automated/cl-lib.el" . "automated/cl-lib-tests.el")
     ("automated/package-x-test.el" . "automated/package-test.el")
     ;; INSTALL-CVS -> .CVS -> .BZR -> .REPO
     ("INSTALL-CVS" . "INSTALL.REPO")
@@ -865,6 +872,8 @@ in the repository.")
     ("grammars/wisent-grammar.el" . "wisent/grammar.el")
     ;; Moved from admin/nt/ to nt/.
     ("nt/README.W32" . "README.W32")
+    ("notes/BRANCH" . "notes/repo")
+    ("notes/bzr" . "notes/repo")
     )
   "Alist of files which have been renamed during their lifetime.
 Elements are (OLDNAME . NEWNAME).")
@@ -937,6 +946,8 @@ ediff\\|emerge\\|log-edit\\|log-view\\|pcvs\\|smerge-mode\\|vc\\)\\.el\\'"
     ("comint-testsuite.el" "automated/\\&")
     ("\\`\\(bytecomp\\|font-parse\\|icalendar\\|occur\\|newsticker\\)\
 -testsuite\\.el" "automated/\\1-tests.el")
+    ("automated/flymake/warnpred/\\(Makefile\\|test\\.\\(?:c\\|pl\\)\\)\\'"
+     "automated/data/flymake/\\1")
     ;; NB lax rules should come last.
     ("^m/m-\\(.*\\.h\\)$" "m/\\1" t)
     ("^m-\\(.*\\.h\\)$" "\\1" t)

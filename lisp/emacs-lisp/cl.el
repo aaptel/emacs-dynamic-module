@@ -1,6 +1,6 @@
 ;;; cl.el --- Compatibility aliases for the old CL library.  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2015 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: extensions
@@ -342,6 +342,8 @@ The two cases that are handled are:
 - renaming of F when it's a function defined via `cl-labels' or `labels'."
   (require 'cl-macs)
   (declare-function cl--expr-contains-any "cl-macs" (x y))
+  (declare-function cl--labels-convert "cl-macs" (f))
+  (defvar cl--labels-convert-cache)
   (cond
    ;; ¡¡Big Ugly Hack!! We can't use a compiler-macro because those are checked
    ;; *after* handling `function', but we want to stop macroexpansion from
@@ -374,13 +376,7 @@ The two cases that are handled are:
           (setq cl--function-convert-cache (cons newf res))
           res))))
    (t
-    (let ((found (assq f macroexpand-all-environment)))
-      (if (and found (ignore-errors
-                       (eq (cadr (cl-caddr found)) 'cl-labels-args)))
-          (cadr (cl-caddr (cl-cadddr found)))
-        (let ((res `(function ,f)))
-          (setq cl--function-convert-cache (cons f res))
-          res))))))
+    (cl--labels-convert f))))
 
 (defmacro lexical-let (bindings &rest body)
   "Like `let', but lexically scoped.

@@ -1,6 +1,6 @@
 ;;; gnus-int.el --- backend interface functions for Gnus
 
-;; Copyright (C) 1996-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -438,6 +438,14 @@ If it is down, start it up (again)."
     (when (gnus-check-backend-function func group)
       (funcall (gnus-get-function gnus-command-method func)
 	       (gnus-group-real-name group) (nth 1 gnus-command-method)))))
+
+(defun gnus-request-group-scan (group info)
+  "Request that GROUP get a complete rescan."
+  (let ((gnus-command-method (gnus-find-method-for-group group))
+	(func 'request-group-description))
+    (when (gnus-check-backend-function func group)
+      (funcall (gnus-get-function gnus-command-method func)
+	       (gnus-group-real-name group) (nth 1 gnus-command-method) info))))
 
 (defun gnus-close-group (group)
   "Request the GROUP be closed."

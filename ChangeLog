@@ -1,11 +1,366 @@
+2015-01-28  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Merge from gnulib and try to repair bad merge
+	This attempts to repair problems introduced by the bad merge
+	5491fd1098d27b3ba3db054076b9ab60fb3558dc.  The easiest way for me
+	to fix the badly-merged gnulib files was to run
+	'admin/merge-gnulib', so I did that, which also imported the
+	following changes:
+	* build-aux/update-copyright, m4/gnulib.m4:
+	Update from gnulib, incorporating:
+	2015-01-15 time: port to MinGW32 3.21
+	2015-01-15 update-copyright: apply to self
+	2015-01-11 update-copyright: recognize groff's \(co marker
+
+2015-01-28  Eli Zaretskii  <eliz@gnu.org>
+
+	* configure.ac (HAVE_W32): Abort with error message if
+	--without-toolkit-scroll-bars was specified.  See
+	http://lists.gnu.org/archive/html/emacs-devel/2015-01/msg00525.html
+	for the details.
+
+2015-01-27  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Port autogen.sh hook creation to private templates
+	* autogen.sh: Do not assume that the hook samples exist.
+	This ports to developers who override templatedir in their Git
+	configuration.  The downside is that patch applications won't be
+	checked, but that's better than autogen.sh failing.
+	Problem reported by Sam Steingold in:
+	http://lists.gnu.org/archive/html/emacs-devel/2015-01/msg00898.html
+
+2015-01-26  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* INSTALL.REPO: Mention minimum Git version.
+
+2015-01-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Use gnustep-config if available
+	* configure.ac (--with-gnustep): Document this.
+	(NS_GNUSTEP_CONFIG): New variable, set if gnustep-config works.
+	If gnustep-config works, use 'gnustep-config --objc-flags' and
+	'gnustep-config --gui-libs' to compute GNUstep configuration
+	variables, instead of attempting to infer them individually.
+	Fixes: bug#19507
+
+2015-01-21  Ulrich Müller  <ulm@gentoo.org>
+
+	* configure.ac (gamegroup): New AC_SUBST.
+	(--with-gameuser): Allow to specify a group instead of a user.
+	In the default case, check at configure time if a 'games' user
+	exists.
+
+2015-01-16  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Give up on -Wsuggest-attribute=const
+	The attribute doesn't help performance significantly, and the
+	warning seems to be more trouble than it's worth.  See the thread at:
+	http://lists.gnu.org/archive/html/emacs-devel/2015-01/msg00361.html
+	* configure.ac (WERROR_CFLAGS): Don't use -Wsuggest-attribute=const.
+
+2015-01-11  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Default to 'configure --enable-silent-rules'
+	This greatly shortens the 'make' output, making it more readable
+	and useful.  For example, on my platform it shortens a
+	4125-character line "gcc -std=gnu99 -c -Demacs -I. -I. -I../lib
+	... emacs.c" -- a line so long that it's hard to see what's going
+	on or where the diagnostics are -- to just "CC emacs.o".
+	* INSTALL: Document this.
+	* configure.ac: Add AM_SILENT_RULES([yes]).
+	(AM_DEFAULT_VERBOSITY): Remove now-unnecessary initialization.
+	Fixes: bug#19501
+
+2015-01-06  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Merge from gnulib
+	* lib/stdio.in.h, m4/stdio_h.m4: Update from gnulib, incorporating:
+	2015-01-05 stdio: fix use of PRIdMAX on modern mingw
+
+2015-01-04  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* INSTALL: Mention 'make WERROR_CFLAGS='.
+
+	Clarify 'make info'
+	* Makefile.in (info): Use GNU make conditional rather than
+	an '@' rule with a shell conditional, so that the builder can
+	see the submake.
+
+	Less 'make' chatter for VCSWITNESS
+	* Makefile.in (dirstate, VCSWITNESS): New macros.
+	(src): Use them to lessen 'make' chatter.
+
+2015-01-01  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Merge from gnulib, incorporating:
+	2015-01-01 version-etc: new year
+
+	* .gitattributes: New file.
+
+	* autogen.sh: Port better to non-GNU 'cp'.  Reported by Han Boetes.
+
+2014-12-31  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Less 'make' chatter at top level
+	* Makefile.in (AM_DEFAULT_VERBOSITY, AM_V_GEN, am__v_GEN_)
+	(am__v_GEN_0, am__v_GEN_1, AM_V_at, am__v_at_, am__v_at_0)
+	(am__v_at_1): New macros, copied from src/Makefile.in.
+	($(srcdir)/src/config.in, ${srcdir}/info/dir):
+	Be less chatty when not verbose.
+	($(srcdir)/src/stamp-h.in): Simplify with '$@'.
+
+2014-12-28  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* build-aux/git-hooks/commit-msg: Allow tabs.
+	Treat them as if they were expanded to spaces, with tab stops
+	every 8 columns.
+
+2014-12-27  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* .gitignore: Ignore /conftest*.
+
+2014-12-27  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* build-aux/git-hooks/commit-msg (at_sign): Bump up line-length limit
+	to 78.
+
+2014-12-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Prefer stpcpy to strcat.
+	* lib/gnulib.mk, m4/gnulib-comp.m4: Regenerate.
+	* lib/stpcpy.c, m4/stpcpy.m4: New files, from gnulib.
+
+2014-12-24  Stephen Leake  <stephen_leake@stephe-leake.org>
+
+	* CONTRIBUTE: Move user-level information to doc/emacs/trouble.texi.
+	Add Savannah url, cleanup announcing freeze.
+	(commit messages): New, gathered from comments on emacs-devel.
+	(Changelog notes): Add reference to GNU coding standards section 5.2;
+	doc 'present tense', bug fix format.
+	(branches): Freeze announcements are made on info-gnu-emacs mailing
+	list.
+	(git vs rename): New.
+
+2014-12-23  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Merge from gnulib.
+	2014-12-20 utimens: remove unnecessary assert
+	2014-12-16 stdalign: port better to HP compilers
+	2014-12-16 stdalign: work around Apple GCC 4.0 bug
+	* lib/stdalign.in.h, lib/utimens.c, m4/stdalign.m4: Update from gnulib.
+
+2014-12-14  Glenn Morris  <rgm@gnu.org>
+
+	* make-dist: No more lib-src/grep-changelog.
+
+	* INSTALL.REPO: Revert 2014-12-06 change.
+
+2014-12-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* lib/gnulib.mk: Regenerate.
+
+2014-12-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* .gitignore: Add lib/std*.h, to ignore stdarg.h, stdbool.h, and
+	stddef.h.  Remove subsumed entries.
+	Add !lib/std*.in.h, so as to not ignore the .in.h files.
+
+2014-12-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Port commit-msg to mawk.  Reported by Ted Zlatanov in:
+	http://lists.gnu.org/archive/html/emacs-devel/2014-12/msg01093.html
+	* build-aux/git-hooks/commit-msg (space, non_space, non_print):
+	New vars.  Use them as approximations to POSIX bracket expressions,
+	on implementations like mawk that do not support POSIX regexps.
+
+	Improve commit-msg messages and autosquash.
+	Reported by Michal Nazarewicz in Bug#19337.
+	* build-aux/git-hooks/commit-msg: Add "commit message" to
+	diagnostics.  Distinguish better between tabs and other
+	unprintable chars in diagnostics.  Don't complain if a prefix
+	"fixup! " or "squash! " makes a summary line too long.
+
+2014-12-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Port commit-message checking to FreeBSD 9.
+	Reported by Jan Djärv in:
+	http://lists.gnu.org/archive/html/emacs-devel/2014-12/msg00704.html
+	along with some other issues I noticed while testing with FreeBSD.
+	* build-aux/git-hooks/commit-msg: Prefer gawk if available.
+	Prefer en_US.UTF-8 to en_US.utf8, as it's more portable.
+	Work around bug in FreeBSD 9 awk, where /[[:cntrl:]]/ matches
+	ordinary text characters.
+	Be less tricky about quoting "'" in a shell script.
+
+2014-12-13  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* .gitignore: Ignore autosave files.
+
+2014-12-12  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Merge from gnulib.
+	2014-12-12 stddef: support C11's max_align_t
+	2014-12-11 unistd: fix iOS check conditional
+	2014-12-08 apply _GL_ATTRIBUTE_PURE to some inline functions
+	2014-12-02 support GNU format printf and scanf on mingw
+	* lib/stat-time.h, lib/stddef.in.h, lib/timespec.h:
+	* m4/extensions.m4, m4/stddef_h.m4, m4/stdio_h.m4: Update from gnulib.
+	* lib/gnulib.mk: Regenerate.
+
+2014-12-06  Stephen Leake  <stephen_leake@stephe-leake.org>
+
+	* CONTRIBUTE: Improve; add explicit web references, move some info
+	from admin/notes/* here.
+
+	* INSTALL.REPO: You can't "just run make" after a clean checkout.
+
+2014-12-05  Stephen Leake  <stephen_leake@stephe-leake.org>
+
+	* CONTRIBUTE: Move here from etc/, preparatory to further
+	changes/cleanup.
+
+2014-12-05  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* .gitignore: Remove redundant pattern (subsumed by _*).
+	Avoid "**", as it requires Git 1.8.2 or later.
+
+2014-12-05  Eli Zaretskii  <eliz@gnu.org>
+
+	* .gitignore: Ignore test/biditest.txt.
+
+2014-12-01  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* .gitignore: Ignore loaddefs directly under lisp, and in
+	sub-sub-directories.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Add more of the old .bzrignore to .gitignore.
+	Plus a few more .gitignore improvements.
+	* .gitignore: Add copyright notice, since it's big enough.
+	Put exceptions immediately after the patterns they're exceptions
+	to, to make them easier to follow.
+	Give four exceptions for the Makefile pattern.
+	Ignore /confdefs.h, test/indent/*.new, TAGS, GPATH, GSYMS, GRTAGS,
+	GTAGS, ID, *.exe, some nextstep-related files,
+	jisx2131-filter, *.orig, *.rej, etc/emacs.tmpdesktop, *.in-h
+	_* (except for build-aux/snippet/_Noreturn.h), /bin/, /BIN/,
+	/data/, etc/icons/, lib/cxxdefs.h, lib/SYS/, /libexec/, /lock/,
+	/README.W32, /share/, /site-lisp/, src/gdb.ini, /var/.
+	Ignore /configure.lineno, since POSIX requires
+	LINENO only with the User Portability Utilities option.
+	Ignore *cust-load.el and *loaddefs.el only under lisp.
+	Ignore core files of various flavors.
+	Do not ignore etc/refcards/gnus-logo.pdf.
+
+2014-11-29  Eli Zaretskii  <eliz@gnu.org>
+
+	* .gitignore: Add back src/_gdbinit, which is a temporary file
+	created by the MS-DOS build.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Add a.out to .gitignore.
+	Suggested by Lee Duhem in:
+	http://lists.gnu.org/archive/html/emacs-devel/2014-11/msg01665.html
+	* .gitignore: Add a.out.
+	Move *.log next to *.tmp, since it's generic.
+	Put *.exe before non-generics.
+
+2014-11-29  Eli Zaretskii  <eliz@gnu.org>
+
+	* .gitignore: Resurrect Windows-specific ignorables lost in last
+	changes.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* .gitignore: Add /emacs-[1-9]*/, and sort better.
+
+2014-11-29  Ivan Andrus  <darthandrus@gmail.com>
+
+	* .gitignore: Add some nextstep/mac ignorables.
+
+2014-11-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	.gitignore cleanup.
+	* .gitignore: Merge contents of subsidiary files and organize the
+	result so as to avoid duplication.  Remove no-longer needed entries.
+	* admin/charsets/.gitignore, admin/unidata/.gitignore:
+	* doc/lispintro/.gitignore, etc/.gitignore, leim/.gitignore:
+	* leim/ja-dic/.gitignore, lib-src/.gitignore, lisp/.gitignore:
+	* lisp/calc/.gitignore, lisp/calendar/.gitignore:
+	* lisp/cedet/.gitignore, lisp/emulation/.gitignore:
+	* lisp/erc/.gitignore, lisp/eshell/.gitignore, lisp/gnus/.gitignore:
+	* lisp/international/.gitignore, lisp/language/.gitignore:
+	* lisp/leim/.gitignore, lisp/leim/quail/.gitignore:
+	* lisp/mail/.gitignore, lisp/mh-e/.gitignore, lisp/net/.gitignore:
+	* lisp/nxml/.gitignore, lisp/obsolete/.gitignore:
+	* lisp/play/.gitignore, lisp/progmodes/.gitignore:
+	* lisp/term/.gitignore, lisp/textmodes/.gitignore:
+	* lisp/url/.gitignore, nt/.gitignore, src/.gitignore:
+	Remove; no longer needed.
+
+2014-11-29  Glenn Morris  <rgm@gnu.org>
+
+	* configure.ac: Simplify gnutls tests.
+
+2014-11-28  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* .gitignore: Add entries for emacsvers files.
+
+2014-11-27  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Restore 'Bug#' -> 'debbugs:' rewrite in log-edit-mode.
+	* .dir-locals.el (log-edit-mode): Restore the (log-edit-rewrite-fixes
+	"[ \n](bug#\\([0-9]+\\))" . "debbugs:\\1").  See Glenn Morris in:
+	http://lists.gnu.org/archive/html/emacs-devel/2014-11/msg01187.html
+
+	Simplify and fix doc-related .gitignore files.
+	This fixes some unwanted 'git status' output after 'make docs'.
+	* .gitignore: Add **/Makefile, **/makefile.
+	Remove Makefile, makefile.
+	Add doc/*/*.xxx rules for the usual kinds of documentation outputs
+	and temporaries.  Add doc/misc/cc-mode.ss.
+	* doc/emacs/.gitignore, doc/lispintro/.gitignore, doc/misc/.gitignore:
+	* lwlib/.gitignore, oldXMenu/.gitignore:
+	Remove, as these .gitignore files are no longer needed.
+	* doc/lispintro/.gitignore: Replace with list of exceptional PDF files.
+
+2014-11-26  Dani Moncayo  <dmoncayo@gmail.com>
+
+	* configure.ac [MINGW]: Fix the way of getting the right host
+	platform.
+
+2014-11-25  Glenn Morris  <rgm@gnu.org>
+
+	* configure.ac: Fix yesterday's use of uninitialised $version.
+
+2014-11-25  Oscar Fuentes  <ofv@wanadoo.es>
+
+	* configure.ac [MINGW]: Set $canonical default value as per the
+	compiler's target.
+
+2014-11-24  Glenn Morris  <rgm@gnu.org>
+
+	* configure.ac [HAVE_W32]: Generate nt/*.rc files when HAVE_W32,
+	not just when using mingw32.
+
+2014-11-22  Glenn Morris  <rgm@gnu.org>
+
+	Further reduce number of versioned files storing Emacs version number.
+	* configure.ac (comma_version, comma_space_version) [mingw32]:
+	New output variables.
+	(nt/emacs.rc, nt/emacsclient.rc) [mingw32]: New output files.
+	* make-dist: Update nt/ for *.rc -> *.rc.in changes.
+
+2014-11-19  Dani Moncayo  <dmoncayo@gmail.com>
+
+	* build-aux/msys-to-w32: Simplify implementation and docstring;
+	Paths starting with '%emacs_dir%' are just considered relative.
+
 2014-11-16  Christoph Scholtes  <cschol2112@gmail.com>
 
 	* .gitignore: Ignore generated file lib/stdalign.h.
-
-2014-11-16  Paul Eggert  <eggert@cs.ucla.edu>
-
-	Backport fix for minor Bazaar leftovers.
-	* .dir-locals.el: Remove reference to bzr commit --fixes debbugs.
 
 2014-11-16  Eli Zaretskii  <eliz@gnu.org>
 
@@ -28,7 +383,7 @@
 	build: port to GCC 4.6.4 + glibc 2.5
 	On platforms this old, building with _FORTIFY_SOURCE equal to 2
 	results in duplicate definitions of standard library functions.
-	Problem reported by Nelson H. F. Beebe.
+	Reported by Nelson H. F. Beebe.
 	* configure.ac (_FORTIFY_SOURCE): Sort after GNULIB_PORTCHECK.
 	By default, do not enable this unless GNULIB_PORTCHECK is defined.
 	This better matches the original intent, which as I recall was to
@@ -38,6 +393,10 @@
 
 	* Makefile.in (install-arch-indep): Compress publicsuffix.txt file.
 
+2014-11-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* .dir-locals.el: Remove reference to bzr commit --fixes debbugs.
+
 2014-11-13  Lars Magne Ingebrigtsen  <larsi@gnus.org>
 
 	* .gitignore: Copy over sufficient ignorable files from the old
@@ -45,7 +404,8 @@
 
 2014-11-11  Eric S. Raymond  <esr@thyrsus.com>
 
-	* Makefile.in: git transition - set VCWITNESS appropriately for git.
+	Git transition.
+	* Makefile.in (src): Set VCSWITNESS appropriately for git.
 
 	All bzr revision IDS, and all CVS revision IDs for which a commit
 	could be identified, were changed to time-date!committer version
@@ -54,7 +414,7 @@
 	corresponding commit comments.
 
 	(The first .cvsignore commit was 1999-09-30T14:07:54Z!fx@gnu.org.
-	The last CVS commit was	2009-12-27T08:11:12Z!cyd@stupidchicken.com.)
+	The last CVS commit was 2009-12-27T08:11:12Z!cyd@stupidchicken.com.)
 
 	Committer/author email addresses are generally correct for the
 	transition day, not necessarily when the commit was originally made.
@@ -1039,7 +1399,7 @@
 	Fix problem with MAKE and xcrun configuration.
 	* configure.ac: Don't set MAKE unless 'make' doesn't work.
 	Set it only in the environment, not in the makefile.
-	Problem reported by Glenn Morris in:
+	Reported by Glenn Morris in:
 	http://lists.gnu.org/archive/html/emacs-devel/2013-12/msg00969.html
 
 2013-12-27  Paul Eggert  <eggert@cs.ucla.edu>
@@ -2733,7 +3093,7 @@
 	(bootstrap): Run ./configure, rather than trying to run config.status
 	if it exists.  That builds src/epaths.h more reliably.
 	Run autogen/copy_autogen if autogen.sh fails,
-	to create 'configure'; problem reported by Andreas Schwab in
+	to create 'configure'.  Reported by Andreas Schwab in
 	<http://lists.gnu.org/archive/html/emacs-devel/2012-09/msg00438.html>.
 	* autogen.sh: Exit with status 1 when failing due to missing tools,
 	reverting the 2012-09-10 change to this file.
@@ -4065,8 +4425,7 @@
 
 	Check pkg-config exit status when configuring (Bug#10626).
 	* configure.in (PKG_CHECK_MODULES): Do not assume that pkg-config
-	works; check its exit status.  Problem reported by Jordi Gutiérrez
-	Hermoso in
+	works; check its exit status.  Reported by Jordi Gutiérrez Hermoso in
 	<http://lists.gnu.org/archive/html/emacs-devel/2012-01/msg00787.html>.
 
 2012-04-07  Glenn Morris  <rgm@gnu.org>
@@ -4224,7 +4583,7 @@
 	* configure.in (LIB_PTHREAD): Prepend -lpthread to LIBS (Bug#9852)
 	if the library is found.  Otherwise, later configure-time tests,
 	such as the test for pthread_sigmask, generate the wrong results
-	on some platforms.  Problem reported for FreeBSD by Nali Toja.
+	on some platforms.  Reported by Nali Toja for FreeBSD.
 
 2011-10-20  Paul Eggert  <eggert@cs.ucla.edu>
 
@@ -4455,7 +4814,7 @@
 	* m4/pthread_sigmask.m4 (gl_FUNC_PTHREAD_SIGMASK): Omit gl_THREADLIB
 	test, which runs afoul of Automake installations where, for example,
 	/usr/share/aclocal contains a copy of gl_THREADLIB.
-	Problem reported by Sven Joachim in
+	Reported by Sven Joachim in
 	<http://lists.gnu.org/archive/html/emacs-devel/2011-07/msg00529.html>.
 	This is just a quick temporary fix, specific to Emacs; I'll work
 	with the other gnulib maintainers to get a more-permanent fix.
@@ -5067,7 +5426,7 @@
 
 	* arg-nonnull.h, c++defs.h, warn-on-use.h: Fix licenses.
 	Sync from gnulib, which has been patched to fix the problem
-	with the license notices.  Problem reported by Glenn Morris in
+	with the license notices.  Reported by Glenn Morris in
 	<http://lists.gnu.org/archive/html/emacs-devel/2011-02/msg00403.html>.
 
 2011-02-09  Stefan Monnier  <monnier@iro.umontreal.ca>
@@ -5221,7 +5580,7 @@
 	used.  The code already assumed two's complement, so there's
 	no need to test for alternatives.  All uses removed.
 	(TYPE_MAXIMUM): Don't rely here on overflow behavior not defined by
-	the C standard.  Problem reported by Rich Felker in
+	the C standard.  Reported by Rich Felker in
 	<http://lists.gnu.org/archive/html/bug-gnulib/2011-01/msg00488.html>.
 	(twos_complement_arithmetic): Also check long_int and time_t.
 	(time_t_avg, time_t_add_ok, time_t_int_add_ok): New functions.
@@ -8538,7 +8897,7 @@
 
 	* configure.in (HAVE_XIM): Define if XIM is available.
 
-2003-07-29  Tim Van Holder  <tim.vanholder@anubex.com>  (tiny change)
+2003-07-29  Tim Van Holder  <tim.vanholder@anubex.com>
 
 	* configure.in: The function gtk_window_set_icon_from_file was
 	introduced in GTK+ 2.2, so check for that release.
@@ -8772,7 +9131,7 @@
 
 	* configure.in (*-sunos5.8*, *-solaris2.8*): New configurations.
 
-2002-11-11  Tim Van Holder  <tim.vanholder@anubex.com>  (tiny change)
+2002-11-11  Tim Van Holder  <tim.vanholder@anubex.com>
 
 	* Makefile.in (install-arch-indep): Prepend $(srcdir)/ to lisp.
 
@@ -14212,7 +14571,7 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 1993-1999, 2001-2014 Free Software Foundation, Inc.
+  Copyright (C) 1993-1999, 2001-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

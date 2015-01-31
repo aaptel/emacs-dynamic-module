@@ -1,6 +1,6 @@
 ;;; easy-mmode.el --- easy definition for major and minor modes
 
-;; Copyright (C) 1997, 2000-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2000-2015 Free Software Foundation, Inc.
 
 ;; Author: Georges Brun-Cottan <Georges.Brun-Cottan@inria.fr>
 ;; Maintainer: Stefan Monnier <monnier@gnu.org>
@@ -149,11 +149,12 @@ For example, you could write
     ...BODY CODE...)"
   (declare (doc-string 2)
            (debug (&define name string-or-null-p
-			   [&optional [&not keywordp] sexp
-			    &optional [&not keywordp] sexp
-			    &optional [&not keywordp] sexp]
-			   [&rest [keywordp sexp]]
-			   def-body)))
+                           [&optional [&not keywordp] sexp
+                            &optional [&not keywordp] sexp
+                            &optional [&not keywordp] sexp]
+                           [&rest [keywordp sexp]]
+                           def-body))
+           (indent 1))
 
   ;; Allow skipping the first three args.
   (cond

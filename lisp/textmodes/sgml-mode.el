@@ -1,6 +1,6 @@
 ;;; sgml-mode.el --- SGML- and HTML-editing modes -*- coding: utf-8 -*-
 
-;; Copyright (C) 1992, 1995-1996, 1998, 2001-2014 Free Software
+;; Copyright (C) 1992, 1995-1996, 1998, 2001-2015 Free Software
 ;; Foundation, Inc.
 
 ;; Author: James Clark <jjc@jclark.com>
@@ -245,7 +245,7 @@ Currently, only Latin-1 characters are supported.")
   ;; which makes it next to useless
   (cond ((executable-find "tidy")
          ;; tidy is available from http://tidy.sourceforge.net/
-         "tidy --gnu-emacs yes -e -q")
+         "tidy --gnu-emacs yes -utf8 -e -q")
         ((executable-find "nsgmls")
          ;; nsgmls is a free SGML parser in the SP suite available from
          ;; ftp.jclark.com, replaced old `sgmls'.

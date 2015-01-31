@@ -1,6 +1,6 @@
 ;;; cc-langs.el --- language specific settings for CC Mode -*- coding: utf-8 -*-
 
-;; Copyright (C) 1985, 1987, 1992-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2015 Free Software Foundation, Inc.
 
 ;; Authors:    2002- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -318,9 +318,9 @@ the evaluated constant value at compile time."
 	:style toggle :selected c-auto-newline]
        ["Hungry delete"         c-toggle-hungry-state
 	:style toggle :selected c-hungry-delete-key]
-       ["Subword mode"          subword-mode
-	:style toggle :selected (and (boundp 'subword-mode)
-                                     subword-mode)])))
+       ["Subword mode"          c-subword-mode
+	:style toggle :selected (and (boundp 'c-subword-mode)
+                                     c-subword-mode)])))
 
 
 ;;; Syntax tables.
@@ -577,9 +577,18 @@ EOL terminated statements."
   (c c++ objc) t)
 (c-lang-defvar c-has-bitfields (c-lang-const c-has-bitfields))
 
+(c-lang-defconst c-modified-constant
+  "Regexp that matches a \"modified\" constant literal such as \"L'a'\",
+a \"long character\".  In particular, this recognizes forms of constant
+which `c-backward-sexp' needs to be called twice to move backwards over."
+  t nil
+  (c c++ objc) "L'\\([^\\'\t\f\n\r]\\|\\\\.\\)'")
+;; FIXME!!!  Extend this to cover strings, if needed.  2008-04-11
+(c-lang-defvar c-modified-constant (c-lang-const c-modified-constant))
+
 (c-lang-defconst c-symbol-start
   "Regexp that matches the start of a symbol, i.e. any identifier or
-keyword.  It's unspecified how far it matches.	Does not contain a \\|
+keyword.  It's unspecified how far it matches.  Does not contain a \\|
 operator at the top level."
   t    (concat "[" c-alpha "_]")
   java (concat "[" c-alpha "_@]")
@@ -1144,7 +1153,8 @@ operators."
   c++  (append '("&" "<%" "%>" "<:" ":>" "%:" "%:%:")
 	       (c-lang-const c-other-op-syntax-tokens))
   objc (append '("#" "##"		; Used by cpp.
-		 "+" "-") (c-lang-const c-other-op-syntax-tokens))
+		 "+" "-")
+               (c-lang-const c-other-op-syntax-tokens))
   idl  (append '("#" "##")		; Used by cpp.
 	       (c-lang-const c-other-op-syntax-tokens))
   pike (append '("..")
@@ -1731,7 +1741,7 @@ but they don't build a type of themselves.  Unlike the keywords on
 not the type face."
   t    nil
   c    '("const" "restrict" "volatile")
-  c++  '("const" "constexpr" "noexcept" "volatile" "throw")
+  c++  '("const" "constexpr" "noexcept" "volatile" "throw" "final" "override")
   objc '("const" "volatile"))
 
 (c-lang-defconst c-opt-type-modifier-key
@@ -2996,17 +3006,15 @@ is in effect or not."
 	  (when (boundp (c-mode-symbol "font-lock-extra-types"))
 	    (c-mode-var "font-lock-extra-types")))
 	 (regexp-strings
-	  (apply 'nconc
-		 (mapcar (lambda (re)
-		    (when (string-match "[][.*+?^$\\]" re)
-		      (list re)))
-		  extra-types)))
+	  (delq nil (mapcar (lambda (re)
+			      (when (string-match "[][.*+?^$\\]" re)
+				re))
+			    extra-types)))
 	 (plain-strings
-	  (apply 'nconc
-		 (mapcar (lambda (re)
-		    (unless (string-match "[][.*+?^$\\]" re)
-		      (list re)))
-		  extra-types))))
+	  (delq nil (mapcar (lambda (re)
+			      (unless (string-match "[][.*+?^$\\]" re)
+				re))
+			    extra-types))))
     (concat "\\<\\("
 	    (c-concat-separated
 	     (append (list (c-make-keywords-re nil
@@ -3252,10 +3260,7 @@ function it returns is byte compiled with all the evaluated results
 from the language constants.  Use the `c-init-language-vars' macro to
 accomplish that conveniently."
 
-  (if (and (not load-in-progress)
-	   (boundp 'byte-compile-dest-file)
-	   (stringp byte-compile-dest-file))
-
+  (if (cc-bytecomp-is-compiling)
       ;; No need to byte compile this lambda since the byte compiler is
       ;; smart enough to detect the `funcall' construct in the
       ;; `c-init-language-vars' macro below and compile it all straight
@@ -3350,4 +3355,8 @@ evaluated and should not be quoted."
 
 (cc-provide 'cc-langs)
 
+;;; Local Variables:
+;;; indent-tabs-mode: t
+;;; tab-width: 8
+;;; End:
 ;;; cc-langs.el ends here

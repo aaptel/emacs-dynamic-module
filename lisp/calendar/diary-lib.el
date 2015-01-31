@@ -1,6 +1,7 @@
 ;;; diary-lib.el --- diary functions
 
-;; Copyright (C) 1989-1990, 1992-1995, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1989-1990, 1992-1995, 2001-2015 Free Software
+;; Foundation, Inc.
 
 ;; Author: Edward M. Reingold <reingold@cs.uiuc.edu>
 ;; Maintainer: Glenn Morris <rgm@gnu.org>
@@ -1586,8 +1587,7 @@ COLOR is passed to `calendar-mark-visible-date' as MARK."
                     (setq date (calendar-gregorian-from-absolute
                                 (funcall toabs (list month day y)))))
                    (calendar-mark-visible-date date color)))))
-      (calendar-mark-complex month day year
-                             'calendar-bahai-from-absolute color))))
+      (calendar-mark-complex month day year fromabs color))))
 
 
 (defun diary-entry-time (s)

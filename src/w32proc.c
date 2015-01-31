@@ -1,6 +1,6 @@
 /* Process support for GNU Emacs on the Microsoft Windows API.
 
-Copyright (C) 1992, 1995, 1999-2014 Free Software Foundation, Inc.
+Copyright (C) 1992, 1995, 1999-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -71,8 +71,6 @@ extern BOOL WINAPI IsValidLocale (LCID, DWORD);
   ((void *)((section)->PointerToRawData					\
 	    + ((DWORD_PTR)(var) - (section)->VirtualAddress)		\
 	    + (filedata).file_base))
-
-Lisp_Object Qhigh, Qlow;
 
 /* Signal handlers...SIG_DFL == 0 so this is initialized correctly.  */
 static signal_handler sig_handlers[NSIG];
@@ -1665,10 +1663,7 @@ sys_spawnve (int mode, char *cmdname, char **argv, char **envp)
       if (egetenv ("CMDPROXY"))
 	strcpy (cmdname, egetenv ("CMDPROXY"));
       else
-	{
-	  lispstpcpy (cmdname, Vinvocation_directory);
-	  strcat (cmdname, "cmdproxy.exe");
-	}
+	strcpy (lispstpcpy (cmdname, Vinvocation_directory), "cmdproxy.exe");
 
       /* Can't use unixtodos_filename here, since that needs its file
 	 name argument encoded in UTF-8.  */
@@ -3073,17 +3068,27 @@ If successful, the new CP is returned, otherwise nil.  */)
 DEFUN ("w32-get-codepage-charset", Fw32_get_codepage_charset,
        Sw32_get_codepage_charset, 1, 1, 0,
        doc: /* Return charset ID corresponding to codepage CP.
-Returns nil if the codepage is not valid.  */)
+Returns nil if the codepage is not valid or its charset ID could
+not be determined.
+
+Note that this function is only guaranteed to work with ANSI
+codepages; most console codepages are not supported and will
+yield nil.  */)
   (Lisp_Object cp)
 {
   CHARSETINFO info;
+  DWORD dwcp;
 
   CHECK_NUMBER (cp);
 
   if (!IsValidCodePage (XINT (cp)))
     return Qnil;
 
-  if (TranslateCharsetInfo ((DWORD *) XINT (cp), &info, TCI_SRCCODEPAGE))
+  /* Going through a temporary DWORD variable avoids compiler warning
+     about cast to pointer from integer of different size, when
+     building --with-wide-int.  */
+  dwcp = XINT (cp);
+  if (TranslateCharsetInfo ((DWORD *) dwcp, &info, TCI_SRCCODEPAGE))
     return make_number (info.ciCharset);
 
   return Qnil;
@@ -3142,8 +3147,8 @@ If successful, the new layout id is returned, otherwise nil.  */)
   CHECK_NUMBER_CAR (layout);
   CHECK_NUMBER_CDR (layout);
 
- kl = (HKL) ((XINT (XCAR (layout)) & 0xffff)
-	     | (XINT (XCDR (layout)) << 16));
+  kl = (HKL) (UINT_PTR) ((XINT (XCAR (layout)) & 0xffff)
+			 | (XINT (XCDR (layout)) << 16));
 
   /* Synchronize layout with input thread.  */
   if (dwWindowsThreadId)
@@ -3183,18 +3188,20 @@ get_lcid_callback (LPTSTR locale_num_str)
   if (GetLocaleInfo (try_lcid, LOCALE_SABBREVLANGNAME,
 		     locval, LOCALE_NAME_MAX_LENGTH))
     {
+      size_t locval_len;
+
       /* This is for when they only specify the language, as in "ENU".  */
       if (stricmp (locval, lname) == 0)
 	{
 	  found_lcid = try_lcid;
 	  return FALSE;
 	}
-      strcat (locval, "_");
+      locval_len = strlen (locval);
+      strcpy (locval + locval_len, "_");
       if (GetLocaleInfo (try_lcid, LOCALE_SABBREVCTRYNAME,
-			 locval + strlen (locval), LOCALE_NAME_MAX_LENGTH))
+			 locval + locval_len + 1, LOCALE_NAME_MAX_LENGTH))
 	{
-	  size_t locval_len = strlen (locval);
-
+	  locval_len = strlen (locval);
 	  if (strnicmp (locval, lname, locval_len) == 0
 	      && (lname[locval_len] == '.'
 		  || lname[locval_len] == '\0'))

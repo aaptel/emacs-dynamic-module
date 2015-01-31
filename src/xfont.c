@@ -1,5 +1,5 @@
 /* xfont.c -- X core font driver.
-   Copyright (C) 2006-2014 Free Software Foundation, Inc.
+   Copyright (C) 2006-2015 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -132,7 +132,7 @@ static int xfont_check (struct frame *, struct font *);
 struct font_driver xfont_driver =
   {
     LISP_INITIALLY_ZERO,	/* Qx */
-    0,				/* case insensitive */
+    false,			/* case insensitive */
     xfont_get_cache,
     xfont_list,
     xfont_match,
@@ -269,7 +269,7 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
 	}
       return (i >= 0);
     }
-  return 0;
+  return false;
 }
 
 /* A hash table recoding which font supports which scripts.  Each key
@@ -983,7 +983,7 @@ xfont_text_extents (struct font *font, unsigned int *code,
   int i, width = 0;
   bool first;
 
-  for (i = 0, first = 1; i < nglyphs; i++)
+  for (i = 0, first = true; i < nglyphs; i++)
     {
       XChar2b char2b;
       static XCharStruct *pcm;
@@ -1000,7 +1000,7 @@ xfont_text_extents (struct font *font, unsigned int *code,
 	  metrics->rbearing = pcm->rbearing;
 	  metrics->ascent = pcm->ascent;
 	  metrics->descent = pcm->descent;
-	  first = 0;
+	  first = false;
 	}
       else
 	{
@@ -1106,13 +1106,7 @@ void
 syms_of_xfont (void)
 {
   staticpro (&xfont_scripts_cache);
-  { /* Here we rely on the fact that syms_of_xfont (via syms_of_font)
-       is called fairly late, when QCtest and Qequal are known to be set.  */
-    Lisp_Object args[2];
-    args[0] = QCtest;
-    args[1] = Qequal;
-    xfont_scripts_cache = Fmake_hash_table (2, args);
-  }
+  xfont_scripts_cache = CALLN (Fmake_hash_table, QCtest, Qequal);
   staticpro (&xfont_scratch_props);
   xfont_scratch_props = Fmake_vector (make_number (8), Qnil);
   xfont_driver.type = Qx;

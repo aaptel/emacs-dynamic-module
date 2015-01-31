@@ -1,6 +1,7 @@
 ;;; hexl.el --- edit a file in a hex dump format using the hexl filter -*- lexical-binding: t -*-
 
-;; Copyright (C) 1989, 1994, 1998, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1989, 1994, 1998, 2001-2015 Free Software Foundation,
+;; Inc.
 
 ;; Author: Keith Gabryelski <ag@wheaties.ai.mit.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -394,8 +395,8 @@ You can use \\[hexl-find-file] to visit a file in Hexl mode.
     (add-hook 'change-major-mode-hook 'hexl-maybe-dehexlify-buffer nil t)
 
     ;; Set a callback function for eldoc.
-    (hexl-mode--setq-local 'eldoc-documentation-function
-                           #'hexl-print-current-point-info)
+    (add-function :before-until (local 'eldoc-documentation-function)
+                  #'hexl-print-current-point-info)
     (eldoc-add-command-completions "hexl-")
     (eldoc-remove-command "hexl-save-buffer"
 			  "hexl-current-address")

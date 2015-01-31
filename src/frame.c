@@ -1,6 +1,6 @@
 /* Generic frame functions.
 
-Copyright (C) 1993-1995, 1997, 1999-2014 Free Software Foundation, Inc.
+Copyright (C) 1993-1995, 1997, 1999-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -55,76 +55,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "widget.h"
 #endif
 
-#ifdef HAVE_NS
-Lisp_Object Qns_parse_geometry;
-#endif
-
-Lisp_Object Qframep, Qframe_live_p;
-Lisp_Object Qicon, Qmodeline;
-Lisp_Object Qonly, Qnone;
-Lisp_Object Qx, Qw32, Qpc, Qns;
-Lisp_Object Qvisible;
-Lisp_Object Qdisplay_type;
-static Lisp_Object Qbackground_mode;
-Lisp_Object Qnoelisp;
-
-static Lisp_Object Qx_frame_parameter;
-Lisp_Object Qx_resource_name;
-Lisp_Object Qterminal;
-
-/* Frame parameters (set or reported).  */
-
-Lisp_Object Qauto_raise, Qauto_lower;
-Lisp_Object Qborder_color, Qborder_width;
-Lisp_Object Qcursor_color, Qcursor_type;
-Lisp_Object Qheight, Qwidth;
-Lisp_Object Qicon_left, Qicon_top, Qicon_type, Qicon_name;
-Lisp_Object Qtooltip;
-Lisp_Object Qinternal_border_width;
-Lisp_Object Qright_divider_width, Qbottom_divider_width;
-Lisp_Object Qmouse_color;
-Lisp_Object Qminibuffer;
-Lisp_Object Qscroll_bar_width, Qvertical_scroll_bars;
-Lisp_Object Qscroll_bar_height, Qhorizontal_scroll_bars;
-Lisp_Object Qvisibility;
-Lisp_Object Qscroll_bar_foreground, Qscroll_bar_background;
-Lisp_Object Qscreen_gamma;
-Lisp_Object Qline_spacing;
-static Lisp_Object Quser_position, Quser_size;
-Lisp_Object Qwait_for_wm;
-static Lisp_Object Qwindow_id;
-#ifdef HAVE_X_WINDOWS
-static Lisp_Object Qouter_window_id;
-#endif
-Lisp_Object Qparent_id;
-Lisp_Object Qtitle, Qname;
-static Lisp_Object Qexplicit_name;
-Lisp_Object Qunsplittable;
-Lisp_Object Qmenu_bar_lines, Qtool_bar_lines, Qtool_bar_position;
-Lisp_Object Qleft_fringe, Qright_fringe;
-Lisp_Object Qbuffer_predicate;
-static Lisp_Object Qbuffer_list, Qburied_buffer_list;
-Lisp_Object Qtty_color_mode;
-Lisp_Object Qtty, Qtty_type;
-
-Lisp_Object Qfullscreen, Qfullwidth, Qfullheight, Qfullboth, Qmaximized;
-Lisp_Object Qsticky;
-Lisp_Object Qfont_backend;
-Lisp_Object Qalpha;
-
-Lisp_Object Qface_set_after_frame_default;
-
-static Lisp_Object Qfocus_in_hook;
-static Lisp_Object Qfocus_out_hook;
-static Lisp_Object Qdelete_frame_functions;
-static Lisp_Object Qframe_windows_min_size;
-static Lisp_Object Qgeometry, Qworkarea, Qmm_size, Qframes, Qsource;
-
-Lisp_Object Qframe_position, Qframe_outer_size, Qframe_inner_size;
-Lisp_Object Qexternal_border_size, Qtitle_height;
-Lisp_Object Qmenu_bar_external, Qmenu_bar_size;
-Lisp_Object Qtool_bar_external, Qtool_bar_size;
-
 /* The currently selected frame.  */
 
 Lisp_Object selected_frame;
@@ -136,6 +66,9 @@ static struct frame *last_nonminibuf_frame;
 
 /* False means there are no visible garbaged frames.  */
 bool frame_garbaged;
+
+/* The default tool bar height for future frames.  */
+int frame_default_tool_bar_height;
 
 #ifdef HAVE_WINDOW_SYSTEM
 static void x_report_frame_params (struct frame *, Lisp_Object *);
@@ -334,10 +267,23 @@ predicates which report frame's specific UI-related capabilities.  */)
     return type;
 }
 
-static int
-frame_windows_min_size (Lisp_Object frame, Lisp_Object horizontal, Lisp_Object pixelwise)
+/* Placeholder used by temacs -nw before window.el is loaded.  */
+DEFUN ("frame-windows-min-size", Fframe_windows_min_size,
+       Sframe_windows_min_size, 4, 4, 0,
+       doc: /* */
+       attributes: const)
+     (Lisp_Object frame, Lisp_Object horizontal,
+      Lisp_Object ignore, Lisp_Object pixelwise)
 {
-  return XINT (call3 (Qframe_windows_min_size, frame, horizontal, pixelwise));
+  return make_number (0);
+}
+
+static int
+frame_windows_min_size (Lisp_Object frame, Lisp_Object horizontal,
+			Lisp_Object ignore, Lisp_Object pixelwise)
+{
+  return XINT (call4 (Qframe_windows_min_size, frame, horizontal,
+		      ignore, pixelwise));
 }
 
 
@@ -389,6 +335,8 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
   int unit_height = FRAME_LINE_HEIGHT (f);
   int old_pixel_width = FRAME_PIXEL_WIDTH (f);
   int old_pixel_height = FRAME_PIXEL_HEIGHT (f);
+  int old_cols = FRAME_COLS (f);
+  int old_lines = FRAME_LINES (f);
   int new_pixel_width, new_pixel_height;
   /* The following two values are calculated from the old frame pixel
      sizes and any "new" settings for tool bar, menu bar and internal
@@ -416,11 +364,27 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
   Lisp_Object frame;
 
   XSETFRAME (frame, f);
+
+  /* `make-frame' initializes Vframe_adjust_size_history to (Qt) and
+     strips its car when exiting.  Just in case make sure its size never
+     exceeds 100.  */
+  if (!NILP (Fconsp (Vframe_adjust_size_history))
+      && EQ (Fcar (Vframe_adjust_size_history), Qt)
+      && XFASTINT (Fsafe_length (Vframe_adjust_size_history)) <= 100)
+    Vframe_adjust_size_history =
+      Fcons (Qt, Fcons (list5 (make_number (0),
+			       make_number (new_text_width),
+			       make_number (new_text_height),
+			       make_number (inhibit), parameter),
+			Fcdr (Vframe_adjust_size_history)));
+
   /* The following two values are calculated from the old window body
      sizes and any "new" settings for scroll bars, dividers, fringes and
      margins (though the latter should have been processed already).  */
-  min_windows_width = frame_windows_min_size (frame, Qt, Qt);
-  min_windows_height = frame_windows_min_size (frame, Qnil, Qt);
+  min_windows_width
+    = frame_windows_min_size (frame, Qt, (inhibit == 5) ? Qt : Qnil, Qt);
+  min_windows_height
+    = frame_windows_min_size (frame, Qnil, (inhibit == 5) ? Qt : Qnil, Qt);
 
   if (inhibit >= 2 && inhibit <= 4)
     /* If INHIBIT is in [2..4] inhibit if the "old" window sizes stay
@@ -481,6 +445,17 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
       else if (inhibit_vertical)
 	new_text_height = old_text_height;
 
+      if (!NILP (Fconsp (Vframe_adjust_size_history))
+	  && EQ (Fcar (Vframe_adjust_size_history), Qt)
+	  && XFASTINT (Fsafe_length (Vframe_adjust_size_history)) <= 100)
+	Vframe_adjust_size_history =
+	  Fcons (Qt, Fcons (list5 (make_number (1),
+				   make_number (new_text_width),
+				   make_number (new_text_height),
+				   make_number (new_cols),
+				   make_number (new_lines)),
+			    Fcdr (Vframe_adjust_size_history)));
+
       x_set_window_size (f, 0, new_text_width, new_text_height, 1);
       f->resized_p = true;
 
@@ -493,7 +468,9 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
       && new_windows_width == old_windows_width
       && new_windows_height == old_windows_height
       && new_pixel_width == old_pixel_width
-      && new_pixel_height == old_pixel_height)
+      && new_pixel_height == old_pixel_height
+      && new_cols == old_cols
+      && new_lines == old_lines)
     /* No change.  Sanitize window sizes and return.  */
     {
       sanitize_window_sizes (frame, Qt);
@@ -552,6 +529,17 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
   SET_FRAME_COLS (f, new_cols);
   SET_FRAME_LINES (f, new_lines);
 
+  if (!NILP (Fconsp (Vframe_adjust_size_history))
+      && EQ (Fcar (Vframe_adjust_size_history), Qt)
+      && XFASTINT (Fsafe_length (Vframe_adjust_size_history)) <= 100)
+    Vframe_adjust_size_history =
+      Fcons (Qt, Fcons (list5 (make_number (2),
+			       make_number (new_text_width),
+			       make_number (new_text_height),
+			       make_number (new_cols),
+			       make_number (new_lines)),
+			Fcdr (Vframe_adjust_size_history)));
+
   {
     struct window *w = XWINDOW (FRAME_SELECTED_WINDOW (f));
     int text_area_x, text_area_y, text_area_width, text_area_height;
@@ -582,6 +570,13 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
   run_window_configuration_change_hook (f);
 }
 
+/* Allocate basically initialized frame.  */
+
+static struct frame *
+allocate_frame (void)
+{
+  return ALLOCATE_ZEROED_PSEUDOVECTOR (struct frame, face_cache, PVEC_FRAME);
+}
 
 struct frame *
 make_frame (bool mini_p)
@@ -610,6 +605,7 @@ make_frame (bool mini_p)
   f->garbaged = true;
   f->can_x_set_window_size = false;
   f->can_run_window_configuration_change_hook = false;
+  f->tool_bar_redisplayed_once = false;
   f->column_width = 1;  /* !FRAME_WINDOW_P value.  */
   f->line_height = 1;  /* !FRAME_WINDOW_P value.  */
 #ifdef HAVE_WINDOW_SYSTEM
@@ -1194,7 +1190,7 @@ This function returns FRAME, or nil if FRAME has been deleted.  */)
   return do_switch_frame (frame, 1, 0, norecord);
 }
 
-DEFUN ("handle-switch-frame", Fhandle_switch_frame, Shandle_switch_frame, 1, 1, "e",
+DEFUN ("handle-switch-frame", Fhandle_switch_frame, Shandle_switch_frame, 1, 1, "^e",
        doc: /* Handle a switch-frame event EVENT.
 Switch-frame events are usually bound to this function.
 A switch-frame event tells Emacs that the window manager has requested
@@ -1207,7 +1203,7 @@ to that frame.  */)
 {
   /* Preserve prefix arg that the command loop just cleared.  */
   kset_prefix_arg (current_kboard, Vcurrent_prefix_arg);
-  Frun_hooks (1, &Qmouse_leave_buffer_hook);
+  run_hook (Qmouse_leave_buffer_hook);
   /* `switch-frame' implies a focus in.  */
   call1 (intern ("handle-focus-in"), event);
   return do_switch_frame (event, 0, 0, Qnil);
@@ -2864,7 +2860,7 @@ DEFUN ("frame-bottom-divider-width", Fbottom_divider_width, Sbottom_divider_widt
 }
 
 DEFUN ("set-frame-height", Fset_frame_height, Sset_frame_height, 2, 4, 0,
-       doc: /* Set height of frame FRAME to HEIGHT lines.
+       doc: /* Set text height of frame FRAME to HEIGHT lines.
 Optional third arg PRETEND non-nil means that redisplay should use
 HEIGHT lines but that the idea of the actual height of the frame should
 not be changed.
@@ -2883,14 +2879,13 @@ multiple of the default frame font height.  */)
   pixel_height = (!NILP (pixelwise)
 		  ? XINT (height)
 		  : XINT (height) * FRAME_LINE_HEIGHT (f));
-  if (pixel_height != FRAME_TEXT_HEIGHT (f))
-    adjust_frame_size (f, -1, pixel_height, 1, !NILP (pretend), Qheight);
+  adjust_frame_size (f, -1, pixel_height, 1, !NILP (pretend), Qheight);
 
   return Qnil;
 }
 
 DEFUN ("set-frame-width", Fset_frame_width, Sset_frame_width, 2, 4, 0,
-       doc: /* Set width of frame FRAME to WIDTH columns.
+       doc: /* Set text width of frame FRAME to WIDTH columns.
 Optional third arg PRETEND non-nil means that redisplay should use WIDTH
 columns but that the idea of the actual width of the frame should not
 be changed.
@@ -2909,14 +2904,13 @@ multiple of the default frame font width.  */)
   pixel_width = (!NILP (pixelwise)
 		 ? XINT (width)
 		 : XINT (width) * FRAME_COLUMN_WIDTH (f));
-  if (pixel_width != FRAME_TEXT_WIDTH (f))
-    adjust_frame_size (f, pixel_width, -1, 1, !NILP (pretend), Qwidth);
+  adjust_frame_size (f, pixel_width, -1, 1, !NILP (pretend), Qwidth);
 
   return Qnil;
 }
 
 DEFUN ("set-frame-size", Fset_frame_size, Sset_frame_size, 3, 4, 0,
-       doc: /* Set size of FRAME to WIDTH by HEIGHT, measured in characters.
+       doc: /* Set text size of FRAME to WIDTH by HEIGHT, measured in characters.
 Optional argument PIXELWISE non-nil means to measure in pixels.  Note:
 When `frame-resize-pixelwise' is nil, some window managers may refuse to
 honor a WIDTH that is not an integer multiple of the default frame font
@@ -2936,10 +2930,7 @@ font height.  */)
   pixel_height = (!NILP (pixelwise)
 		  ? XINT (height)
 		  : XINT (height) * FRAME_LINE_HEIGHT (f));
-
-  if (pixel_width != FRAME_TEXT_WIDTH (f)
-      || pixel_height != FRAME_TEXT_HEIGHT (f))
-    adjust_frame_size (f, pixel_width, pixel_height, 1, 0, Qsize);
+  adjust_frame_size (f, pixel_width, pixel_height, 1, 0, Qsize);
 
   return Qnil;
 }
@@ -2981,48 +2972,48 @@ or bottommost possible position (that stays within the screen).  */)
 
 struct frame_parm_table {
   const char *name;
-  Lisp_Object *variable;
+  int sym;
 };
 
 static const struct frame_parm_table frame_parms[] =
 {
-  {"auto-raise",		&Qauto_raise},
-  {"auto-lower",		&Qauto_lower},
-  {"background-color",		0},
-  {"border-color",		&Qborder_color},
-  {"border-width",		&Qborder_width},
-  {"cursor-color",		&Qcursor_color},
-  {"cursor-type",		&Qcursor_type},
-  {"font",			0},
-  {"foreground-color",		0},
-  {"icon-name",			&Qicon_name},
-  {"icon-type",			&Qicon_type},
-  {"internal-border-width",	&Qinternal_border_width},
-  {"right-divider-width",	&Qright_divider_width},
-  {"bottom-divider-width",	&Qbottom_divider_width},
-  {"menu-bar-lines",		&Qmenu_bar_lines},
-  {"mouse-color",		&Qmouse_color},
-  {"name",			&Qname},
-  {"scroll-bar-width",		&Qscroll_bar_width},
-  {"scroll-bar-height",		&Qscroll_bar_height},
-  {"title",			&Qtitle},
-  {"unsplittable",		&Qunsplittable},
-  {"vertical-scroll-bars",	&Qvertical_scroll_bars},
-  {"horizontal-scroll-bars",	&Qhorizontal_scroll_bars},
-  {"visibility",		&Qvisibility},
-  {"tool-bar-lines",		&Qtool_bar_lines},
-  {"scroll-bar-foreground",	&Qscroll_bar_foreground},
-  {"scroll-bar-background",	&Qscroll_bar_background},
-  {"screen-gamma",		&Qscreen_gamma},
-  {"line-spacing",		&Qline_spacing},
-  {"left-fringe",		&Qleft_fringe},
-  {"right-fringe",		&Qright_fringe},
-  {"wait-for-wm",		&Qwait_for_wm},
-  {"fullscreen",                &Qfullscreen},
-  {"font-backend",		&Qfont_backend},
-  {"alpha",			&Qalpha},
-  {"sticky",			&Qsticky},
-  {"tool-bar-position",		&Qtool_bar_position},
+  {"auto-raise",		SYMBOL_INDEX (Qauto_raise)},
+  {"auto-lower",		SYMBOL_INDEX (Qauto_lower)},
+  {"background-color",		-1},
+  {"border-color",		SYMBOL_INDEX (Qborder_color)},
+  {"border-width",		SYMBOL_INDEX (Qborder_width)},
+  {"cursor-color",		SYMBOL_INDEX (Qcursor_color)},
+  {"cursor-type",		SYMBOL_INDEX (Qcursor_type)},
+  {"font",			-1},
+  {"foreground-color",		-1},
+  {"icon-name",			SYMBOL_INDEX (Qicon_name)},
+  {"icon-type",			SYMBOL_INDEX (Qicon_type)},
+  {"internal-border-width",	SYMBOL_INDEX (Qinternal_border_width)},
+  {"right-divider-width",	SYMBOL_INDEX (Qright_divider_width)},
+  {"bottom-divider-width",	SYMBOL_INDEX (Qbottom_divider_width)},
+  {"menu-bar-lines",		SYMBOL_INDEX (Qmenu_bar_lines)},
+  {"mouse-color",		SYMBOL_INDEX (Qmouse_color)},
+  {"name",			SYMBOL_INDEX (Qname)},
+  {"scroll-bar-width",		SYMBOL_INDEX (Qscroll_bar_width)},
+  {"scroll-bar-height",		SYMBOL_INDEX (Qscroll_bar_height)},
+  {"title",			SYMBOL_INDEX (Qtitle)},
+  {"unsplittable",		SYMBOL_INDEX (Qunsplittable)},
+  {"vertical-scroll-bars",	SYMBOL_INDEX (Qvertical_scroll_bars)},
+  {"horizontal-scroll-bars",	SYMBOL_INDEX (Qhorizontal_scroll_bars)},
+  {"visibility",		SYMBOL_INDEX (Qvisibility)},
+  {"tool-bar-lines",		SYMBOL_INDEX (Qtool_bar_lines)},
+  {"scroll-bar-foreground",	SYMBOL_INDEX (Qscroll_bar_foreground)},
+  {"scroll-bar-background",	SYMBOL_INDEX (Qscroll_bar_background)},
+  {"screen-gamma",		SYMBOL_INDEX (Qscreen_gamma)},
+  {"line-spacing",		SYMBOL_INDEX (Qline_spacing)},
+  {"left-fringe",		SYMBOL_INDEX (Qleft_fringe)},
+  {"right-fringe",		SYMBOL_INDEX (Qright_fringe)},
+  {"wait-for-wm",		SYMBOL_INDEX (Qwait_for_wm)},
+  {"fullscreen",                SYMBOL_INDEX (Qfullscreen)},
+  {"font-backend",		SYMBOL_INDEX (Qfont_backend)},
+  {"alpha",			SYMBOL_INDEX (Qalpha)},
+  {"sticky",			SYMBOL_INDEX (Qsticky)},
+  {"tool-bar-position",		SYMBOL_INDEX (Qtool_bar_position)},
 };
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -3217,7 +3208,7 @@ x_set_frame_parameters (struct frame *f, Lisp_Object alist)
 
     if ((width_change && width != FRAME_TEXT_WIDTH (f))
 	|| (height_change && height != FRAME_TEXT_HEIGHT (f))
-	|| f->new_height || f->new_width)
+	|| (f->can_x_set_window_size && (f->new_height || f->new_width)))
       {
 	/* If necessary provide default values for HEIGHT and WIDTH.  Do
 	   that here since otherwise a size change implied by an
@@ -3641,7 +3632,7 @@ x_set_font_backend (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
 
       XSETFRAME (frame, f);
       x_set_font (f, Fframe_parameter (frame, Qfont), Qnil);
-      ++face_change_count;
+      face_change = true;
       windows_or_buffers_changed = 18;
     }
 }
@@ -4074,23 +4065,23 @@ xrdb_get_resource (XrmDatabase rdb, Lisp_Object attribute, Lisp_Object class, Li
 
   /* Start with emacs.FRAMENAME for the name (the specific one)
      and with `Emacs' for the class key (the general one).  */
-  lispstpcpy (name_key, Vx_resource_name);
-  lispstpcpy (class_key, Vx_resource_class);
+  char *nz = lispstpcpy (name_key, Vx_resource_name);
+  char *cz = lispstpcpy (class_key, Vx_resource_class);
 
-  strcat (class_key, ".");
-  strcat (class_key, SSDATA (class));
+  *cz++ = '.';
+  cz = lispstpcpy (cz, class);
 
   if (!NILP (component))
     {
-      strcat (class_key, ".");
-      strcat (class_key, SSDATA (subclass));
+      *cz++ = '.';
+      lispstpcpy (cz, subclass);
 
-      strcat (name_key, ".");
-      strcat (name_key, SSDATA (component));
+      *nz++ = '.';
+      nz = lispstpcpy (nz, component);
     }
 
-  strcat (name_key, ".");
-  strcat (name_key, SSDATA (attribute));
+  *nz++ = '.';
+  lispstpcpy (nz, attribute);
 
   char *value = x_get_string_resource (rdb, name_key, class_key);
   SAFE_FREE();
@@ -4548,23 +4539,27 @@ x_figure_window_size (struct frame *f, Lisp_Object parms, bool toolbar_p)
      frames without having to guess how tall the tool bar will get.  */
   if (toolbar_p && FRAME_TOOL_BAR_LINES (f))
     {
-      int margin, relief;
-
-      relief = (tool_bar_button_relief >= 0
-		? tool_bar_button_relief
-		: DEFAULT_TOOL_BAR_BUTTON_RELIEF);
-
-      if (RANGED_INTEGERP (1, Vtool_bar_button_margin, INT_MAX))
-	margin = XFASTINT (Vtool_bar_button_margin);
-      else if (CONSP (Vtool_bar_button_margin)
-	       && RANGED_INTEGERP (1, XCDR (Vtool_bar_button_margin), INT_MAX))
-	margin = XFASTINT (XCDR (Vtool_bar_button_margin));
+      if (frame_default_tool_bar_height)
+	FRAME_TOOL_BAR_HEIGHT (f) = frame_default_tool_bar_height;
       else
-	margin = 0;
+	{
+	  int margin, relief;
 
-      FRAME_TOOL_BAR_HEIGHT (f)
-	= DEFAULT_TOOL_BAR_IMAGE_HEIGHT + 2 * margin + 2 * relief;
-      Vframe_initial_frame_tool_bar_height = make_number (FRAME_TOOL_BAR_HEIGHT (f));
+	  relief = (tool_bar_button_relief >= 0
+		    ? tool_bar_button_relief
+		    : DEFAULT_TOOL_BAR_BUTTON_RELIEF);
+
+	  if (RANGED_INTEGERP (1, Vtool_bar_button_margin, INT_MAX))
+	    margin = XFASTINT (Vtool_bar_button_margin);
+	  else if (CONSP (Vtool_bar_button_margin)
+		   && RANGED_INTEGERP (1, XCDR (Vtool_bar_button_margin), INT_MAX))
+	    margin = XFASTINT (XCDR (Vtool_bar_button_margin));
+	  else
+	    margin = 0;
+
+	  FRAME_TOOL_BAR_HEIGHT (f)
+	    = DEFAULT_TOOL_BAR_IMAGE_HEIGHT + 2 * margin + 2 * relief;
+	}
     }
 
   top = x_get_arg (dpyinfo, parms, Qtop, 0, 0, RES_TYPE_NUMBER);
@@ -4835,22 +4830,59 @@ syms_of_frame (void)
   DEFSYM (Qtool_bar_external, "tool-bar-external");
   DEFSYM (Qtool_bar_size, "tool-bar-size");
   DEFSYM (Qframe_inner_size, "frame-inner-size");
+  DEFSYM (Qchange_frame_size, "change-frame-size");
+  DEFSYM (Qxg_frame_set_char_size, "xg-frame-set-char-size");
+  DEFSYM (Qset_window_configuration, "set-window-configuration");
+  DEFSYM (Qx_create_frame_1, "x-create-frame-1");
+  DEFSYM (Qx_create_frame_2, "x-create-frame-2");
 
 #ifdef HAVE_NS
   DEFSYM (Qns_parse_geometry, "ns-parse-geometry");
 #endif
+
+  DEFSYM (Qalpha, "alpha");
+  DEFSYM (Qauto_lower, "auto-lower");
+  DEFSYM (Qauto_raise, "auto-raise");
+  DEFSYM (Qborder_color, "border-color");
+  DEFSYM (Qborder_width, "border-width");
+  DEFSYM (Qbottom_divider_width, "bottom-divider-width");
+  DEFSYM (Qcursor_color, "cursor-color");
+  DEFSYM (Qcursor_type, "cursor-type");
+  DEFSYM (Qfont_backend, "font-backend");
+  DEFSYM (Qfullscreen, "fullscreen");
+  DEFSYM (Qhorizontal_scroll_bars, "horizontal-scroll-bars");
+  DEFSYM (Qicon_name, "icon-name");
+  DEFSYM (Qicon_type, "icon-type");
+  DEFSYM (Qinternal_border_width, "internal-border-width");
+  DEFSYM (Qleft_fringe, "left-fringe");
+  DEFSYM (Qline_spacing, "line-spacing");
+  DEFSYM (Qmenu_bar_lines, "menu-bar-lines");
+  DEFSYM (Qmouse_color, "mouse-color");
+  DEFSYM (Qname, "name");
+  DEFSYM (Qright_divider_width, "right-divider-width");
+  DEFSYM (Qright_fringe, "right-fringe");
+  DEFSYM (Qscreen_gamma, "screen-gamma");
+  DEFSYM (Qscroll_bar_background, "scroll-bar-background");
+  DEFSYM (Qscroll_bar_foreground, "scroll-bar-foreground");
+  DEFSYM (Qscroll_bar_height, "scroll-bar-height");
+  DEFSYM (Qscroll_bar_width, "scroll-bar-width");
+  DEFSYM (Qsticky, "sticky");
+  DEFSYM (Qtitle, "title");
+  DEFSYM (Qtool_bar_lines, "tool-bar-lines");
+  DEFSYM (Qtool_bar_position, "tool-bar-position");
+  DEFSYM (Qunsplittable, "unsplittable");
+  DEFSYM (Qvertical_scroll_bars, "vertical-scroll-bars");
+  DEFSYM (Qvisibility, "visibility");
+  DEFSYM (Qwait_for_wm, "wait-for-wm");
 
   {
     int i;
 
     for (i = 0; i < ARRAYELTS (frame_parms); i++)
       {
-	Lisp_Object v = intern_c_string (frame_parms[i].name);
-	if (frame_parms[i].variable)
-	  {
-	    *frame_parms[i].variable = v;
-	    staticpro (frame_parms[i].variable);
-	  }
+	Lisp_Object v = (frame_parms[i].sym < 0
+			 ? intern_c_string (frame_parms[i].name)
+			 : builtin_lisp_symbol (frame_parms[i].sym));
 	Fput (v, Qx_frame_parameter, make_number (i));
       }
   }
@@ -4992,10 +5024,6 @@ or call the function `tool-bar-mode'.  */);
   Vtool_bar_mode = Qnil;
 #endif
 
-  DEFVAR_LISP ("frame-initial-frame-tool-bar-height", Vframe_initial_frame_tool_bar_height,
-               doc: /* Height of tool bar of initial frame.  */);
-  Vframe_initial_frame_tool_bar_height = make_number (0);
-
   DEFVAR_KBOARD ("default-minibuffer-frame", Vdefault_minibuffer_frame,
 		 doc: /* Minibufferless frames use this frame's minibuffer.
 Emacs cannot create minibufferless frames unless this is set to an
@@ -5055,7 +5083,7 @@ keep it unchanged if this option is either `t' or a list containing
 `vertical-scroll-bars'.
 
 The default value is '(tool-bar-lines) on Lucid, Motif and Windows
-(which means that adding/removing a tool bar does not change the frame
+\(which means that adding/removing a tool bar does not change the frame
 height), nil on all other window systems including GTK+ (which means
 that changing any of the parameters listed above may change the size of
 the frame), and `t' otherwise (which means the frame size never changes
@@ -5074,11 +5102,16 @@ even if this option is non-nil.  */);
   frame_inhibit_implied_resize = Qt;
 #endif
 
+  DEFVAR_LISP ("frame-adjust-size-history", Vframe_adjust_size_history,
+               doc: /* History of frame size adjustments.  */);
+  Vframe_adjust_size_history = Qnil;
+
   staticpro (&Vframe_list);
 
   defsubr (&Sframep);
   defsubr (&Sframe_live_p);
   defsubr (&Swindow_system);
+  defsubr (&Sframe_windows_min_size);
   defsubr (&Smake_terminal_frame);
   defsubr (&Shandle_switch_frame);
   defsubr (&Sselect_frame);

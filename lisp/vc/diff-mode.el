@@ -1,6 +1,6 @@
 ;;; diff-mode.el --- a mode for viewing/editing context diffs -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2015 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: convenience patch diff vc
@@ -1816,6 +1816,16 @@ With a prefix argument, try to REVERSE the hunk."
     (set-window-point (display-buffer buf) (+ (car pos) (cdr src)))
     (diff-hunk-status-msg line-offset (diff-xor reverse switched) t)))
 
+
+(defun diff-kill-applied-hunks ()
+  "Kill all hunks that have already been applied starting at point."
+  (interactive)
+  (while (not (eobp))
+    (pcase-let ((`(,buf ,line-offset ,pos ,src ,_dst ,switched)
+                 (diff-find-source-location nil nil)))
+      (if (and line-offset switched)
+          (diff-hunk-kill)
+        (diff-hunk-next)))))
 
 (defalias 'diff-mouse-goto-source 'diff-goto-source)
 

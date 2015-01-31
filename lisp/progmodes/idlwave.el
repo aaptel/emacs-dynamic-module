@@ -1,6 +1,6 @@
 ;; idlwave.el --- IDL editing mode for GNU Emacs
 
-;; Copyright (C) 1999-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2015 Free Software Foundation, Inc.
 
 ;; Authors: J.D. Smith <jdsmith@as.arizona.edu>
 ;;          Carsten Dominik <dominik@science.uva.nl>
@@ -3713,7 +3713,7 @@ expression to enter.
 The lines containing S1 and S2 are reindented using `indent-region'
 unless the optional second argument NOINDENT is non-nil."
   (if (derived-mode-p 'idlwave-shell-mode)
-      ;; This is a gross hack to avoit template abbrev expansion
+      ;; This is a gross hack to avoid template abbrev expansion
       ;; in the shell.  FIXME: This is a dirty hack.
       (if (and (eq this-command 'self-insert-command)
 	       (equal last-abbrev-location (point)))

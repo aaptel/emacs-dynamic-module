@@ -1,5 +1,5 @@
 /* ftfont.c -- FreeType font driver.
-   Copyright (C) 2006-2014 Free Software Foundation, Inc.
+   Copyright (C) 2006-2015 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -37,12 +37,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "fontset.h"
 #include "font.h"
 #include "ftfont.h"
-
-/* Symbolic type of this font-driver.  */
-static Lisp_Object Qfreetype;
-
-/* Fontconfig's generic families and their aliases.  */
-static Lisp_Object Qmonospace, Qsans_serif, Qserif, Qmono, Qsans, Qsans__serif;
 
 /* Flag to tell if FcInit is already called or not.  */
 static bool fc_initialized;
@@ -381,13 +375,7 @@ ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
   if (NILP (cache))
     {
       if (NILP (ft_face_cache))
-	{
-	  Lisp_Object args[2];
-
-	  args[0] = QCtest;
-	  args[1] = Qequal;
-	  ft_face_cache = Fmake_hash_table (2, args);
-	}
+	ft_face_cache = CALLN (Fmake_hash_table, QCtest, Qequal);
       cache_data = xmalloc (sizeof *cache_data);
       cache_data->ft_face = NULL;
       cache_data->fc_charset = NULL;
@@ -2582,13 +2570,10 @@ ftfont_shape_by_flt (Lisp_Object lgstring, struct font *font,
 Lisp_Object
 ftfont_shape (Lisp_Object lgstring)
 {
-  struct font *font;
-  struct ftfont_info *ftfont_info;
-  OTF *otf;
+  struct font *font = CHECK_FONT_GET_OBJECT (LGSTRING_FONT (lgstring));
+  struct ftfont_info *ftfont_info = (struct ftfont_info *) font;
+  OTF *otf = ftfont_get_otf (ftfont_info);
 
-  CHECK_FONT_GET_OBJECT (LGSTRING_FONT (lgstring), font);
-  ftfont_info = (struct ftfont_info *) font;
-  otf = ftfont_get_otf (ftfont_info);
   if (! otf)
     return make_number (0);
   return ftfont_shape_by_flt (lgstring, font, ftfont_info->ft_size->face, otf,
@@ -2667,7 +2652,10 @@ ftfont_filter_properties (Lisp_Object font, Lisp_Object alist)
 void
 syms_of_ftfont (void)
 {
+  /* Symbolic type of this font-driver.  */
   DEFSYM (Qfreetype, "freetype");
+
+  /* Fontconfig's generic families and their aliases.  */
   DEFSYM (Qmonospace, "monospace");
   DEFSYM (Qsans_serif, "sans-serif");
   DEFSYM (Qserif, "serif");

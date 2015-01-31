@@ -1,6 +1,6 @@
 /* Utility and Unix shadow routines for GNU Emacs on the Microsoft Windows API.
 
-Copyright (C) 1994-1995, 2000-2014 Free Software Foundation, Inc.
+Copyright (C) 1994-1995, 2000-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -72,7 +72,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <pwd.h>
 #include <grp.h>
 
-/* MinGW64 (_W64) defines these in its _mingw.h.  */
+/* MinGW64 defines these in its _mingw.h.  */
 #ifndef _ANONYMOUS_UNION
 # define _ANONYMOUS_UNION
 #endif
@@ -151,7 +151,7 @@ typedef struct _PROCESS_MEMORY_COUNTERS_EX {
 #define SDDL_REVISION_1	1
 #endif	/* SDDL_REVISION_1 */
 
-#if defined(_MSC_VER) || defined(_W64)
+#if defined(_MSC_VER) || defined(MINGW_W64)
 /* MSVC and MinGW64 don't provide the definition of
    REPARSE_DATA_BUFFER and the associated macros, except on ntifs.h,
    which cannot be included because it triggers conflicts with other
@@ -241,8 +241,6 @@ typedef struct _REPARSE_DATA_BUFFER {
 
 typedef HRESULT (WINAPI * ShGetFolderPath_fn)
   (IN HWND, IN int, IN HANDLE, IN DWORD, OUT char *);
-
-Lisp_Object QCloaded_from;
 
 void globals_of_w32 (void);
 static DWORD get_rid (PSID);
@@ -3405,10 +3403,10 @@ sys_readdir (DIR *dirp)
       int ln;
 
       strcpy (filename, dir_pathname);
-      ln = strlen (filename) - 1;
-      if (!IS_DIRECTORY_SEP (filename[ln]))
-	strcat (filename, "\\");
-      strcat (filename, "*");
+      ln = strlen (filename);
+      if (!IS_DIRECTORY_SEP (filename[ln - 1]))
+	filename[ln++] = '\\';
+      strcpy (filename + ln, "*");
 
       /* Note: No need to resolve symlinks in FILENAME, because
 	 FindFirst opens the directory that is the target of a
@@ -3435,17 +3433,51 @@ sys_readdir (DIR *dirp)
 	}
 
       if (dir_find_handle == INVALID_HANDLE_VALUE)
-	return NULL;
+	{
+	  /* Any changes in the value of errno here should be in sync
+	     with what directory_files_internal does when it calls
+	     readdir.  */
+	  switch (GetLastError ())
+	    {
+	      /* Windows uses this value when FindFirstFile finds no
+		 files that match the wildcard.  This is not supposed
+		 to happen, since our wildcard is "*", but just in
+		 case, if there's some weird empty directory with not
+		 even "." and ".." entries...  */
+	    case ERROR_FILE_NOT_FOUND:
+	      errno = 0;
+	      /* FALLTHRU */
+	    default:
+	      break;
+	    case ERROR_ACCESS_DENIED:
+	    case ERROR_NETWORK_ACCESS_DENIED:
+	      errno = EACCES;
+	      break;
+	    case ERROR_PATH_NOT_FOUND:
+	    case ERROR_INVALID_DRIVE:
+	    case ERROR_BAD_NETPATH:
+	    case ERROR_BAD_NET_NAME:
+	      errno = ENOENT;
+	      break;
+	    }
+	  return NULL;
+	}
     }
   else if (w32_unicode_filenames)
     {
       if (!FindNextFileW (dir_find_handle, &dir_find_data_w))
-	return NULL;
+	{
+	  errno = 0;
+	  return NULL;
+	}
     }
   else
     {
       if (!FindNextFileA (dir_find_handle, &dir_find_data_a))
-	return NULL;
+	{
+	  errno = 0;
+	  return NULL;
+	}
     }
 
   /* Emacs never uses this value, so don't bother making it match
@@ -3547,7 +3579,11 @@ open_unc_volume (const char *path)
   if (result == NO_ERROR)
     return henum;
   else
-    return INVALID_HANDLE_VALUE;
+    {
+      /* Make sure directory_files_internal reports a sensible error.  */
+      errno = ENOENT;
+      return INVALID_HANDLE_VALUE;
+    }
 }
 
 static void *
@@ -4969,7 +5005,7 @@ stat_worker (const char * path, struct stat * buf, int follow_symlinks)
 	{
 	  /* Make sure root directories end in a slash.  */
 	  if (!IS_DIRECTORY_SEP (name[len-1]))
-	    strcat (name, "\\");
+	    strcpy (name + len, "\\");
 	  if (GetDriveType (name) < 2)
 	    {
 	      errno = ENOENT;
@@ -5438,8 +5474,7 @@ symlink (char const *filename, char const *linkname)
 	p--;
       if (p > linkfn)
 	strncpy (tem, linkfn, p - linkfn);
-      tem[p - linkfn] = '\0';
-      strcat (tem, filename);
+      strcpy (tem + (p - linkfn), filename);
       dir_access = faccessat (AT_FDCWD, tem, D_OK, AT_EACCESS);
     }
   else

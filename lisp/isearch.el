@@ -1,6 +1,6 @@
 ;;; isearch.el --- incremental search minor mode
 
-;; Copyright (C) 1992-1997, 1999-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1997, 1999-2015 Free Software Foundation, Inc.
 
 ;; Author: Daniel LaLiberte <liberte@cs.uiuc.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -974,10 +974,17 @@ The last thing it does is to run `isearch-update-post-hook'."
                 (other-window 1))
               (goto-char found-point))
 	  ;; Keep same hscrolling as at the start of the search when possible
-	  (let ((current-scroll (window-hscroll)))
+	  (let ((current-scroll (window-hscroll))
+		visible-p)
 	    (set-window-hscroll (selected-window) isearch-start-hscroll)
-	    (unless (pos-visible-in-window-p)
-	      (set-window-hscroll (selected-window) current-scroll))))
+	    (setq visible-p (pos-visible-in-window-p nil nil t))
+	    (if (or (not visible-p)
+		    ;; When point is not visible because of hscroll,
+		    ;; pos-visible-in-window-p returns non-nil, but
+		    ;; the X coordinate it returns is 1 pixel beyond
+		    ;; the last visible one.
+		    (>= (car visible-p) (window-body-width nil t)))
+		(set-window-hscroll (selected-window) current-scroll))))
 	(if isearch-other-end
             (if (< isearch-other-end (point)) ; isearch-forward?
                 (isearch-highlight isearch-other-end (point))
@@ -2342,6 +2349,8 @@ With argument, add COUNT copies of the character."
       (isearch-process-search-char char count))))
 
 (defun isearch-process-search-char (char &optional count)
+  "Add CHAR to the search string, COUNT times.
+Search is updated accordingly."
   ;; * and ? are special in regexps when not preceded by \.
   ;; } and | are special in regexps when preceded by \.
   ;; Nothing special for + because it matches at least once.
@@ -2727,7 +2736,7 @@ update the match data, and return point."
 ;; in any of these overlays, se we are safe in this case too.
 (defun isearch-open-necessary-overlays (ov)
   (let ((inside-overlay (and  (> (point) (overlay-start ov))
-			      (< (point) (overlay-end ov))))
+			      (<= (point) (overlay-end ov))))
 	;; If this exists it means that the overlay was opened using
 	;; this function, not by us tweaking the overlay properties.
 	(fct-temp (overlay-get ov 'isearch-open-invisible-temporary)))
@@ -3056,11 +3065,15 @@ Attempt to do the search exactly the way the pending Isearch would."
 	    (bound (if isearch-lazy-highlight-forward
 		       (min (or isearch-lazy-highlight-end-limit (point-max))
 			    (if isearch-lazy-highlight-wrapped
-				isearch-lazy-highlight-start
+				(+ isearch-lazy-highlight-start
+				   ;; Extend bound to match whole string at point
+				   (1- (length isearch-lazy-highlight-last-string)))
 			      (window-end)))
 		     (max (or isearch-lazy-highlight-start-limit (point-min))
 			  (if isearch-lazy-highlight-wrapped
-			      isearch-lazy-highlight-end
+			      (- isearch-lazy-highlight-end
+				 ;; Extend bound to match whole string at point
+				 (1- (length isearch-lazy-highlight-last-string)))
 			    (window-start))))))
 	;; Use a loop like in `isearch-search'.
 	(while retry

@@ -1,6 +1,6 @@
 ;;; files.el --- file input and output commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1992-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1992-2015 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -729,6 +729,39 @@ The path separator is colon in GNU and GNU-like systems."
                     (lambda (f) (and (file-directory-p f) 'dir-ok)))
        (error "No such directory found via CDPATH environment variable"))))
 
+(defsubst directory-name-p (name)
+  "Return non-nil if NAME ends with a slash character."
+  (and (> (length name) 0)
+       (char-equal (aref name (1- (length name))) ?/)))
+
+(defun directory-files-recursively (dir match &optional include-directories)
+  "Return all files under DIR that have file names matching MATCH (a regexp).
+This function works recursively.  Files are returned in \"depth first\"
+and alphabetical order.
+If INCLUDE-DIRECTORIES, also include directories that have matching names."
+  (let ((result nil)
+	(files nil)
+	;; When DIR is "/", remote file names like "/method:" could
+	;; also be offered.  We shall suppress them.
+	(tramp-mode (and tramp-mode (file-remote-p dir))))
+    (dolist (file (sort (file-name-all-completions "" dir)
+			'string<))
+      (unless (member file '("./" "../"))
+	(if (directory-name-p file)
+	    (let* ((leaf (substring file 0 (1- (length file))))
+		   (full-file (expand-file-name leaf dir)))
+	      ;; Don't follow symlinks to other directories.
+	      (unless (file-symlink-p full-file)
+		(setq result
+		      (nconc result (directory-files-recursively
+				     full-file match include-directories))))
+	      (when (and include-directories
+			 (string-match match leaf))
+		(setq result (nconc result (list full-file)))))
+	  (when (string-match match file)
+	    (push (expand-file-name file dir) files)))))
+    (nconc result (nreverse files))))
+
 (defun load-file (file)
   "Load the Lisp file named FILE."
   ;; This is a case where .elc makes a lot of sense.
@@ -1456,8 +1489,9 @@ expand wildcards (if any) and visit multiple files."
     (if (listp value)
 	(progn
 	  (setq value (nreverse value))
-	  (cons (switch-to-buffer-other-window (car value))
-		(mapcar 'switch-to-buffer (cdr value))))
+	  (switch-to-buffer-other-window (car value))
+	  (mapc 'switch-to-buffer (cdr value))
+	  value)
       (switch-to-buffer-other-window value))))
 
 (defun find-file-other-frame (filename &optional wildcards)
@@ -1479,8 +1513,9 @@ expand wildcards (if any) and visit multiple files."
     (if (listp value)
 	(progn
 	  (setq value (nreverse value))
-	  (cons (switch-to-buffer-other-frame (car value))
-		(mapcar 'switch-to-buffer (cdr value))))
+	  (switch-to-buffer-other-frame (car value))
+	  (mapc 'switch-to-buffer (cdr value))
+	  value)
       (switch-to-buffer-other-frame value))))
 
 (defun find-file-existing (filename)
@@ -2093,7 +2128,7 @@ This function ensures that none of these modifications will take place."
 
 (defun insert-file-1 (filename insert-func)
   (if (file-directory-p filename)
-      (signal 'file-error (list "Opening input file" "file is a directory"
+      (signal 'file-error (list "Opening input file" "Is a directory"
                                 filename)))
   ;; Check whether the file is uncommonly large
   (abort-if-file-too-large (nth 7 (file-attributes filename)) "insert" filename)
@@ -3567,7 +3602,9 @@ Returns the new list."
   "Collect entries from CLASS-VARIABLES into VARIABLES.
 ROOT is the root directory of the project.
 Return the new variables list."
-  (let* ((file-name (buffer-file-name))
+  (let* ((file-name (or (buffer-file-name)
+			;; Handle non-file buffers, too.
+			(expand-file-name default-directory)))
 	 (sub-file-name (if file-name
                             ;; FIXME: Why not use file-relative-name?
 			    (substring file-name (length root)))))
@@ -4602,7 +4639,7 @@ See the subroutine `basic-save-buffer' for more information."
     ;; then Rmail-mbox never displays it due to buffer swapping.  If
     ;; the test is ever re-introduced, be sure to handle saving of
     ;; Rmail files.
-    (if (and modp (buffer-file-name))
+    (if (and modp (buffer-file-name) (not noninteractive))
 	(message "Saving file %s..." (buffer-file-name)))
     (basic-save-buffer)
     (and modp (memq arg '(4 64)) (setq buffer-backed-up nil))))
@@ -4744,7 +4781,7 @@ Before and after saving the buffer, this function runs
 	  ;; Support VC `implicit' locking.
 	  (vc-after-save)
 	  (run-hooks 'after-save-hook))
-      (message "(No changes need to be saved)"))))
+      (or noninteractive (message "(No changes need to be saved)")))))
 
 ;; This does the "real job" of writing a buffer into its visited file
 ;; and making a backup file.  This is what is normally done
@@ -6057,7 +6094,7 @@ and `list-directory-verbose-switches'."
 
 PATTERN is assumed to represent a file-name wildcard suitable for the
 underlying filesystem.  For Unix and GNU/Linux, each character from the
-set [ \\t\\n;<>&|()'\"#$] is quoted with a backslash; for DOS/Windows, all
+set [ \\t\\n;<>&|()`'\"#$] is quoted with a backslash; for DOS/Windows, all
 the parts of the pattern which don't include wildcard characters are
 quoted with double quotes.
 
@@ -6071,12 +6108,12 @@ need to be passed verbatim to shell commands."
       ;; argument has quotes, we can safely assume it is already
       ;; quoted by the caller.
       (if (or (string-match "[\"]" pattern)
-	      ;; We quote [&()#$'] in case their shell is a port of a
+	      ;; We quote [&()#$`'] in case their shell is a port of a
 	      ;; Unixy shell.  We quote [,=+] because stock DOS and
 	      ;; Windows shells require that in some cases, such as
 	      ;; passing arguments to batch files that use positional
 	      ;; arguments like %1.
-	      (not (string-match "[ \t;&()#$',=+]" pattern)))
+	      (not (string-match "[ \t;&()#$`',=+]" pattern)))
 	  pattern
 	(let ((result "\"")
 	      (beg 0)
@@ -6091,7 +6128,7 @@ need to be passed verbatim to shell commands."
 	  (concat result (substring pattern beg) "\""))))
      (t
       (let ((beg 0))
-	(while (string-match "[ \t\n;<>&|()'\"#$]" pattern beg)
+	(while (string-match "[ \t\n;<>&|()`'\"#$]" pattern beg)
 	  (setq pattern
 		(concat (substring pattern 0 (match-beginning 0))
 			"\\"
@@ -6553,35 +6590,40 @@ Runs the members of `kill-emacs-query-functions' in turn and stops
 if any returns nil.  If `confirm-kill-emacs' is non-nil, calls it."
   (interactive "P")
   (save-some-buffers arg t)
-  (and (or (not (memq t (mapcar (function
-				  (lambda (buf) (and (buffer-file-name buf)
-						     (buffer-modified-p buf))))
-				(buffer-list))))
-	   (yes-or-no-p "Modified buffers exist; exit anyway? "))
-       (or (not (fboundp 'process-list))
-	   ;; process-list is not defined on MSDOS.
-	   (let ((processes (process-list))
-		 active)
-	     (while processes
-	       (and (memq (process-status (car processes)) '(run stop open listen))
-		    (process-query-on-exit-flag (car processes))
-		    (setq active t))
-	       (setq processes (cdr processes)))
-	     (or (not active)
-		 (with-current-buffer-window
-		  (get-buffer-create "*Process List*") nil
-		  #'(lambda (window _value)
-		      (with-selected-window window
-			(unwind-protect
-			    (yes-or-no-p "Active processes exist; kill them and exit anyway? ")
-			  (when (window-live-p window)
-			    (quit-restore-window window 'kill)))))
-		  (list-processes t)))))
-       ;; Query the user for other things, perhaps.
-       (run-hook-with-args-until-failure 'kill-emacs-query-functions)
-       (or (null confirm-kill-emacs)
-	   (funcall confirm-kill-emacs "Really exit Emacs? "))
-       (kill-emacs)))
+  (let ((confirm confirm-kill-emacs))
+    (and
+     (or (not (memq t (mapcar (function
+                               (lambda (buf) (and (buffer-file-name buf)
+                                                  (buffer-modified-p buf))))
+                              (buffer-list))))
+         (progn (setq confirm nil)
+                (yes-or-no-p "Modified buffers exist; exit anyway? ")))
+     (or (not (fboundp 'process-list))
+         ;; process-list is not defined on MSDOS.
+         (let ((processes (process-list))
+               active)
+           (while processes
+             (and (memq (process-status (car processes)) '(run stop open listen))
+                  (process-query-on-exit-flag (car processes))
+                  (setq active t))
+             (setq processes (cdr processes)))
+           (or (not active)
+               (with-current-buffer-window
+                (get-buffer-create "*Process List*") nil
+                #'(lambda (window _value)
+                    (with-selected-window window
+                      (unwind-protect
+                          (progn
+                            (setq confirm nil)
+                            (yes-or-no-p "Active processes exist; kill them and exit anyway? "))
+                        (when (window-live-p window)
+                          (quit-restore-window window 'kill)))))
+                (list-processes t)))))
+     ;; Query the user for other things, perhaps.
+     (run-hook-with-args-until-failure 'kill-emacs-query-functions)
+     (or (null confirm)
+         (funcall confirm "Really exit Emacs? "))
+     (kill-emacs))))
 
 (defun save-buffers-kill-terminal (&optional arg)
   "Offer to save each buffer, then kill the current connection.

@@ -1,6 +1,6 @@
 ;;; org-table.el --- The table editor for Org-mode
 
-;; Copyright (C) 2004-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2015 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -2351,7 +2351,7 @@ For all numbers larger than LIMIT, shift them by DELTA."
 		     (string-match "^[a-zA-Z][_a-zA-Z0-9]*$" field))
 	    (push (cons field v) org-table-local-parameters)
 	    (push (list field line col) org-table-named-field-locations))))
-      ;; Analyse the line types
+      ;; Analyze the line types.
       (goto-char beg)
       (setq org-table-current-begin-line (org-current-line)
 	    org-table-current-begin-pos (point)

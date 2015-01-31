@@ -1,6 +1,6 @@
 ;;; ox-ascii.el --- ASCII Back-End for Org Export Engine
 
-;; Copyright (C) 2012-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2015 Free Software Foundation, Inc.
 
 ;; Author: Nicolas Goaziou <n.goaziou at gmail dot com>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -185,7 +185,7 @@ original Org buffer at the same place."
   :package-version '(Org . "8.0")
   :type '(choice
 	  (const :tag "Replicate original spacing" nil)
-	  (cons :tag "Set an uniform spacing"
+	  (cons :tag "Set a uniform spacing"
 		(integer :tag "Number of blank lines before contents")
 		(integer :tag "Number of blank lines after contents"))))
 

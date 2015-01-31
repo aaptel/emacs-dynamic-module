@@ -1,3 +1,20 @@
+2015-01-28  Dima Kogan  <dima@secretsauce.net>
+
+	* erc-backend.el (define-erc-response-handler): Give hook-name
+	default value of nil and add-to-list (bug#19363).
+
+2015-01-22  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Don't downcase system diagnostics' first letters
+	* erc-dcc.el (erc-dcc-server): Ignore case while comparing diagnostics.
+
+2014-11-23  Michael Albinus  <michael.albinus@gmx.de>
+
+	* erc-desktop-notifications.el (erc-notifications-bus):
+	New customer option.  Supports cases when Emacs hasn't been
+	invoked in the same environment where the notifications shall go to.
+	(erc-notifications-notify): Use it.
+
 2014-11-10  Kelvin White  <kwhite@gnu.org>
 
 	* erc-stamp.el (erc-timestamp-intangible): Change version tag to 24.5.
@@ -99,7 +116,7 @@
 	(erc-channel-user): Add members for new modes.
 	(erc-channel-member-halfop-p, erc-channel-user-admin-p)
 	(erc-channel-user-owner-p): Use new struct members.
-	(erc-format-nick, erc-format-@nick): Display user modes as nick	prefix.
+	(erc-format-nick, erc-format-@nick): Display user modes as nick prefix.
 	(erc-nick-prefix-face, erc-my-nick-prefix-face): Add new faces
 	(erc-get-user-mode-prefix): Return symbol for mode prefix.
 	(erc-update-channel-member, erc-update-current-channel-member)
@@ -702,7 +719,7 @@
 
 See ChangeLog.08 for earlier changes.
 
-	Copyright (C) 2009-2014 Free Software Foundation, Inc.
+	Copyright (C) 2009-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

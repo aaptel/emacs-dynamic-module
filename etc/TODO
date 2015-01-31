@@ -1,6 +1,6 @@
 Emacs TODO List                                                   -*-outline-*-
 
-Copyright (C) 2001-2014 Free Software Foundation, Inc.
+Copyright (C) 2001-2015 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 
@@ -418,12 +418,6 @@ rather than interactively.  This a trivial one-liner in easy-mode.el.
 ** Make byte-compile warn when a doc string is too wide.
 
 ** Make byte-optimization warnings issue accurate line numbers.
-
-** A function to check for customizable options that have been
-  set but not saved, and ask the user whether to save them.
-  This could go in kill-emacs-query-functions, to remind people
-  to save their changes. If the user says yes, show them
-  in a Custom buffer using customize-customized.
 
 ** Record the sxhash of the default value for customized variables
   and notify the user (maybe by adding a menu item or toolbar button,

@@ -1,5 +1,5 @@
 /* Definitions and headers for communication with X protocol.
-   Copyright (C) 1989, 1993-1994, 1998-2014 Free Software Foundation,
+   Copyright (C) 1989, 1993-1994, 1998-2015 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -834,7 +834,7 @@ struct scroll_bar
   int whole;
 #endif
 
-  /* 1 if the scroll bar is horizontal.  */
+  /* True if the scroll bar is horizontal.  */
   bool horizontal;
 };
 
@@ -979,7 +979,7 @@ XrmDatabase x_load_resources (Display *, const char *, const char *,
 
 /* Defined in xterm.c */
 
-extern int x_text_icon (struct frame *, const char *);
+extern bool x_text_icon (struct frame *, const char *);
 extern void x_catch_errors (Display *);
 extern void x_check_errors (Display *, const char *)
   ATTRIBUTE_FORMAT_PRINTF (2, 0);
@@ -1049,10 +1049,10 @@ extern void x_send_client_event (Lisp_Object display,
                                  Lisp_Object format,
                                  Lisp_Object values);
 
-extern int x_handle_dnd_message (struct frame *,
-                                 const XClientMessageEvent *,
-                                 struct x_display_info *,
-                                 struct input_event *);
+extern bool x_handle_dnd_message (struct frame *,
+				  const XClientMessageEvent *,
+				  struct x_display_info *,
+				  struct input_event *);
 extern int x_check_property_data (Lisp_Object);
 extern void x_fill_property_data (Display *,
                                   Lisp_Object,
@@ -1067,8 +1067,8 @@ extern void x_clipboard_manager_save_frame (Lisp_Object);
 extern void x_clipboard_manager_save_all (void);
 
 #ifdef USE_GTK
-extern int xg_set_icon (struct frame *, Lisp_Object);
-extern int xg_set_icon_from_xpm_data (struct frame *, const char **);
+extern bool xg_set_icon (struct frame *, Lisp_Object);
+extern bool xg_set_icon_from_xpm_data (struct frame *, const char **);
 #endif /* USE_GTK */
 
 extern void xic_free_xfontset (struct frame *);
@@ -1081,7 +1081,7 @@ extern bool x_defined_color (struct frame *, const char *, XColor *, bool);
 #ifdef HAVE_X_I18N
 extern void free_frame_xic (struct frame *);
 # if defined HAVE_X_WINDOWS && defined USE_X_TOOLKIT
-extern char * xic_create_fontsetname (const char *base_fontname, int motif);
+extern char *xic_create_fontsetname (const char *, bool);
 # endif
 #endif
 
@@ -1099,7 +1099,7 @@ extern Lisp_Object xw_popup_dialog (struct frame *, Lisp_Object, Lisp_Object);
 #endif
 
 #if defined USE_GTK || defined USE_MOTIF
-extern void x_menu_set_in_use (int);
+extern void x_menu_set_in_use (bool);
 #endif
 extern void x_menu_wait_for_event (void *data);
 extern void initialize_frame_menubar (struct frame *);
@@ -1107,13 +1107,10 @@ extern void initialize_frame_menubar (struct frame *);
 /* Defined in xsmfns.c */
 #ifdef HAVE_X_SM
 extern void x_session_initialize (struct x_display_info *dpyinfo);
-extern int x_session_have_connection (void);
+extern bool x_session_have_connection (void);
 extern void x_session_close (void);
 #endif
 
-/* Defined in xterm.c */
-
-extern Lisp_Object Qx_gtk_map_stock;
 
 /* Is the frame embedded into another application? */
 

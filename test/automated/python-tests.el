@@ -1,6 +1,6 @@
 ;;; python-tests.el --- Test suite for python.el
 
-;; Copyright (C) 2013-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -174,13 +174,13 @@ aliqua."
 foo = long_function_name(var_one, var_two,
                          var_three, var_four)
 "
-   (should (eq (car (python-indent-context)) 'no-indent))
+   (should (eq (car (python-indent-context)) :no-indent))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "foo = long_function_name(var_one, var_two,")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "var_three, var_four)")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 25))))
 
 (ert-deftest python-indent-pep8-2 ()
@@ -192,19 +192,22 @@ def long_function_name(
         var_four):
     print (var_one)
 "
-   (should (eq (car (python-indent-context)) 'no-indent))
+   (should (eq (car (python-indent-context)) :no-indent))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "def long_function_name(")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "var_one, var_two, var_three,")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-newline-start-from-block))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "var_four):")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-newline-start-from-block))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "print (var_one)")
-   (should (eq (car (python-indent-context)) 'after-beginning-of-block))
+   (should (eq (car (python-indent-context))
+               :after-block-start))
    (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-pep8-3 ()
@@ -215,17 +218,33 @@ foo = long_function_name(
   var_one, var_two,
   var_three, var_four)
 "
-   (should (eq (car (python-indent-context)) 'no-indent))
+   (should (eq (car (python-indent-context)) :no-indent))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "foo = long_function_name(")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "var_one, var_two,")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "var_three, var_four)")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))))
+
+(ert-deftest python-indent-base-case ()
+  "Check base case does not trigger errors."
+  (python-tests-with-temp-buffer
+   "
+
+"
+   (goto-char (point-min))
+   (should (eq (car (python-indent-context)) :no-indent))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))))
 
 (ert-deftest python-indent-after-comment-1 ()
   "The most simple after-comment case that shouldn't fail."
@@ -240,23 +259,23 @@ class Blag(object):
 # with the exception with which the first child failed.
 "
    (python-tests-look-at "# We only complete")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-block-end))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "# terminal state")
-   (should (eq (car (python-indent-context)) 'after-comment))
+   (should (eq (car (python-indent-context)) :after-comment))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "# with the exception")
-   (should (eq (car (python-indent-context)) 'after-comment))
+   (should (eq (car (python-indent-context)) :after-comment))
    ;; This one indents relative to previous block, even given the fact
    ;; that it was under-indented.
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "# terminal state" -1)
    ;; It doesn't hurt to check again.
-   (should (eq (car (python-indent-context)) 'after-comment))
+   (should (eq (car (python-indent-context)) :after-comment))
    (python-indent-line)
    (should (= (current-indentation) 8))
    (python-tests-look-at "# with the exception")
-   (should (eq (car (python-indent-context)) 'after-comment))
+   (should (eq (car (python-indent-context)) :after-comment))
    ;; Now everything should be lined up.
    (should (= (python-indent-calculate-indentation) 8))))
 
@@ -275,33 +294,33 @@ now_we_do_mess_cause_this_is_not_a_comment = 1
 # yeah, that.
 "
    (python-tests-look-at "# I don't do much")
-   (should (eq (car (python-indent-context)) 'after-beginning-of-block))
+   (should (eq (car (python-indent-context)) :after-block-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "return arg")
    ;; Comment here just gets ignored, this line is not a comment so
    ;; the rules won't apply here.
-   (should (eq (car (python-indent-context)) 'after-beginning-of-block))
+   (should (eq (car (python-indent-context)) :after-block-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "# This comment is badly")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-block-end))
    ;; The return keyword moves indentation backwards 4 spaces, but
    ;; let's assume this comment was placed there because the user
    ;; wanted to (manually adding spaces or whatever).
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "# but we won't mess")
-   (should (eq (car (python-indent-context)) 'after-comment))
+   (should (eq (car (python-indent-context)) :after-comment))
    (should (= (python-indent-calculate-indentation) 4))
    ;; Behave the same for blank lines: potentially a comment.
    (forward-line 1)
-   (should (eq (car (python-indent-context)) 'after-comment))
+   (should (eq (car (python-indent-context)) :after-comment))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "now_we_do_mess")
    ;; Here is where comment indentation starts to get ignored and
    ;; where the user can't freely indent anymore.
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-block-end))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "# yeah, that.")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))))
 
 (ert-deftest python-indent-inside-paren-1 ()
@@ -325,49 +344,53 @@ data = {
 }
 "
    (python-tests-look-at "data = {")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "'key':")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "{")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "'objlist': [")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "{")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 12))
    (python-tests-look-at "'pk': 1,")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "'name': 'first',")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "},")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 12))
    (python-tests-look-at "{")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 12))
    (python-tests-look-at "'pk': 2,")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "'name': 'second',")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 16))
    (python-tests-look-at "}")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 12))
    (python-tests-look-at "]")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "}")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "}")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-at-closing-paren))
    (should (= (python-indent-calculate-indentation) 0))))
 
 (ert-deftest python-indent-inside-paren-2 ()
@@ -384,32 +407,110 @@ data = {'key': {
 }}
 "
    (python-tests-look-at "data = {")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "'objlist': [")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "{'pk': 1,")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "'name': 'first'},")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 9))
    (python-tests-look-at "{'pk': 2,")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 8))
    (python-tests-look-at "'name': 'second'}")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 9))
    (python-tests-look-at "]")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "}}")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context))
+               :inside-paren-at-closing-nested-paren))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "}")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-at-closing-paren))
    (should (= (python-indent-calculate-indentation) 0))))
+
+(ert-deftest python-indent-inside-paren-3 ()
+  "The simplest case possible."
+  (python-tests-with-temp-buffer
+   "
+data = ('these',
+        'are',
+        'the',
+        'tokens')
+"
+   (python-tests-look-at "data = ('these',")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 8))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 8))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 8))))
+
+(ert-deftest python-indent-inside-paren-4 ()
+  "Respect indentation of first column."
+  (python-tests-with-temp-buffer
+   "
+data = [ [ 'these', 'are'],
+         ['the', 'tokens' ] ]
+"
+   (python-tests-look-at "data = [ [ 'these', 'are'],")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 9))))
+
+(ert-deftest python-indent-inside-paren-5 ()
+  "Test when :inside-paren initial parens are skipped in context start."
+  (python-tests-with-temp-buffer
+   "
+while ((not some_condition) and
+       another_condition):
+    do_something_interesting(
+        with_some_arg)
+"
+   (python-tests-look-at "while ((not some_condition) and")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 7))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
+   (should (= (python-indent-calculate-indentation) 8))))
+
+(ert-deftest python-indent-inside-paren-6 ()
+  "This should be aligned.."
+  (python-tests-with-temp-buffer
+   "
+CHOICES = (('some', 'choice'),
+           ('another', 'choice'),
+           ('more', 'choices'))
+"
+   (python-tests-look-at "CHOICES = (('some', 'choice'),")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 11))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :inside-paren))
+   (should (= (python-indent-calculate-indentation) 11))))
 
 (ert-deftest python-indent-after-block-1 ()
   "The most simple after-block case that shouldn't fail."
@@ -417,10 +518,10 @@ data = {'key': {
    "
 def foo(a, b, c=True):
 "
-   (should (eq (car (python-indent-context)) 'no-indent))
+   (should (eq (car (python-indent-context)) :no-indent))
    (should (= (python-indent-calculate-indentation) 0))
    (goto-char (point-max))
-   (should (eq (car (python-indent-context)) 'after-beginning-of-block))
+   (should (eq (car (python-indent-context)) :after-block-start))
    (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-after-block-2 ()
@@ -432,8 +533,27 @@ def foo(a, b, c={
 }):
 "
    (goto-char (point-max))
-   (should (eq (car (python-indent-context)) 'after-beginning-of-block))
+   (should (eq (car (python-indent-context)) :after-block-start))
    (should (= (python-indent-calculate-indentation) 4))))
+
+(ert-deftest python-indent-after-block-3 ()
+  "A weird (malformed) sample, usually found in python shells."
+  (python-tests-with-temp-buffer
+   "
+In [1]:
+def func():
+pass
+
+In [2]:
+something
+"
+   (python-tests-look-at "pass")
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "something")
+   (end-of-line)
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))))
 
 (ert-deftest python-indent-after-backslash-1 ()
   "The most common case."
@@ -444,16 +564,16 @@ from foo.bar.baz import something, something_1 \\\\
     something_4, something_5
 "
    (python-tests-look-at "from foo.bar.baz import something, something_1")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at "something_2 something_3,")
-   (should (eq (car (python-indent-context)) 'after-backslash))
+   (should (eq (car (python-indent-context)) :after-backslash-first-line))
    (should (= (python-indent-calculate-indentation) 4))
    (python-tests-look-at "something_4, something_5")
-   (should (eq (car (python-indent-context)) 'after-backslash))
+   (should (eq (car (python-indent-context)) :after-backslash))
    (should (= (python-indent-calculate-indentation) 4))
    (goto-char (point-max))
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))))
 
 (ert-deftest python-indent-after-backslash-2 ()
@@ -471,40 +591,104 @@ objects = Thing.objects.all() \\\\
                        .values_list()
 "
    (python-tests-look-at "objects = Thing.objects.all()")
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))
    (python-tests-look-at ".filter(")
-   (should (eq (car (python-indent-context)) 'after-backslash))
+   (should (eq (car (python-indent-context))
+               :after-backslash-dotted-continuation))
    (should (= (python-indent-calculate-indentation) 23))
    (python-tests-look-at "type='toy',")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 27))
    (python-tests-look-at "status='bought'")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 27))
    (python-tests-look-at ") \\\\")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-at-closing-paren))
    (should (= (python-indent-calculate-indentation) 23))
    (python-tests-look-at ".aggregate(")
-   (should (eq (car (python-indent-context)) 'after-backslash))
+   (should (eq (car (python-indent-context))
+               :after-backslash-dotted-continuation))
    (should (= (python-indent-calculate-indentation) 23))
    (python-tests-look-at "Sum('amount')")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))
    (should (= (python-indent-calculate-indentation) 27))
    (python-tests-look-at ") \\\\")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren-at-closing-paren))
    (should (= (python-indent-calculate-indentation) 23))
    (python-tests-look-at ".values_list()")
-   (should (eq (car (python-indent-context)) 'after-backslash))
+   (should (eq (car (python-indent-context))
+               :after-backslash-dotted-continuation))
    (should (= (python-indent-calculate-indentation) 23))
    (forward-line 1)
-   (should (eq (car (python-indent-context)) 'after-line))
+   (should (eq (car (python-indent-context)) :after-line))
    (should (= (python-indent-calculate-indentation) 0))))
+
+(ert-deftest python-indent-after-backslash-3 ()
+  "Backslash continuation from block start."
+  (python-tests-with-temp-buffer
+   "
+with open('/path/to/some/file/you/want/to/read') as file_1, \\\\
+     open('/path/to/some/file/being/written', 'w') as file_2:
+    file_2.write(file_1.read())
+"
+   (python-tests-look-at
+    "with open('/path/to/some/file/you/want/to/read') as file_1, \\\\")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (python-tests-look-at
+    "open('/path/to/some/file/being/written', 'w') as file_2")
+   (should (eq (car (python-indent-context))
+               :after-backslash-block-continuation))
+   (should (= (python-indent-calculate-indentation) 5))
+   (python-tests-look-at "file_2.write(file_1.read())")
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))))
+
+(ert-deftest python-indent-after-backslash-4 ()
+  "Backslash continuation from assignment."
+  (python-tests-with-temp-buffer
+   "
+super_awful_assignment = some_calculation() and \\\\
+                         another_calculation() and \\\\
+                         some_final_calculation()
+"
+   (python-tests-look-at
+    "super_awful_assignment = some_calculation() and \\\\")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (python-tests-look-at "another_calculation() and \\\\")
+   (should (eq (car (python-indent-context))
+               :after-backslash-assignment-continuation))
+   (should (= (python-indent-calculate-indentation) 25))
+   (python-tests-look-at "some_final_calculation()")
+   (should (eq (car (python-indent-context)) :after-backslash))
+   (should (= (python-indent-calculate-indentation) 25))))
+
+(ert-deftest python-indent-after-backslash-5 ()
+  "Dotted continuation bizarre example."
+  (python-tests-with-temp-buffer
+   "
+def delete_all_things():
+    Thing \\\\
+        .objects.all() \\\\
+                .delete()
+"
+   (python-tests-look-at "Thing \\\\")
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at ".objects.all() \\\\")
+   (should (eq (car (python-indent-context)) :after-backslash-first-line))
+   (should (= (python-indent-calculate-indentation) 8))
+   (python-tests-look-at ".delete()")
+   (should (eq (car (python-indent-context))
+               :after-backslash-dotted-continuation))
+   (should (= (python-indent-calculate-indentation) 16))))
 
 (ert-deftest python-indent-block-enders-1 ()
   "Test de-indentation for pass keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 Class foo(object):
 
     def bar(self):
@@ -516,17 +700,18 @@ Class foo(object):
         else:
             pass
 "
-    (python-tests-look-at "3)")
-    (forward-line 1)
-    (should (= (python-indent-calculate-indentation) 8))
-    (python-tests-look-at "pass")
-    (forward-line 1)
-    (should (= (python-indent-calculate-indentation) 8))))
+   (python-tests-look-at "3)")
+   (forward-line 1)
+   (should (= (python-indent-calculate-indentation) 8))
+   (python-tests-look-at "pass")
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-block-end))
+   (should (= (python-indent-calculate-indentation) 8))))
 
 (ert-deftest python-indent-block-enders-2 ()
   "Test de-indentation for return keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 Class foo(object):
     '''raise lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do
 
@@ -539,64 +724,68 @@ Class foo(object):
                     2,
                     3)
 "
-    (python-tests-look-at "def")
-    (should (= (python-indent-calculate-indentation) 4))
-    (python-tests-look-at "if")
-    (should (= (python-indent-calculate-indentation) 8))
-    (python-tests-look-at "return")
-    (should (= (python-indent-calculate-indentation) 12))
-    (goto-char (point-max))
-    (should (= (python-indent-calculate-indentation) 8))))
+   (python-tests-look-at "def")
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "if")
+   (should (= (python-indent-calculate-indentation) 8))
+   (python-tests-look-at "return")
+   (should (= (python-indent-calculate-indentation) 12))
+   (goto-char (point-max))
+   (should (eq (car (python-indent-context)) :after-block-end))
+   (should (= (python-indent-calculate-indentation) 8))))
 
 (ert-deftest python-indent-block-enders-3 ()
   "Test de-indentation for continue keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 for element in lst:
     if element is None:
         continue
 "
-    (python-tests-look-at "if")
-    (should (= (python-indent-calculate-indentation) 4))
-    (python-tests-look-at "continue")
-    (should (= (python-indent-calculate-indentation) 8))
-    (forward-line 1)
-    (should (= (python-indent-calculate-indentation) 4))))
+   (python-tests-look-at "if")
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "continue")
+   (should (= (python-indent-calculate-indentation) 8))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-block-end))
+   (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-block-enders-4 ()
   "Test de-indentation for break keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 for element in lst:
     if element is None:
         break
 "
-    (python-tests-look-at "if")
-    (should (= (python-indent-calculate-indentation) 4))
-    (python-tests-look-at "break")
-    (should (= (python-indent-calculate-indentation) 8))
-    (forward-line 1)
-    (should (= (python-indent-calculate-indentation) 4))))
+   (python-tests-look-at "if")
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "break")
+   (should (= (python-indent-calculate-indentation) 8))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-block-end))
+   (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-block-enders-5 ()
   "Test de-indentation for raise keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 for element in lst:
     if element is None:
         raise ValueError('Element cannot be None')
 "
-    (python-tests-look-at "if")
-    (should (= (python-indent-calculate-indentation) 4))
-    (python-tests-look-at "raise")
-    (should (= (python-indent-calculate-indentation) 8))
-    (forward-line 1)
-    (should (= (python-indent-calculate-indentation) 4))))
+   (python-tests-look-at "if")
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "raise")
+   (should (= (python-indent-calculate-indentation) 8))
+   (forward-line 1)
+   (should (eq (car (python-indent-context)) :after-block-end))
+   (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-dedenters-1 ()
   "Test de-indentation for the elif keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 if save:
     try:
         write_to_disk(data)
@@ -604,15 +793,15 @@ if save:
         cleanup()
         elif
 "
-    (python-tests-look-at "elif\n")
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 0))
-    (should (equal (python-indent-calculate-levels) '(0)))))
+   (python-tests-look-at "elif\n")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 0))
+   (should (= (python-indent-calculate-indentation t) 0))))
 
 (ert-deftest python-indent-dedenters-2 ()
   "Test de-indentation for the else keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 if save:
     try:
         write_to_disk(data)
@@ -627,43 +816,50 @@ if save:
     finally:
         data.free()
 "
-    (python-tests-look-at "else\n")
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 8))
-    (should (equal (python-indent-calculate-levels) '(0 4 8)))))
+   (python-tests-look-at "else\n")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 8))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 4))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 0))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 8))))
 
 (ert-deftest python-indent-dedenters-3 ()
   "Test de-indentation for the except keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 if save:
     try:
         write_to_disk(data)
         except
 "
-    (python-tests-look-at "except\n")
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 4))
-    (should (equal (python-indent-calculate-levels) '(4)))))
+   (python-tests-look-at "except\n")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 4))))
 
 (ert-deftest python-indent-dedenters-4 ()
   "Test de-indentation for the finally keyword."
   (python-tests-with-temp-buffer
-      "
+   "
 if save:
     try:
         write_to_disk(data)
         finally
 "
-    (python-tests-look-at "finally\n")
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 4))
-    (should (equal (python-indent-calculate-levels) '(4)))))
+   (python-tests-look-at "finally\n")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-dedenters-5 ()
   "Test invalid levels are skipped in a complex example."
   (python-tests-with-temp-buffer
-      "
+   "
 if save:
     try:
         write_to_disk(data)
@@ -676,29 +872,31 @@ if save:
             do_cleanup()
         else
 "
-    (python-tests-look-at "else\n")
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 8))
-    (should (equal (python-indent-calculate-levels) '(0 8)))))
+   (python-tests-look-at "else\n")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 8))
+   (should (= (python-indent-calculate-indentation t) 0))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 8))))
 
 (ert-deftest python-indent-dedenters-6 ()
   "Test indentation is zero when no opening block for dedenter."
   (python-tests-with-temp-buffer
-      "
+   "
 try:
     # if save:
         write_to_disk(data)
         else
 "
-    (python-tests-look-at "else\n")
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 0))
-    (should (equal (python-indent-calculate-levels) '(0)))))
+   (python-tests-look-at "else\n")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 0))
+   (should (= (python-indent-calculate-indentation t) 0))))
 
 (ert-deftest python-indent-dedenters-7 ()
   "Test indentation case from Bug#15163."
   (python-tests-with-temp-buffer
-      "
+   "
 if a:
     if b:
         pass
@@ -706,10 +904,10 @@ if a:
         pass
         else:
 "
-    (python-tests-look-at "else:" 2)
-    (should (eq (car (python-indent-context)) 'dedenter-statement))
-    (should (= (python-indent-calculate-indentation) 0))
-    (should (equal (python-indent-calculate-levels) '(0)))))
+   (python-tests-look-at "else:" 2)
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 0))
+   (should (= (python-indent-calculate-indentation t) 0))))
 
 (ert-deftest python-indent-dedenters-8 ()
   "Test indentation for Bug#18432."
@@ -721,10 +919,99 @@ if (a == 1 or
 elif (a == 3 or
 a == 4):
 "
+   (python-tests-look-at "elif (a == 3 or")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 0))
+   (should (= (python-indent-calculate-indentation t) 0))
    (python-tests-look-at "a == 4):\n")
-   (should (eq (car (python-indent-context)) 'inside-paren))
+   (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 6))
-   (should (equal (python-indent-calculate-levels) '(0 4 6)))))
+   (python-indent-line)
+   (should (= (python-indent-calculate-indentation t) 4))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 0))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 6))))
+
+(ert-deftest python-indent-inside-string-1 ()
+  "Test indentation for strings."
+  (python-tests-with-temp-buffer
+   "
+multiline = '''
+bunch
+of
+lines
+'''
+"
+   (python-tests-look-at "multiline = '''")
+   (should (eq (car (python-indent-context)) :after-line))
+   (should (= (python-indent-calculate-indentation) 0))
+   (python-tests-look-at "bunch")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 0))
+   (python-tests-look-at "of")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 0))
+   (python-tests-look-at "lines")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 0))
+   (python-tests-look-at "'''")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 0))))
+
+(ert-deftest python-indent-inside-string-2 ()
+  "Test indentation for docstrings."
+  (python-tests-with-temp-buffer
+   "
+def fn(a, b, c=True):
+    '''docstring
+    bunch
+    of
+    lines
+    '''
+"
+   (python-tests-look-at "'''docstring")
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "bunch")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "of")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "lines")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "'''")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))))
+
+(ert-deftest python-indent-inside-string-3 ()
+  "Test indentation for nested strings."
+  (python-tests-with-temp-buffer
+   "
+def fn(a, b, c=True):
+    some_var = '''
+    bunch
+    of
+    lines
+    '''
+"
+   (python-tests-look-at "some_var = '''")
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "bunch")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "of")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "lines")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-tests-look-at "'''")
+   (should (eq (car (python-indent-context)) :inside-string))
+   (should (= (python-indent-calculate-indentation) 4))))
 
 (ert-deftest python-indent-electric-colon-1 ()
   "Test indentation case from Bug#18228."
@@ -739,6 +1026,39 @@ def b()
    (goto-char (line-end-position))
    (python-tests-self-insert ":")
    (should (= (current-indentation) 0))))
+
+(ert-deftest python-indent-electric-colon-2 ()
+  "Test indentation case for dedenter."
+  (python-tests-with-temp-buffer
+   "
+if do:
+    something()
+    else
+"
+   (python-tests-look-at "else")
+   (goto-char (line-end-position))
+   (python-tests-self-insert ":")
+   (should (= (current-indentation) 0))))
+
+(ert-deftest python-indent-electric-colon-3 ()
+  "Test indentation case for multi-line dedenter."
+  (python-tests-with-temp-buffer
+   "
+if do:
+    something()
+    elif (this
+          and
+          that)
+"
+   (python-tests-look-at "that)")
+   (goto-char (line-end-position))
+   (python-tests-self-insert ":")
+   (python-tests-look-at "elif" -1)
+   (should (= (current-indentation) 0))
+   (python-tests-look-at "and")
+   (should (= (current-indentation) 6))
+   (python-tests-look-at "that)")
+   (should (= (current-indentation) 6))))
 
 (ert-deftest python-indent-region-1 ()
   "Test indentation case from Bug#18843."
@@ -1769,58 +2089,64 @@ def f():
    (python-nav-backward-up-list)
    (should (looking-at "def f():"))))
 
+(ert-deftest python-indent-dedent-line-backspace-1 ()
+  "Check de-indentation on first call.  Bug#18319."
+  (python-tests-with-temp-buffer
+   "
+if True:
+    x ()
+    if False:
+"
+   (python-tests-look-at "if False:")
+   (call-interactively #'python-indent-dedent-line-backspace)
+   (should (zerop (current-indentation)))
+   ;; XXX: This should be a call to `undo' but it's triggering errors.
+   (insert "    ")
+   (should (= (current-indentation) 4))
+   (call-interactively #'python-indent-dedent-line-backspace)
+   (should (zerop (current-indentation)))))
+
 
 ;;; Shell integration
 
 (defvar python-tests-shell-interpreter "python")
 
 (ert-deftest python-shell-get-process-name-1 ()
-  "Check process name calculation on different scenarios."
+  "Check process name calculation sans `buffer-file-name'."
   (python-tests-with-temp-buffer
-      ""
-    (should (string= (python-shell-get-process-name nil)
-                     python-shell-buffer-name))
-    ;; When the `current-buffer' doesn't have `buffer-file-name', even
-    ;; if dedicated flag is non-nil should not include its name.
-    (should (string= (python-shell-get-process-name t)
-                     python-shell-buffer-name)))
+   ""
+   (should (string= (python-shell-get-process-name nil)
+                    python-shell-buffer-name))
+   (should (string= (python-shell-get-process-name t)
+                    (format "%s[%s]" python-shell-buffer-name (buffer-name))))))
+
+(ert-deftest python-shell-get-process-name-2 ()
+  "Check process name calculation with `buffer-file-name'."
   (python-tests-with-temp-file
-      ""
-    ;; `buffer-file-name' is non-nil but the dedicated flag is nil and
-    ;; should be respected.
-    (should (string= (python-shell-get-process-name nil)
-                     python-shell-buffer-name))
-    (should (string=
-             (python-shell-get-process-name t)
-             (format "%s[%s]" python-shell-buffer-name buffer-file-name)))))
+   ""
+   ;; `buffer-file-name' is non-nil but the dedicated flag is nil and
+   ;; should be respected.
+   (should (string= (python-shell-get-process-name nil)
+                    python-shell-buffer-name))
+   (should (string=
+            (python-shell-get-process-name t)
+            (format "%s[%s]" python-shell-buffer-name (buffer-name))))))
 
 (ert-deftest python-shell-internal-get-process-name-1 ()
-  "Check the internal process name is config-unique."
-  (let* ((python-shell-interpreter python-tests-shell-interpreter)
-         (python-shell-interpreter-args "")
-         (python-shell-prompt-regexp ">>> ")
-         (python-shell-prompt-block-regexp "[.][.][.] ")
-         (python-shell-setup-codes "")
-         (python-shell-process-environment "")
-         (python-shell-extra-pythonpaths "")
-         (python-shell-exec-path "")
-         (python-shell-virtualenv-path "")
-         (expected (python-tests-with-temp-buffer
-                       "" (python-shell-internal-get-process-name))))
-    ;; Same configurations should match.
-    (should
-     (string= expected
-              (python-tests-with-temp-buffer
-                  "" (python-shell-internal-get-process-name))))
-    (let ((python-shell-interpreter-args "-B"))
-      ;; A minimal change should generate different names.
-      (should
-       (not (string=
-             expected
-             (python-tests-with-temp-buffer
-                 "" (python-shell-internal-get-process-name))))))))
+  "Check the internal process name is buffer-unique sans `buffer-file-name'."
+  (python-tests-with-temp-buffer
+   ""
+   (should (string= (python-shell-internal-get-process-name)
+                    (format "%s[%s]" python-shell-internal-buffer-name (buffer-name))))))
 
-(ert-deftest python-shell-parse-command-1 ()
+(ert-deftest python-shell-internal-get-process-name-2 ()
+  "Check the internal process name is buffer-unique with `buffer-file-name'."
+  (python-tests-with-temp-file
+   ""
+   (should (string= (python-shell-internal-get-process-name)
+                    (format "%s[%s]" python-shell-internal-buffer-name (buffer-name))))))
+
+(ert-deftest python-shell-calculate-command-1 ()
   "Check the command to execute is calculated correctly.
 Using `python-shell-interpreter' and
 `python-shell-interpreter-args'."
@@ -1832,7 +2158,7 @@ Using `python-shell-interpreter' and
              (format "%s %s"
                      python-shell-interpreter
                      python-shell-interpreter-args)
-             (python-shell-parse-command)))))
+             (python-shell-calculate-command)))))
 
 (ert-deftest python-shell-calculate-process-environment-1 ()
   "Test `python-shell-process-environment' modification."
@@ -1857,18 +2183,35 @@ Using `python-shell-interpreter' and
                     path-separator original-pythonpath)))))
 
 (ert-deftest python-shell-calculate-process-environment-3 ()
-  "Test `python-shell-virtualenv-path' modification."
+  "Test `python-shell-virtualenv-root' modification."
   (let* ((original-path (or (getenv "PATH") ""))
-         (python-shell-virtualenv-path
+         (python-shell-virtualenv-root
           (directory-file-name user-emacs-directory))
          (process-environment
           (python-shell-calculate-process-environment)))
     (should (not (getenv "PYTHONHOME")))
-    (should (string= (getenv "VIRTUAL_ENV") python-shell-virtualenv-path))
+    (should (string= (getenv "VIRTUAL_ENV") python-shell-virtualenv-root))
     (should (equal (getenv "PATH")
                    (format "%s/bin%s%s"
-                           python-shell-virtualenv-path
+                           python-shell-virtualenv-root
                            path-separator original-path)))))
+
+(ert-deftest python-shell-calculate-process-environment-4 ()
+  "Test `python-shell-unbuffered' modification."
+  (setenv "PYTHONUNBUFFERED")
+  (let* ((process-environment
+          (python-shell-calculate-process-environment)))
+    ;; Defaults to t
+    (should python-shell-unbuffered)
+    (should (string= (getenv "PYTHONUNBUFFERED") "1"))))
+
+(ert-deftest python-shell-calculate-process-environment-5 ()
+  (setenv "PYTHONUNBUFFERED")
+  "Test `python-shell-unbuffered' modification."
+  (let* ((python-shell-unbuffered nil)
+         (process-environment
+          (python-shell-calculate-process-environment)))
+    (should (not (getenv "PYTHONUNBUFFERED")))))
 
 (ert-deftest python-shell-calculate-exec-path-1 ()
   "Test `python-shell-exec-path' modification."
@@ -1883,13 +2226,13 @@ Using `python-shell-interpreter' and
 (ert-deftest python-shell-calculate-exec-path-2 ()
   "Test `python-shell-exec-path' modification."
   (let* ((original-exec-path exec-path)
-         (python-shell-virtualenv-path
+         (python-shell-virtualenv-root
           (directory-file-name (expand-file-name user-emacs-directory)))
          (exec-path (python-shell-calculate-exec-path)))
     (should (equal
              exec-path
              (append (cons
-                      (format "%s/bin" python-shell-virtualenv-path)
+                      (format "%s/bin" python-shell-virtualenv-root)
                       original-exec-path))))))
 
 (ert-deftest python-shell-make-comint-1 ()
@@ -1905,7 +2248,7 @@ Using `python-shell-interpreter' and
          (shell-buffer
           (python-tests-with-temp-buffer
            "" (python-shell-make-comint
-               (python-shell-parse-command) proc-name)))
+               (python-shell-calculate-command) proc-name)))
          (process (get-buffer-process shell-buffer)))
     (unwind-protect
         (progn
@@ -1926,7 +2269,7 @@ Using `python-shell-interpreter' and
          (shell-buffer
           (python-tests-with-temp-buffer
            "" (python-shell-make-comint
-               (python-shell-parse-command) proc-name nil t)))
+               (python-shell-calculate-command) proc-name nil t)))
          (process (get-buffer-process shell-buffer)))
     (unwind-protect
         (progn
@@ -1959,8 +2302,9 @@ and `python-shell-interpreter-args' in the new shell buffer."
           (should (process-live-p process))
           (with-current-buffer shell-buffer
             (should (eq major-mode 'inferior-python-mode))
-            (should (string= python-shell-interpreter
-                             (executable-find python-tests-shell-interpreter)))
+            (should (file-equal-p
+                     python-shell-interpreter
+                     (executable-find python-tests-shell-interpreter)))
             (should (string= python-shell-interpreter-args "-i"))))
       (kill-buffer shell-buffer))))
 
@@ -1992,7 +2336,7 @@ and `python-shell-interpreter-args' in the new shell buffer."
             (setenv "PYTHONSTARTUP" startup-file)
             (python-tests-with-temp-buffer
              "" (python-shell-make-comint
-                 (python-shell-parse-command) proc-name nil))))
+                 (python-shell-calculate-command) proc-name nil))))
          (process (get-buffer-process shell-buffer)))
     (unwind-protect
         (progn
@@ -2022,10 +2366,10 @@ and `python-shell-interpreter-args' in the new shell buffer."
            (dedicated-proc-name (python-shell-get-process-name t))
            (global-shell-buffer
             (python-shell-make-comint
-             (python-shell-parse-command) global-proc-name))
+             (python-shell-calculate-command) global-proc-name))
            (dedicated-shell-buffer
             (python-shell-make-comint
-             (python-shell-parse-command) dedicated-proc-name))
+             (python-shell-calculate-command) dedicated-proc-name))
            (global-process (get-buffer-process global-shell-buffer))
            (dedicated-process (get-buffer-process dedicated-shell-buffer)))
       (unwind-protect
@@ -2042,87 +2386,6 @@ and `python-shell-interpreter-args' in the new shell buffer."
             (should (not (python-shell-get-process))))
         (ignore-errors (kill-buffer global-shell-buffer))
         (ignore-errors (kill-buffer dedicated-shell-buffer))))))
-
-(ert-deftest python-shell-get-or-create-process-1 ()
-  "Check shell dedicated process creation."
-  (skip-unless (executable-find python-tests-shell-interpreter))
-  (python-tests-with-temp-file
-   ""
-   (let* ((python-shell-interpreter
-           (executable-find python-tests-shell-interpreter))
-          (use-dialog-box)
-          (dedicated-process-name (python-shell-get-process-name t))
-          (dedicated-process
-           (python-shell-get-or-create-process python-shell-interpreter t))
-          (dedicated-shell-buffer (process-buffer dedicated-process)))
-     (unwind-protect
-         (progn
-           (set-process-query-on-exit-flag dedicated-process nil)
-           ;; should be dedicated.
-           (should (equal (process-name dedicated-process)
-                          dedicated-process-name))
-           (kill-buffer dedicated-shell-buffer)
-           ;; Check there are no processes for current buffer.
-           (should (not (python-shell-get-process))))
-       (ignore-errors (kill-buffer dedicated-shell-buffer))))))
-
-(ert-deftest python-shell-get-or-create-process-2 ()
-  "Check shell global process creation."
-  (skip-unless (executable-find python-tests-shell-interpreter))
-  (python-tests-with-temp-file
-   ""
-   (let* ((python-shell-interpreter
-           (executable-find python-tests-shell-interpreter))
-          (use-dialog-box)
-          (process-name (python-shell-get-process-name nil))
-          (process
-           (python-shell-get-or-create-process python-shell-interpreter))
-          (shell-buffer (process-buffer process)))
-     (unwind-protect
-         (progn
-           (set-process-query-on-exit-flag process nil)
-           ;; should be global.
-           (should (equal (process-name process) process-name))
-           (kill-buffer shell-buffer)
-           ;; Check there are no processes for current buffer.
-           (should (not (python-shell-get-process))))
-       (ignore-errors (kill-buffer dedicated-shell-buffer))))))
-
-(ert-deftest python-shell-get-or-create-process-3 ()
-  "Check shell dedicated/global process preference."
-  (skip-unless (executable-find python-tests-shell-interpreter))
-  (python-tests-with-temp-file
-   ""
-   (let* ((python-shell-interpreter
-           (executable-find python-tests-shell-interpreter))
-          (use-dialog-box)
-          (dedicated-process-name (python-shell-get-process-name t))
-          (global-process)
-          (dedicated-process))
-     (unwind-protect
-         (progn
-           ;; Create global process
-           (run-python python-shell-interpreter nil)
-           (setq global-process (get-buffer-process "*Python*"))
-           (should global-process)
-           (set-process-query-on-exit-flag global-process nil)
-           ;; Create dedicated process
-           (run-python python-shell-interpreter t)
-           (setq dedicated-process (get-process dedicated-process-name))
-           (should dedicated-process)
-           (set-process-query-on-exit-flag dedicated-process nil)
-           ;; Prefer dedicated.
-           (should (equal (python-shell-get-or-create-process)
-                          dedicated-process))
-           ;; Kill the dedicated so the global takes over.
-           (kill-buffer (process-buffer dedicated-process))
-           ;; Detect global.
-           (should (equal (python-shell-get-or-create-process) global-process))
-           ;; Kill the global.
-           (kill-buffer (process-buffer global-process))
-           ;; Check there are no processes for current buffer.
-           (should (not (python-shell-get-process))))
-       (ignore-errors (kill-buffer dedicated-shell-buffer))))))
 
 (ert-deftest python-shell-internal-get-or-create-process-1 ()
   "Check internal shell process creation fallback."
@@ -2409,8 +2672,228 @@ and `python-shell-interpreter-args' in the new shell buffer."
                            "^\\(o\\.t \\|\\)")))
       (ignore-errors (delete-file startup-file)))))
 
+(ert-deftest python-shell-buffer-substring-1 ()
+  "Selecting a substring of the whole buffer must match its contents."
+  (python-tests-with-temp-buffer
+   "
+class Foo(models.Model):
+    pass
+
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (buffer-string)
+                    (python-shell-buffer-substring (point-min) (point-max))))))
+
+(ert-deftest python-shell-buffer-substring-2 ()
+  "Main block should be removed if NOMAIN is non-nil."
+  (python-tests-with-temp-buffer
+   "
+class Foo(models.Model):
+    pass
+
+class Bar(models.Model):
+    pass
+
+if __name__ == \"__main__\":
+    foo = Foo()
+    print (foo)
+"
+   (should (string= (python-shell-buffer-substring (point-min) (point-max) t)
+                    "
+class Foo(models.Model):
+    pass
+
+class Bar(models.Model):
+    pass
+
+
+
+
+"))))
+
+(ert-deftest python-shell-buffer-substring-3 ()
+  "Main block should be removed if NOMAIN is non-nil."
+  (python-tests-with-temp-buffer
+   "
+class Foo(models.Model):
+    pass
+
+if __name__ == \"__main__\":
+    foo = Foo()
+    print (foo)
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring (point-min) (point-max) t)
+                    "
+class Foo(models.Model):
+    pass
+
+
+
+
+
+class Bar(models.Model):
+    pass
+"))))
+
+(ert-deftest python-shell-buffer-substring-4 ()
+  "Coding cookie should be added for substrings."
+  (python-tests-with-temp-buffer
+   "# coding: latin-1
+
+class Foo(models.Model):
+    pass
+
+if __name__ == \"__main__\":
+    foo = Foo()
+    print (foo)
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring
+                     (python-tests-look-at "class Foo(models.Model):")
+                     (progn (python-nav-forward-sexp) (point)))
+                    "# -*- coding: latin-1 -*-
+
+class Foo(models.Model):
+    pass"))))
+
+(ert-deftest python-shell-buffer-substring-5 ()
+  "The proper amount of blank lines is added for a substring."
+  (python-tests-with-temp-buffer
+   "# coding: latin-1
+
+class Foo(models.Model):
+    pass
+
+if __name__ == \"__main__\":
+    foo = Foo()
+    print (foo)
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring
+                     (python-tests-look-at "class Bar(models.Model):")
+                     (progn (python-nav-forward-sexp) (point)))
+                    "# -*- coding: latin-1 -*-
+
+
+
+
+
+
+
+
+class Bar(models.Model):
+    pass"))))
+
+(ert-deftest python-shell-buffer-substring-6 ()
+  "Handle substring with coding cookie in the second line."
+  (python-tests-with-temp-buffer
+   "
+# coding: latin-1
+
+class Foo(models.Model):
+    pass
+
+if __name__ == \"__main__\":
+    foo = Foo()
+    print (foo)
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring
+                     (python-tests-look-at "# coding: latin-1")
+                     (python-tests-look-at "if __name__ == \"__main__\":"))
+                    "# -*- coding: latin-1 -*-
+
+
+class Foo(models.Model):
+    pass
+
+"))))
+
+(ert-deftest python-shell-buffer-substring-7 ()
+  "Ensure first coding cookie gets precedence."
+  (python-tests-with-temp-buffer
+   "# coding: utf-8
+# coding: latin-1
+
+class Foo(models.Model):
+    pass
+
+if __name__ == \"__main__\":
+    foo = Foo()
+    print (foo)
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring
+                     (python-tests-look-at "# coding: latin-1")
+                     (python-tests-look-at "if __name__ == \"__main__\":"))
+                    "# -*- coding: utf-8 -*-
+
+
+class Foo(models.Model):
+    pass
+
+"))))
+
+(ert-deftest python-shell-buffer-substring-8 ()
+  "Ensure first coding cookie gets precedence when sending whole buffer."
+  (python-tests-with-temp-buffer
+   "# coding: utf-8
+# coding: latin-1
+
+class Foo(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring (point-min) (point-max))
+                    "# coding: utf-8
+
+
+class Foo(models.Model):
+    pass
+"))))
+
+(ert-deftest python-shell-buffer-substring-9 ()
+  "Check substring starting from `point-min'."
+  (python-tests-with-temp-buffer
+   "# coding: utf-8
+
+class Foo(models.Model):
+    pass
+
+class Bar(models.Model):
+    pass
+"
+   (should (string= (python-shell-buffer-substring
+                     (point-min)
+                     (python-tests-look-at "class Bar(models.Model):"))
+                    "# coding: utf-8
+
+class Foo(models.Model):
+    pass
+
+"))))
+
 
 ;;; Shell completion
+
+(ert-deftest python-shell-completion-native-interpreter-disabled-p-1 ()
+  (let* ((python-shell-completion-native-disabled-interpreters (list "pypy"))
+         (python-shell-interpreter "/some/path/to/bin/pypy"))
+    (should (python-shell-completion-native-interpreter-disabled-p))))
+
+
 
 
 ;;; PDB Track integration
@@ -3723,6 +4206,85 @@ foo = True  # another comment
    (forward-line 1)
    (should (python-info-current-line-empty-p))))
 
+(ert-deftest python-info-encoding-from-cookie-1 ()
+  "Should detect it on first line."
+  (python-tests-with-temp-buffer
+   "# coding=latin-1
+
+foo = True  # another comment
+"
+   (should (eq (python-info-encoding-from-cookie) 'latin-1))))
+
+(ert-deftest python-info-encoding-from-cookie-2 ()
+  "Should detect it on second line."
+  (python-tests-with-temp-buffer
+   "
+# coding=latin-1
+
+foo = True  # another comment
+"
+   (should (eq (python-info-encoding-from-cookie) 'latin-1))))
+
+(ert-deftest python-info-encoding-from-cookie-3 ()
+  "Should not be detected on third line (and following ones)."
+  (python-tests-with-temp-buffer
+   "
+
+# coding=latin-1
+foo = True  # another comment
+"
+   (should (not (python-info-encoding-from-cookie)))))
+
+(ert-deftest python-info-encoding-from-cookie-4 ()
+  "Should detect Emacs style."
+  (python-tests-with-temp-buffer
+   "# -*- coding: latin-1 -*-
+
+foo = True  # another comment"
+   (should (eq (python-info-encoding-from-cookie) 'latin-1))))
+
+(ert-deftest python-info-encoding-from-cookie-5 ()
+  "Should detect Vim style."
+  (python-tests-with-temp-buffer
+   "# vim: set fileencoding=latin-1 :
+
+foo = True  # another comment"
+   (should (eq (python-info-encoding-from-cookie) 'latin-1))))
+
+(ert-deftest python-info-encoding-from-cookie-6 ()
+  "First cookie wins."
+  (python-tests-with-temp-buffer
+   "# -*- coding: iso-8859-1 -*-
+# vim: set fileencoding=latin-1 :
+
+foo = True  # another comment"
+   (should (eq (python-info-encoding-from-cookie) 'iso-8859-1))))
+
+(ert-deftest python-info-encoding-from-cookie-7 ()
+  "First cookie wins."
+  (python-tests-with-temp-buffer
+   "# vim: set fileencoding=latin-1 :
+# -*- coding: iso-8859-1 -*-
+
+foo = True  # another comment"
+   (should (eq (python-info-encoding-from-cookie) 'latin-1))))
+
+(ert-deftest python-info-encoding-1 ()
+  "Should return the detected encoding from cookie."
+  (python-tests-with-temp-buffer
+   "# vim: set fileencoding=latin-1 :
+
+foo = True  # another comment"
+   (should (eq (python-info-encoding) 'latin-1))))
+
+(ert-deftest python-info-encoding-2 ()
+  "Should default to utf-8."
+  (python-tests-with-temp-buffer
+   "# No encoding for you
+
+foo = True  # another comment"
+   (should (eq (python-info-encoding) 'utf-8))))
+
 
 ;;; Utility functions
 
@@ -3752,7 +4314,7 @@ def foo(a, b, c):
             . "from IPython.core.completerlib import module_completion")
            (python-shell-completion-string-code
             . "';'.join(get_ipython().Completer.all_completions('''%s'''))\n")
-           (python-shell-virtualenv-path
+           (python-shell-virtualenv-root
             . "/home/user/.virtualenvs/project"))))
     (with-current-buffer buffer
       (kill-all-local-variables)

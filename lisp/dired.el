@@ -1,7 +1,7 @@
 ;;; dired.el --- directory-browsing commands -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992-1997, 2000-2014
-;;   Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992-1997, 2000-2015 Free Software
+;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
 ;; Maintainer: emacs-devel@gnu.org
@@ -3059,7 +3059,7 @@ or \"* [3 files]\"."
   (when dired-shrink-to-fit
     ;; Try to not delete window when we want to display less than
     ;; `window-min-height' lines.
-    (fit-window-to-buffer (get-buffer-window buf) nil 1)))
+    (fit-window-to-buffer (get-buffer-window buf) nil 1 nil nil t)))
 
 (defcustom dired-no-confirm nil
   "A list of symbols for commands Dired should not confirm, or t.
@@ -3106,7 +3106,8 @@ argument or confirmation)."
       (with-displayed-buffer-window
        buffer
        (cons 'display-buffer-below-selected
-	     '((window-height . fit-window-to-buffer)))
+	     '((window-height . fit-window-to-buffer)
+	       (preserve-size . (nil . t))))
        #'(lambda (window _value)
 	   (with-selected-window window
 	     (unwind-protect
@@ -3883,7 +3884,7 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 
 ;;; Start of automatically extracted autoloads.
 
-;;;### (autoloads nil "dired-aux" "dired-aux.el" "1448837b5f3e2b9ad63f723361f1e32e")
+;;;### (autoloads nil "dired-aux" "dired-aux.el" "65f8aa57ace423283926d92dff903ca7")
 ;;; Generated autoloads from dired-aux.el
 
 (autoload 'dired-diff "dired-aux" "\
@@ -4386,7 +4387,7 @@ instead.
 
 ;;;***
 
-;;;### (autoloads nil "dired-x" "dired-x.el" "994b5d9fc38059ab641ec271c728e56f")
+;;;### (autoloads nil "dired-x" "dired-x.el" "d8d702a50887671b9128ba60bd9ebb8e")
 ;;; Generated autoloads from dired-x.el
 
 (autoload 'dired-jump "dired-x" "\

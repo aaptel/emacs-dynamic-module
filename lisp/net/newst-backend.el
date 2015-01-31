@@ -1,6 +1,6 @@
 ;;; newst-backend.el --- Retrieval backend for newsticker.
 
-;; Copyright (C) 2003-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2015 Free Software Foundation, Inc.
 
 ;; Author:      Ulf Jasper <ulf.jasper@web.de>
 ;; Filename:    newst-backend.el
@@ -745,10 +745,14 @@ from."
     (insert result)
     ;; remove MIME header
     (goto-char (point-min))
-    (search-forward "\n\n")
+    (search-forward "\n\n" nil t)
     (delete-region (point-min) (point))
     ;; read the rss/atom contents
-    (newsticker--sentinel-work nil t feed-name "url-retrieve" (current-buffer))
+    (newsticker--sentinel-work nil
+                               (or (not status)
+                                   (not (eq (car status) :error)))
+                               feed-name "url-retrieve"
+                               (current-buffer))
     (when status
       (let ((status-type (car status))
             (status-details (cdr status)))
@@ -831,7 +835,8 @@ Argument COMMAND is the command of the retrieval process.
 Argument BUFFER is the buffer of the retrieval process."
   (let ((time (current-time))
         (name-symbol (intern feed-name))
-        (something-was-added nil))
+        (something-was-added nil)
+        (ct (current-time)))
     ;; catch known errors (zombie processes, rubbish-xml etc.
     ;; if an error occurs the news feed is not updated!
     (catch 'oops
@@ -848,9 +853,10 @@ Argument BUFFER is the buffer of the retrieval process."
                 (format-time-string "%A, %H:%M")
                 feed-name event command)
                ""
-               (current-time)
+               ct
                'new
-               0 nil))
+               0 '((guid nil "newsticker--download-error"))
+               ct))
         (message "%s: Error while retrieving news from %s"
                  (format-time-string "%A, %H:%M")
                  feed-name)
@@ -879,10 +885,11 @@ Argument BUFFER is the buffer of the retrieval process."
                   (decode-coding-region (point-min) (point-max)
                                         coding-system))
                 (condition-case errordata
-                    ;; The xml parser might fail
-                    ;; or the xml might be bugged
+                    ;; The xml parser might fail or the xml might be
+                    ;; bugged
                     (if (fboundp 'libxml-parse-xml-region)
-                        (list (libxml-parse-xml-region (point-min) (point-max)))
+                        (list (libxml-parse-xml-region (point-min) (point-max)
+                                                       nil t))
                       (xml-parse-region (point-min) (point-max)))
                   (error (message "Could not parse %s: %s"
                                   (buffer-name) (cadr errordata))
@@ -1215,13 +1222,17 @@ URL `http://www.atompub.org/2005/08/17/draft-ietf-atompub-format-11.html'"
                             (car (xml-get-children node 'title)))))
                     ;; desc-fn
                     (lambda (node)
-                      ;; unxml the content node. Atom allows for
-                      ;; integrating (x)html into the atom structure
-                      ;; but we need the raw html string.
+                      ;; unxml the content or the summary node. Atom
+                      ;; allows for integrating (x)html into the atom
+                      ;; structure but we need the raw html string.
                       ;; e.g. http://www.heise.de/open/news/news-atom.xml
-                  (or (newsticker--unxml
+                      ;; http://feeds.feedburner.com/ru_nix_blogs
+                      (or (newsticker--unxml
                            (car (xml-node-children
-                                (car (xml-get-children node 'content)))))
+                                 (car (xml-get-children node 'content)))))
+                          (newsticker--unxml
+                           (car (xml-node-children
+                                 (car (xml-get-children node 'summary)))))
                           (car (xml-node-children
                                 (car (xml-get-children node 'summary))))))
                     ;; link-fn
@@ -1578,11 +1589,16 @@ argument, which is one of the items in ITEMLIST."
                   ;; item was not there
                   (setq item-new-p t)
                   (setq something-was-added t))
-                (setq newsticker--cache
-                      (newsticker--cache-add
-                       newsticker--cache (intern name) title desc link
-                       time age1 position (funcall extra-fn node)
-                       time age2))
+                (let ((extra-elements-with-guid (funcall extra-fn node)))
+                  (unless (assoc 'guid extra-elements-with-guid)
+                     (setq extra-elements-with-guid
+                           (cons `(guid nil ,(funcall guid-fn node))
+                                 extra-elements-with-guid)))
+                    (setq newsticker--cache
+                        (newsticker--cache-add
+                         newsticker--cache (intern name) title desc link
+                         time age1 position extra-elements-with-guid
+                         time age2)))
                 (when item-new-p
                   (let ((item (newsticker--cache-contains
                                newsticker--cache (intern name) title

@@ -12,6 +12,8 @@ autoconf  - at least the version specified near the start of
   configure.ac (in the AC_PREREQ command).
 automake  - at least the version specified near the start of
   configure.ac (in the AM_INIT_AUTOMAKE command).
+git - at least Git 1.7.1.  If your repository was created by an older
+  Git version, you may need to reclone it.
 makeinfo  - not strictly necessary, but highly recommended, so that
   you can build the manuals.
 
@@ -62,7 +64,7 @@ never platform-specific.
 
 
 
-Copyright (C) 2002-2014 Free Software Foundation, Inc.
+Copyright (C) 2002-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 

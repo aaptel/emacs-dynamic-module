@@ -1,5 +1,5 @@
 /* Definitions and headers for communication with NeXT/Open/GNUstep API.
-   Copyright (C) 1989, 1993, 2005, 2008-2014 Free Software Foundation,
+   Copyright (C) 1989, 1993, 2005, 2008-2015 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -792,7 +792,6 @@ struct glyph_string;
 void ns_dump_glyphstring (struct glyph_string *s);
 
 /* Implemented in nsterm, published in or needed from nsfns. */
-extern Lisp_Object Qfontsize;
 extern Lisp_Object ns_list_fonts (struct frame *f, Lisp_Object pattern,
                                   int size, int maxnames);
 extern void ns_clear_frame (struct frame *f);
@@ -890,11 +889,15 @@ extern unsigned long ns_get_rgb_color (struct frame *f,
 extern void ns_init_events ();
 extern void ns_finish_events ();
 
-/* From nsterm.m, needed in nsfont.m. */
 #ifdef __OBJC__
+/* From nsterm.m, needed in nsfont.m. */
 extern void
 ns_draw_text_decoration (struct glyph_string *s, struct face *face,
                          NSColor *defaultCol, CGFloat width, CGFloat x);
+/* Needed in nsfns.m.  */
+extern void
+ns_set_represented_filename (NSString* fstr, struct frame *f);
+
 #endif
 
 #ifdef NS_IMPL_GNUSTEP

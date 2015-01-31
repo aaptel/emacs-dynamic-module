@@ -1,6 +1,6 @@
 /* Window creation, deletion and examination for GNU Emacs.
    Does not include redisplay.
-   Copyright (C) 1985-1987, 1993-1998, 2000-2014 Free Software
+   Copyright (C) 1985-1987, 1993-1998, 2000-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -44,20 +44,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #ifdef MSDOS
 #include "msdos.h"
 #endif
-
-Lisp_Object Qwindowp, Qwindow_live_p;
-static Lisp_Object Qwindow_valid_p;
-static Lisp_Object Qwindow_configuration_p;
-static Lisp_Object Qrecord_window_buffer;
-static Lisp_Object Qwindow_deletable_p, Qdelete_window, Qdisplay_buffer;
-static Lisp_Object Qreplace_buffer_in_windows, Qget_mru_window;
-static Lisp_Object Qwindow_resize_root_window, Qwindow_resize_root_window_vertically;
-static Lisp_Object Qwindow_sanitize_window_sizes;
-static Lisp_Object Qwindow_pixel_to_total;
-static Lisp_Object Qscroll_up, Qscroll_down, Qscroll_command;
-static Lisp_Object Qsafe, Qabove, Qbelow, Qwindow_size, Qclone_of;
-static Lisp_Object Qfloor, Qceiling;
-static Lisp_Object Qwindow_point_insertion_type;
 
 static int displayed_window_lines (struct window *);
 static int count_windows (struct window *);
@@ -115,14 +101,8 @@ Lisp_Object minibuf_window;
    shown as the selected window when the minibuffer is selected.  */
 Lisp_Object minibuf_selected_window;
 
-/* Hook run at end of temp_output_buffer_show.  */
-static Lisp_Object Qtemp_buffer_show_hook;
-
 /* Incremented for each window created.  */
 static int sequence_number;
-
-/* Hook to run when window config changes.  */
-static Lisp_Object Qwindow_configuration_change_hook;
 
 /* Used by the function window_scroll_pixel_based.  */
 static int window_scroll_pixel_based_preserve_x;
@@ -994,7 +974,10 @@ or scroll bars.
 If PIXELWISE is nil, return the largest integer smaller than WINDOW's
 pixel width divided by the character width of WINDOW's frame.  This
 means that if a column at the right of the text area is only partially
-visible, that column is not counted.  */)
+visible, that column is not counted.
+
+Note that the returned value includes the column reserved for the
+continuation glyph.  */)
   (Lisp_Object window, Lisp_Object pixelwise)
 {
   return make_number (window_body_width (decode_live_window (window),
@@ -2443,16 +2426,14 @@ window_list (void)
       Vwindow_list = Qnil;
       FOR_EACH_FRAME (tail, frame)
 	{
-	  Lisp_Object args[2];
+	  Lisp_Object arglist = Qnil;
 
 	  /* We are visiting windows in canonical order, and add
 	     new windows at the front of args[1], which means we
 	     have to reverse this list at the end.  */
-	  args[1] = Qnil;
-	  foreach_window (XFRAME (frame), add_window_to_list, &args[1]);
-	  args[0] = Vwindow_list;
-	  args[1] = Fnreverse (args[1]);
-	  Vwindow_list = Fnconc (2, args);
+	  foreach_window (XFRAME (frame), add_window_to_list, &arglist);
+	  arglist = Fnreverse (arglist);
+	  Vwindow_list = CALLN (Fnconc, Vwindow_list, arglist);
 	}
     }
 
@@ -3014,6 +2995,15 @@ resize_root_window (Lisp_Object window, Lisp_Object delta, Lisp_Object horizonta
   return call5 (Qwindow_resize_root_window, window, delta, horizontal, ignore, pixelwise);
 }
 
+/* Placeholder used by temacs -nw before window.el is loaded.  */
+DEFUN ("window--sanitize-window-sizes", Fwindow__sanitize_window_sizes,
+       Swindow__sanitize_window_sizes, 2, 2, 0,
+       doc: /* */
+       attributes: const)
+     (Lisp_Object frame, Lisp_Object horizontal)
+{
+  return Qnil;
+}
 
 Lisp_Object
 sanitize_window_sizes (Lisp_Object frame, Lisp_Object horizontal)
@@ -3645,12 +3635,21 @@ temp_output_buffer_show (register Lisp_Object buf)
         record_unwind_protect (select_window_norecord, prev_window);
         Fselect_window (window, Qt);
         Fset_buffer (w->contents);
-        Frun_hooks (1, &Qtemp_buffer_show_hook);
+        run_hook (Qtemp_buffer_show_hook);
         unbind_to (count, Qnil);
       }
     }
 }
-
+
+/* Allocate basically initialized window.  */
+
+static struct window *
+allocate_window (void)
+{
+  return ALLOCATE_ZEROED_PSEUDOVECTOR
+    (struct window, current_matrix, PVEC_WINDOW);
+}
+
 /* Make new window, have it replace WINDOW in window-tree, and make
    WINDOW its only vertical child (HORFLAG 1 means make WINDOW its only
    horizontal child).   */
@@ -4135,11 +4134,7 @@ values.  */)
 
 /* Resize frame F's windows when number of lines of F is set to SIZE.
    HORFLAG 1 means resize windows when number of columns of F is set to
-   SIZE.  PIXELWISE 1 means to interpret SIZE as pixels.
-
-   This function can delete all windows but the selected one in order to
-   satisfy the request.  The result will be meaningful if and only if
-   F's windows have meaningful sizes when you call this.  */
+   SIZE.  PIXELWISE 1 means to interpret SIZE as pixels.  */
 void
 resize_frame_windows (struct frame *f, int size, bool horflag, bool pixelwise)
 {
@@ -4869,10 +4864,15 @@ window_internal_height (struct window *w)
 static void
 window_scroll (Lisp_Object window, EMACS_INT n, bool whole, int noerror)
 {
+  ptrdiff_t count = SPECPDL_INDEX ();
+
   immediate_quit = 1;
   n = clip_to_bounds (INT_MIN, n, INT_MAX);
 
   wset_redisplay (XWINDOW (window));
+
+  if (whole && Vfast_but_imprecise_scrolling)
+    specbind (Qfontification_functions, Qnil);
 
   /* If we must, use the pixel-based version which is much slower than
      the line-based one but can handle varying line heights.  */
@@ -4880,6 +4880,8 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, int noerror)
     window_scroll_pixel_based (window, n, whole, noerror);
   else
     window_scroll_line_based (window, n, whole, noerror);
+
+  unbind_to (count, Qnil);
 
   /* Bug#15957.  */
   XWINDOW (window)->window_end_valid = 0;
@@ -6427,7 +6429,7 @@ the return value is nil.  Otherwise the value is t.  */)
       /* Allow x_set_window_size again and apply frame size changes if
 	 needed.  */
       f->can_x_set_window_size = true;
-      adjust_frame_size (f, -1, -1, 1, 0, Qnil);
+      adjust_frame_size (f, -1, -1, 1, 0, Qset_window_configuration);
 
       adjust_frame_glyphs (f);
       unblock_input ();
@@ -7345,7 +7347,7 @@ the buffer; `temp-buffer-show-hook' is not run unless this function runs it.  */
 	       doc: /* Non-nil means to use `mode-line-inactive' face in non-selected windows.
 If the minibuffer is active, the `minibuffer-scroll-window' mode line
 is displayed in the `mode-line' face.  */);
-  mode_line_in_non_selected_windows = 1;
+  mode_line_in_non_selected_windows = true;
 
   DEFVAR_LISP ("other-window-scroll-buffer", Vother_window_scroll_buffer,
 	       doc: /* If this is a live buffer, \\[scroll-other-window] should scroll its window.  */);
@@ -7353,7 +7355,7 @@ is displayed in the `mode-line' face.  */);
 
   DEFVAR_BOOL ("auto-window-vscroll", auto_window_vscroll_p,
 	       doc: /* Non-nil means to automatically adjust `window-vscroll' to view tall lines.  */);
-  auto_window_vscroll_p = 1;
+  auto_window_vscroll_p = true;
 
   DEFVAR_INT ("next-screen-context-lines", next_screen_context_lines,
 	      doc: /* Number of lines of continuity when scrolling by screenfuls.  */);
@@ -7476,7 +7478,18 @@ all functions that symmetrically resize a parent window.
 Note that when a frame's pixel size is not a multiple of the
 frame's character size, at least one window may get resized
 pixelwise even if this option is nil.  */);
-  window_resize_pixelwise = 0;
+  window_resize_pixelwise = false;
+
+  DEFVAR_BOOL ("fast-but-imprecise-scrolling",
+               Vfast_but_imprecise_scrolling,
+               doc: /* When non-nil, accelerate scrolling operations.
+This comes into play when scrolling rapidly over previously
+unfontified buffer regions.  Only those portions of the buffer which
+are actually going to be displayed get fontified.
+
+Note that this optimization can cause the portion of the buffer
+displayed after a scrolling operation to be somewhat inaccurate.  */);
+  Vfast_but_imprecise_scrolling = false;
 
   defsubr (&Sselected_window);
   defsubr (&Sminibuffer_window);
@@ -7549,6 +7562,7 @@ pixelwise even if this option is nil.  */);
   defsubr (&Sset_window_display_table);
   defsubr (&Snext_window);
   defsubr (&Sprevious_window);
+  defsubr (&Swindow__sanitize_window_sizes);
   defsubr (&Sget_buffer_window);
   defsubr (&Sdelete_other_windows_internal);
   defsubr (&Sdelete_window_internal);

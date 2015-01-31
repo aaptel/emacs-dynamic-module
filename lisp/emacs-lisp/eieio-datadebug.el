@@ -1,6 +1,6 @@
-;;; eieio-datadebug.el --- EIEIO extensions to the data debugger.
+;;; eieio-datadebug.el --- EIEIO extensions to the data debugger.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2015 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: OO, lisp
@@ -79,7 +79,7 @@ PREBUTTONTEXT is some text between PREFIX and the object button."
 ;;
 ;; Each object should have an opportunity to show stuff about itself.
 
-(defmethod data-debug/eieio-insert-slots ((obj eieio-default-superclass)
+(cl-defmethod data-debug/eieio-insert-slots ((obj eieio-default-superclass)
 					  prefix)
   "Insert the slots of OBJ into the current DDEBUG buffer."
   (let ((inhibit-read-only t))
@@ -87,8 +87,8 @@ PREBUTTONTEXT is some text between PREFIX and the object button."
 			     prefix
 			     "Name: ")
     (let* ((cl (eieio-object-class obj))
-	   (cv (class-v cl)))
-      (data-debug-insert-thing (class-constructor cl)
+	   (cv (eieio--class-v cl)))
+      (data-debug-insert-thing (eieio--class-constructor cl)
 			       prefix
 			       "Class: ")
       ;; Loop over all the public slots
@@ -96,7 +96,8 @@ PREBUTTONTEXT is some text between PREFIX and the object button."
 	    )
 	(while publa
 	  (if (slot-boundp obj (car publa))
-	      (let* ((i (class-slot-initarg cl (car publa)))
+	      (let* ((i (eieio--class-slot-initarg (eieio--class-v cl)
+                                                   (car publa)))
 		     (v (eieio-oref obj (car publa))))
 		(data-debug-insert-thing
 		 v prefix (concat
@@ -104,7 +105,8 @@ PREBUTTONTEXT is some text between PREFIX and the object button."
 			     (symbol-name (car publa)))
 			   " ")))
 	    ;; Unbound case
-	    (let ((i (class-slot-initarg cl (car publa))))
+	    (let ((i (eieio--class-slot-initarg (eieio--class-v cl)
+                                                (car publa))))
 	      (data-debug-insert-custom
 	       "#unbound" prefix
 	       (concat (if i (symbol-name i)
@@ -115,33 +117,17 @@ PREBUTTONTEXT is some text between PREFIX and the object button."
 	  (setq publa (cdr publa)))))))
 
 ;;; Augment the Data debug thing display list.
-(data-debug-add-specialized-thing (lambda (thing) (object-p thing))
+(data-debug-add-specialized-thing (lambda (thing) (eieio-object-p thing))
 				  #'data-debug-insert-object-button)
 
 ;;; DEBUG METHODS
 ;;
 ;; A generic function to run DDEBUG on an object and popup a new buffer.
 ;;
-(defmethod data-debug-show ((obj eieio-default-superclass))
+(cl-defmethod data-debug-show ((obj eieio-default-superclass))
   "Run ddebug against any EIEIO object OBJ."
   (data-debug-new-buffer (format "*%s DDEBUG*" (eieio-object-name obj)))
   (data-debug-insert-object-slots obj "]"))
-
-;;; DEBUG FUNCTIONS
-;;
-(defun eieio-debug-methodinvoke (method class)
-  "Show the method invocation order for METHOD with CLASS object."
-  (interactive "aMethod: \nXClass Expression: ")
-  (let* ((eieio-pre-method-execution-functions
-	  (lambda (l) (throw 'moose l) ))
-	 (data
-	  (catch 'moose (eieio-generic-call
-			 method (list class))))
-	 (buf (data-debug-new-buffer "*Method Invocation*"))
-	 (data2 (mapcar (lambda (sym)
-			  (symbol-function (car sym)))
-			  data)))
-    (data-debug-insert-thing data2 ">" "")))
 
 (provide 'eieio-datadebug)
 

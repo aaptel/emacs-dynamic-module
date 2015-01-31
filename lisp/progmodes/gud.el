@@ -1,6 +1,6 @@
 ;;; gud.el --- Grand Unified Debugger mode for running GDB and other debuggers
 
-;; Copyright (C) 1992-1996, 1998, 2000-2014 Free Software Foundation,
+;; Copyright (C) 1992-1996, 1998, 2000-2015 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
@@ -803,8 +803,7 @@ directory and source-file directory for your debugger."
   "Completion table for GDB commands.
 COMMAND is the prefix for which we seek completion.
 CONTEXT is the text before COMMAND on the line."
-  (let* ((start (- (point) (field-beginning)))
-         (complete-list
+  (let* ((complete-list
 	  (gud-gdb-run-command-fetch-lines (concat "complete " context command)
 					   (current-buffer)
 					   ;; From string-match above.

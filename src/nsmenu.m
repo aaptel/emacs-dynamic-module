@@ -1,5 +1,5 @@
 /* NeXT/Open/GNUstep and MacOSX Cocoa menu and toolbar module.
-   Copyright (C) 2007-2014 Free Software Foundation, Inc.
+   Copyright (C) 2007-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -58,12 +58,6 @@ int menu_trace_num = 0;
 #define ENCODE_MENU_STRING(str) ENCODE_UTF_8 (str)
 #include "nsmenu_common.c"
 #endif
-
-extern Lisp_Object Qundefined, Qmenu_enable, Qmenu_bar_update_hook;
-extern Lisp_Object QCtoggle, QCradio;
-
-Lisp_Object Qdebug_on_next_call;
-extern Lisp_Object Qoverriding_local_map, Qoverriding_terminal_local_map;
 
 extern long context_menu_value;
 EmacsMenu *mainMenu, *svcsMenu, *dockMenu;
@@ -1876,6 +1870,5 @@ syms_of_nsmenu (void)
   defsubr (&Sns_reset_menu);
   defsubr (&Smenu_or_popup_active_p);
 
-  Qdebug_on_next_call = intern_c_string ("debug-on-next-call");
-  staticpro (&Qdebug_on_next_call);
+  DEFSYM (Qdebug_on_next_call, "debug-on-next-call");
 }

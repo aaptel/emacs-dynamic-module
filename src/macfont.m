@@ -1,5 +1,5 @@
 /* Font driver on Mac OSX Core text.
-   Copyright (C) 2009-2014 Free Software Foundation, Inc.
+   Copyright (C) 2009-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -40,9 +40,6 @@ Original author: YAMAMOTO Mitsuharu
 
 static struct font_driver macfont_driver;
 
-/* Core Text, for Mac OS X.  */
-static Lisp_Object Qmac_ct;
-
 static double mac_ctfont_get_advance_width_for_glyph (CTFontRef, CGGlyph);
 static CGRect mac_ctfont_get_bounding_rect_for_glyph (CTFontRef, CGGlyph);
 static CFArrayRef mac_ctfont_create_available_families (void);
@@ -68,18 +65,6 @@ static CGGlyph mac_ctfont_get_glyph_for_cid (CTFontRef,
                                              CTCharacterCollection,
                                              CGFontIndex);
 #endif
-
-/* The font property key specifying the font design destination.  The
-   value is an unsigned integer code: 0 for WYSIWYG, and 1 for Video
-   text.  (See the documentation of X Logical Font Description
-   Conventions.)  In the Mac font driver, 1 means the screen font is
-   used for calculating some glyph metrics.  You can see the
-   difference with Monaco 8pt or 9pt, for example.  */
-static Lisp_Object QCdestination;
-
-/* The boolean-valued font property key specifying the use of
-   leading.  */
-static Lisp_Object QCminspace;
 
 struct macfont_metrics;
 
@@ -2803,9 +2788,9 @@ macfont_draw (struct glyph_string *s, int from, int to, int x, int y,
 static Lisp_Object
 macfont_shape (Lisp_Object lgstring)
 {
-  struct font *font;
-  struct macfont_info *macfont_info;
-  FontRef macfont;
+  struct font *font = CHECK_FONT_GET_OBJECT (LGSTRING_FONT (lgstring));
+  struct macfont_info *macfont_info = (struct macfont_info *) font;
+  FontRef macfont = macfont_info->macfont;
   ptrdiff_t glyph_len, len, i, j;
   CFIndex nonbmp_len;
   UniChar *unichars;
@@ -2813,10 +2798,6 @@ macfont_shape (Lisp_Object lgstring)
   CFStringRef string;
   CFIndex used = 0;
   struct mac_glyph_layout *glyph_layouts;
-
-  CHECK_FONT_GET_OBJECT (LGSTRING_FONT (lgstring), font);
-  macfont_info = (struct macfont_info *) font;
-  macfont = macfont_info->macfont;
 
   glyph_len = LGSTRING_GLYPH_LEN (lgstring);
   nonbmp_len = 0;
@@ -3927,10 +3908,19 @@ syms_of_macfont (void)
 {
   static struct font_driver mac_font_driver;
 
+  /* Core Text, for Mac OS X.  */
   DEFSYM (Qmac_ct, "mac-ct");
   macfont_driver.type = Qmac_ct;
   register_font_driver (&macfont_driver, NULL);
 
+  /* The font property key specifying the font design destination.  The
+     value is an unsigned integer code: 0 for WYSIWYG, and 1 for Video
+     text.  (See the documentation of X Logical Font Description
+     Conventions.)  In the Mac font driver, 1 means the screen font is
+     used for calculating some glyph metrics.  You can see the
+     difference with Monaco 8pt or 9pt, for example.  */
   DEFSYM (QCdestination, ":destination");
+
+  /* The boolean-valued font property key specifying the use of leading.  */
   DEFSYM (QCminspace, ":minspace");
 }

@@ -1,6 +1,6 @@
 ;;; flymake-tests.el --- Test suite for flymake
 
-;; Copyright (C) 2011-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2015 Free Software Foundation, Inc.
 
 ;; Author: Eduard Wiebe <usenet@pusto.de>
 
@@ -26,7 +26,7 @@
 (require 'flymake)
 
 (defvar flymake-tests-data-directory
-  (expand-file-name "flymake/warnpred" (getenv "EMACS_TEST_DIRECTORY"))
+  (expand-file-name "data/flymake" (getenv "EMACS_TEST_DIRECTORY"))
   "Directory containing flymake test data.")
 
 

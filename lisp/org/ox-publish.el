@@ -1,5 +1,5 @@
 ;;; ox-publish.el --- Publish Related Org Mode Files as a Website
-;; Copyright (C) 2006-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2015 Free Software Foundation, Inc.
 
 ;; Author: David O'Toole <dto@gnu.org>
 ;; Maintainer: Carsten Dominik <carsten DOT dominik AT gmail DOT com>
@@ -228,7 +228,7 @@ If you create a site-map file, adjust the sorting like this:
   `:sitemap-sort-files'
 
     The site map is normally sorted alphabetically.  You can
-    change this behaviour setting this to `anti-chronologically',
+    change this behavior setting this to `anti-chronologically',
     `chronologically', or nil.
 
   `:sitemap-ignore-case'

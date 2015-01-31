@@ -1,7 +1,7 @@
 /* Fully extensible Emacs, running on Unix, intended for GNU.
 
-Copyright (C) 1985-1987, 1993-1995, 1997-1999, 2001-2014
-  Free Software Foundation, Inc.
+Copyright (C) 1985-1987, 1993-1995, 1997-1999, 2001-2015 Free Software
+Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -59,11 +59,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#ifdef NS_IMPL_GNUSTEP
-/* At least under Debian, GSConfig is in a subdirectory.  --Stef  */
-#include <GNUstepBase/GSConfig.h>
-#endif
-
 #include "commands.h"
 #include "intervals.h"
 #include "character.h"
@@ -88,9 +83,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "sysselect.h"
 #include "systime.h"
 
-#ifdef HAVE_GNUTLS
 #include "gnutls.h"
-#endif
 
 #if (defined PROFILING \
      && (defined __FreeBSD__ || defined GNU_LINUX || defined __MINGW32__))
@@ -149,13 +142,6 @@ static bool malloc_using_checking;
 #elif defined HAVE_PTHREAD && !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
 extern void malloc_enable_thread (void);
 #endif
-
-Lisp_Object Qfile_name_handler_alist;
-
-Lisp_Object Qrisky_local_variable;
-
-Lisp_Object Qkill_emacs;
-static Lisp_Object Qkill_emacs_hook;
 
 /* If true, Emacs should not attempt to use a window-specific code,
    but instead should use the virtual terminal under which it was started.  */
@@ -245,7 +231,7 @@ Initialization options:\n\
     "\
 --no-desktop                do not load a saved desktop\n\
 --no-init-file, -q          load neither ~/.emacs nor default.el\n\
---no-shared-memory, -nl     do not use shared memory\n\
+--no-loadup, -nl            do not load loadup.el into bare Emacs\n\
 --no-site-file              do not load site-start.el\n\
 --no-site-lisp, -nsl        do not add site-lisp directories to load-path\n\
 --no-splash                 do not display a splash screen on startup\n\
@@ -803,10 +789,10 @@ main (int argc, char **argv)
 	  version = emacs_version;
 	  copyright = emacs_copyright;
 	}
-      printf ("GNU Emacs %s\n", version);
+      printf ("%s %s\n", PACKAGE_NAME, version);
       printf ("%s\n", copyright);
-      printf ("GNU Emacs comes with ABSOLUTELY NO WARRANTY.\n");
-      printf ("You may redistribute copies of Emacs\n");
+      printf ("%s comes with ABSOLUTELY NO WARRANTY.\n", PACKAGE_NAME);
+      printf ("You may redistribute copies of %s\n", PACKAGE_NAME);
       printf ("under the terms of the GNU General Public License.\n");
       printf ("For more information about these matters, ");
       printf ("see the file named COPYING.\n");
@@ -1493,9 +1479,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_fontset ();
 #endif /* HAVE_NS */
 
-#ifdef HAVE_GNUTLS
       syms_of_gnutls ();
-#endif
 
 #ifdef HAVE_GFILENOTIFY
       syms_of_gfilenotify ();
@@ -1903,7 +1887,8 @@ or SIGHUP, and upon SIGINT in batch mode.
 
 The value of `kill-emacs-hook', if not void,
 is a list of functions (of no args),
-all of which are called before Emacs is actually killed.  */)
+all of which are called before Emacs is actually killed.  */
+       attributes: noreturn)
   (Lisp_Object arg)
 {
   struct gcpro gcpro1;
@@ -1917,7 +1902,7 @@ all of which are called before Emacs is actually killed.  */)
   /* Fsignal calls emacs_abort () if it sees that waiting_for_input is
      set.  */
   waiting_for_input = 0;
-  Frun_hooks (1, &Qkill_emacs_hook);
+  run_hook (Qkill_emacs_hook);
   UNGCPRO;
 
 #ifdef HAVE_X_WINDOWS
@@ -2407,9 +2392,7 @@ hpux, irix, usg-unix-v) indicates some sort of Unix system.  */);
   /* See configure.ac (and config.nt) for the possible SYSTEM_TYPEs.  */
 
   DEFVAR_LISP ("system-configuration", Vsystem_configuration,
-	       doc: /* Value is string indicating configuration Emacs was built for.
-On MS-Windows, the value reflects the OS flavor and version on which
-Emacs is running.  */);
+	       doc: /* Value is string indicating configuration Emacs was built for.  */);
   Vsystem_configuration = build_string (EMACS_CONFIGURATION);
 
   DEFVAR_LISP ("system-configuration-options", Vsystem_configuration_options,

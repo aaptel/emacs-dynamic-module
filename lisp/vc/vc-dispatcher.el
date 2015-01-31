@@ -1,6 +1,6 @@
 ;;; vc-dispatcher.el -- generic command-dispatcher facility.  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
 ;; Author:     FSF (see below for full credits)
 ;; Maintainer: Eric S. Raymond <esr@thyrsus.com>
@@ -702,7 +702,7 @@ the buffer contents as a comment."
     ;; Now make sure we see the expanded headers
     (when log-fileset
       (mapc
-       (lambda (file) (vc-resynch-buffer file vc-keep-workfiles t))
+       (lambda (file) (vc-resynch-buffer file t t))
        log-fileset))
     (when (vc-dispatcher-browsing)
       (vc-dir-move-to-goal-column))

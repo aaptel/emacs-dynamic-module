@@ -1,6 +1,6 @@
 ;;; bindings.el --- define standard key bindings and some variables
 
-;; Copyright (C) 1985-1987, 1992-1996, 1999-2014 Free Software
+;; Copyright (C) 1985-1987, 1992-1996, 1999-2015 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -839,11 +839,11 @@ if `inhibit-field-text-motion' is non-nil."
 (let ((map minibuffer-local-map))
   (define-key map "\en"   'next-history-element)
   (define-key map [next]  'next-history-element)
-  (define-key map [down]  'next-history-element)
+  (define-key map [down]  'next-line-or-history-element)
   (define-key map [XF86Forward] 'next-history-element)
   (define-key map "\ep"   'previous-history-element)
   (define-key map [prior] 'previous-history-element)
-  (define-key map [up]    'previous-history-element)
+  (define-key map [up]    'previous-line-or-history-element)
   (define-key map [XF86Back] 'previous-history-element)
   (define-key map "\es"   'next-matching-history-element)
   (define-key map "\er"   'previous-matching-history-element)

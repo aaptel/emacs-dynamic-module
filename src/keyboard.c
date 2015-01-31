@@ -1,6 +1,7 @@
 /* Keyboard and mouse input; editor command loop.
 
-Copyright (C) 1985-1989, 1993-1997, 1999-2014 Free Software Foundation, Inc.
+Copyright (C) 1985-1989, 1993-1997, 1999-2015 Free Software Foundation,
+Inc.
 
 This file is part of GNU Emacs.
 
@@ -86,11 +87,6 @@ static KBOARD *all_kboards;
 
 /* True in the single-kboard state, false in the any-kboard state.  */
 static bool single_kboard;
-
-/* Non-nil disable property on a command means
-   do not execute it; call disabled-command-function's value instead.  */
-Lisp_Object Qdisabled;
-static Lisp_Object Qdisabled_command_function;
 
 #define NUM_RECENT_KEYS (300)
 
@@ -231,47 +227,64 @@ static ptrdiff_t last_point_position;
    'volatile' here.  */
 Lisp_Object internal_last_event_frame;
 
-static Lisp_Object Qgui_set_selection, Qhandle_switch_frame;
-static Lisp_Object Qhandle_select_window;
-Lisp_Object QPRIMARY;
-
-static Lisp_Object Qself_insert_command;
-static Lisp_Object Qforward_char;
-static Lisp_Object Qbackward_char;
-Lisp_Object Qundefined;
-static Lisp_Object Qtimer_event_handler;
-
 /* `read_key_sequence' stores here the command definition of the
    key sequence that it reads.  */
 static Lisp_Object read_key_sequence_cmd;
 static Lisp_Object read_key_sequence_remapped;
 
-static Lisp_Object Qinput_method_function;
-
-static Lisp_Object Qdeactivate_mark;
-
-Lisp_Object Qrecompute_lucid_menubar, Qactivate_menubar_hook;
-
-static Lisp_Object Qecho_area_clear_hook;
-
-/* Hooks to run before and after each command.  */
-static Lisp_Object Qpre_command_hook;
-static Lisp_Object Qpost_command_hook;
-
-static Lisp_Object Qdeferred_action_function;
-
-static Lisp_Object Qdelayed_warnings_hook;
-
-static Lisp_Object Qinput_method_exit_on_first_char;
-static Lisp_Object Qinput_method_use_echo_area;
-
-static Lisp_Object Qhelp_form_show;
-
 /* File in which we write all commands we read.  */
 static FILE *dribble;
 
-/* Nonzero if input is available.  */
+/* True if input is available.  */
 bool input_pending;
+
+/* True if more input was available last time we read an event.
+
+   Since redisplay can take a significant amount of time and is not
+   indispensable to perform the user's commands, when input arrives
+   "too fast", Emacs skips redisplay.  More specifically, if the next
+   command has already been input when we finish the previous command,
+   we skip the intermediate redisplay.
+
+   This is useful to try and make sure Emacs keeps up with fast input
+   rates, such as auto-repeating keys.  But in some cases, this proves
+   too conservative: we may end up disabling redisplay for the whole
+   duration of a key repetition, even though we could afford to
+   redisplay every once in a while.
+
+   So we "sample" the input_pending flag before running a command and
+   use *that* value after running the command to decide whether to
+   skip redisplay or not.  This way, we only skip redisplay if we
+   really can't keep up with the repeat rate.
+
+   This only makes a difference if the next input arrives while running the
+   command, which is very unlikely if the command is executed quickly.
+   IOW this tends to avoid skipping redisplay after a long running command
+   (which is a case where skipping redisplay is not very useful since the
+   redisplay time is small compared to the time it took to run the command).
+
+   A typical use case is when scrolling.  Scrolling time can be split into:
+   - Time to do jit-lock on the newly displayed portion of buffer.
+   - Time to run the actual scroll command.
+   - Time to perform the redisplay.
+   Jit-lock can happen either during the command or during the redisplay.
+   In the most painful cases, the jit-lock time is the one that dominates.
+   Also jit-lock can be tweaked (via jit-lock-defer) to delay its job, at the
+   cost of temporary inaccuracy in display and scrolling.
+   So without input_was_pending, what typically happens is the following:
+   - when the command starts, there's no pending input (yet).
+   - the scroll command triggers jit-lock.
+   - during the long jit-lock time the next input arrives.
+   - at the end of the command, we check input_pending and hence decide to
+     skip redisplay.
+   - we read the next input and start over.
+   End result: all the hard work of jit-locking is "wasted" since redisplay
+   doesn't actually happens (at least not before the input rate slows down).
+   With input_was_pending redisplay is still skipped if Emacs can't keep up
+   with the input rate, but if it can keep up just enough that there's no
+   input_pending when we begin the command, then redisplay is not skipped
+   which results in better feedback to the user.  */
+static bool input_was_pending;
 
 /* Circular buffer for pre-read keyboard input.  */
 
@@ -297,82 +310,11 @@ static struct input_event * volatile kbd_store_ptr;
    dequeuing functions?  Such a flag could be screwed up by interrupts
    at inopportune times.  */
 
-/* Symbols to head events.  */
-static Lisp_Object Qmouse_movement;
-static Lisp_Object Qscroll_bar_movement;
-Lisp_Object Qswitch_frame;
-static Lisp_Object Qfocus_in, Qfocus_out;
-static Lisp_Object Qdelete_frame;
-static Lisp_Object Qiconify_frame;
-static Lisp_Object Qmake_frame_visible;
-static Lisp_Object Qselect_window;
-Lisp_Object Qhelp_echo;
-
-static Lisp_Object Qmouse_fixup_help_message;
-
-/* Symbols to denote kinds of events.  */
-static Lisp_Object Qfunction_key;
-Lisp_Object Qmouse_click;
-#ifdef HAVE_NTGUI
-Lisp_Object Qlanguage_change;
-#endif
-static Lisp_Object Qdrag_n_drop;
-static Lisp_Object Qsave_session;
-#ifdef HAVE_DBUS
-static Lisp_Object Qdbus_event;
-#endif
-#ifdef USE_FILE_NOTIFY
-static Lisp_Object Qfile_notify;
-#endif /* USE_FILE_NOTIFY */
-static Lisp_Object Qconfig_changed_event;
-
-/* Lisp_Object Qmouse_movement; - also an event header */
-
-/* Properties of event headers.  */
-Lisp_Object Qevent_kind;
-static Lisp_Object Qevent_symbol_elements;
-
-/* Menu and tool bar item parts.  */
-static Lisp_Object Qmenu_enable;
-static Lisp_Object QCenable, QCvisible, QChelp, QCkeys, QCkey_sequence;
-Lisp_Object QCfilter;
-
-/* Non-nil disable property on a command means
-   do not execute it; call disabled-command-function's value instead.  */
-Lisp_Object QCtoggle, QCradio;
-static Lisp_Object QCbutton, QClabel;
-
-static Lisp_Object QCvert_only;
-
-/* An event header symbol HEAD may have a property named
-   Qevent_symbol_element_mask, which is of the form (BASE MODIFIERS);
-   BASE is the base, unmodified version of HEAD, and MODIFIERS is the
-   mask of modifiers applied to it.  If present, this is used to help
-   speed up parse_modifiers.  */
-Lisp_Object Qevent_symbol_element_mask;
-
-/* An unmodified event header BASE may have a property named
-   Qmodifier_cache, which is an alist mapping modifier masks onto
-   modified versions of BASE.  If present, this helps speed up
-   apply_modifiers.  */
-static Lisp_Object Qmodifier_cache;
-
-/* Symbols to use for parts of windows.  */
-Lisp_Object Qmode_line;
-Lisp_Object Qvertical_line;
-Lisp_Object Qright_divider, Qbottom_divider;
-Lisp_Object Qmenu_bar;
-
-static Lisp_Object Qecho_keystrokes;
-
 static void recursive_edit_unwind (Lisp_Object buffer);
 static Lisp_Object command_loop (void);
-static Lisp_Object Qcommand_execute;
 
 static void echo_now (void);
 static ptrdiff_t echo_length (void);
-
-static Lisp_Object Qpolling_period;
 
 /* Incremented whenever a timer is run.  */
 unsigned timers_run;
@@ -1221,7 +1163,8 @@ top_level_1 (Lisp_Object ignore)
 
 DEFUN ("top-level", Ftop_level, Stop_level, 0, 0, "",
        doc: /* Exit all recursive editing levels.
-This also exits all active minibuffers.  */)
+This also exits all active minibuffers.  */
+       attributes: noreturn)
   (void)
 {
 #ifdef HAVE_WINDOW_SYSTEM
@@ -1244,7 +1187,8 @@ user_error (const char *msg)
 
 /* _Noreturn will be added to prototype by make-docfile.  */
 DEFUN ("exit-recursive-edit", Fexit_recursive_edit, Sexit_recursive_edit, 0, 0, "",
-       doc: /* Exit from the innermost recursive edit or minibuffer.  */)
+       doc: /* Exit from the innermost recursive edit or minibuffer.  */
+       attributes: noreturn)
   (void)
 {
   if (command_loop_level > 0 || minibuf_level > 0)
@@ -1255,7 +1199,8 @@ DEFUN ("exit-recursive-edit", Fexit_recursive_edit, Sexit_recursive_edit, 0, 0, 
 
 /* _Noreturn will be added to prototype by make-docfile.  */
 DEFUN ("abort-recursive-edit", Fabort_recursive_edit, Sabort_recursive_edit, 0, 0, "",
-       doc: /* Abort the command that requested this recursive edit or minibuffer input.  */)
+       doc: /* Abort the command that requested this recursive edit or minibuffer input.  */
+       attributes: noreturn)
   (void)
 {
   if (command_loop_level > 0 || minibuf_level > 0)
@@ -1664,10 +1609,7 @@ command_loop_1 (void)
 		}
 
 	      if (current_buffer != prev_buffer || MODIFF != prev_modiff)
-                {
-                  Lisp_Object hook = intern ("activate-mark-hook");
-                  Frun_hooks (1, &hook);
-                }
+		run_hook (intern ("activate-mark-hook"));
 	    }
 
 	  Vsaved_region_selection = Qnil;
@@ -1902,7 +1844,7 @@ safe_run_hooks_error (Lisp_Object error, ptrdiff_t nargs, Lisp_Object *args)
   AUTO_STRING (format, "Error in %s (%S): %S");
   Lisp_Object hook = args[0];
   Lisp_Object fun = args[1];
-  Fmessage (4, (Lisp_Object []) {format, hook, fun, error});
+  CALLN (Fmessage, format, hook, fun, error);
 
   if (SYMBOLP (hook))
     {
@@ -1935,13 +1877,10 @@ safe_run_hooks_error (Lisp_Object error, ptrdiff_t nargs, Lisp_Object *args)
 static Lisp_Object
 safe_run_hook_funcall (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object iargs[2];
-
   eassert (nargs == 2);
-  /* Yes, run_hook_with_args works this way.  */
-  iargs[0] = args[1];
-  iargs[1] = args[0];
-  internal_condition_case_n (safe_run_hooks_1, 2, iargs,
+  /* Yes, run_hook_with_args works with args in the other order.  */
+  internal_condition_case_n (safe_run_hooks_1,
+			     2, ((Lisp_Object []) {args[1], args[0]}),
 			     Qt, safe_run_hooks_error);
   return Qnil;
 }
@@ -1953,16 +1892,12 @@ safe_run_hook_funcall (ptrdiff_t nargs, Lisp_Object *args)
 void
 safe_run_hooks (Lisp_Object hook)
 {
-  Lisp_Object args[2];
   struct gcpro gcpro1;
   ptrdiff_t count = SPECPDL_INDEX ();
 
-  args[0] = hook;
-  args[1] = hook;
-
   GCPRO1 (hook);
   specbind (Qinhibit_quit, Qt);
-  run_hook_with_args (2, args, safe_run_hook_funcall);
+  run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
   unbind_to (count, Qnil);
   UNGCPRO;
 }
@@ -2403,9 +2338,9 @@ echo_keystrokes_p (void)
 /* commandflag 0 means do not autosave, but do redisplay.
    -1 means do not redisplay, but do autosave.
    -2 means do neither.
-   1 means do both.  */
+   1 means do both.
 
-/* The argument MAP is a keymap for menu prompting.
+   The argument MAP is a keymap for menu prompting.
 
    PREV_EVENT is the previous input event, or nil if we are reading
    the first event of a key sequence (or not reading a key sequence).
@@ -2582,11 +2517,13 @@ read_char (int commandflag, Lisp_Object map,
 	   user-visible, such as X selection_request events.  */
       if (input_pending
 	  || detect_input_pending_run_timers (0))
-	swallow_events (0);		/* May clear input_pending.  */
+	swallow_events (false);		/* May clear input_pending.  */
 
       /* Redisplay if no pending input.  */
-      while (!input_pending)
+      while (!(input_pending
+	       && (input_was_pending || !redisplay_dont_pause)))
 	{
+	  input_was_pending = input_pending;
 	  if (help_echo_showing_p && !EQ (selected_window, minibuf_window))
 	    redisplay_preserve_echo_area (5);
 	  else
@@ -2598,7 +2535,7 @@ read_char (int commandflag, Lisp_Object map,
 
 	  /* Input arrived and pre-empted redisplay.
 	     Process any events which are not user-visible.  */
-	  swallow_events (0);
+	  swallow_events (false);
 	  /* If that cleared input_pending, try again to redisplay.  */
 	}
 
@@ -3255,6 +3192,7 @@ read_char (int commandflag, Lisp_Object map,
 
  exit:
   RESUME_POLLING;
+  input_was_pending = input_pending;
   RETURN_UNGCPRO (c);
 }
 
@@ -3701,7 +3639,9 @@ kbd_buffer_store_event_hold (register struct input_event *event,
      as input, set quit-flag to cause an interrupt.  */
   if (!NILP (Vthrow_on_input)
       && event->kind != FOCUS_IN_EVENT
+      && event->kind != FOCUS_OUT_EVENT
       && event->kind != HELP_EVENT
+      && event->kind != ICONIFY_EVENT
       && event->kind != DEICONIFY_EVENT)
     {
       Vquit_flag = Vthrow_on_input;
@@ -3878,7 +3818,7 @@ kbd_buffer_get_event (KBOARD **kbp,
   Lisp_Object obj;
 
 #ifdef subprocesses
-  if (kbd_on_hold_p () && kbd_buffer_nr_stored () < KBD_BUFFER_SIZE/4)
+  if (kbd_on_hold_p () && kbd_buffer_nr_stored () < KBD_BUFFER_SIZE / 4)
     {
       /* Start reading input again because we have processed enough to
          be able to accept new events again.  */
@@ -4083,11 +4023,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 	{
 #ifdef HAVE_W32NOTIFY
 	  /* Make an event (file-notify (DESCRIPTOR ACTION FILE) CALLBACK).  */
-	  obj = list3 (Qfile_notify,
-		       list3 (make_number (event->code),
-			      XCAR (event->arg),
-			      XCDR (event->arg)),
-		       event->frame_or_window);
+	  obj = list3 (Qfile_notify, event->arg, event->frame_or_window);
 #else
           obj = make_lispy_event (event);
 #endif
@@ -4370,7 +4306,7 @@ swallow_events (bool do_display)
   old_timers_run = timers_run;
   get_input_pending (READABLE_EVENTS_DO_TIMERS_NOW);
 
-  if (timers_run != old_timers_run && do_display)
+  if (!input_pending && timers_run != old_timers_run && do_display)
     redisplay_preserve_echo_area (7);
 }
 
@@ -5226,22 +5162,17 @@ static const char *const lispy_drag_n_drop_names[] =
   "drag-n-drop"
 };
 
-/* Scroll bar parts.  */
-static Lisp_Object Qabove_handle, Qhandle, Qbelow_handle;
-static Lisp_Object Qbefore_handle, Qhorizontal_handle, Qafter_handle;
-Lisp_Object Qup, Qdown, Qtop, Qbottom;
-static Lisp_Object Qleftmost, Qrightmost;
-static Lisp_Object Qend_scroll;
-static Lisp_Object Qratio;
-
-/* An array of scroll bar parts, indexed by an enum scroll_bar_part value.
-   Note that Qnil corresponds to scroll_bar_nowhere and should not appear
-   in Lisp events.  */
-static Lisp_Object *const scroll_bar_parts[] = {
-  &Qnil, &Qabove_handle, &Qhandle, &Qbelow_handle,
-  &Qup, &Qdown, &Qtop, &Qbottom, &Qend_scroll, &Qratio,
-  &Qbefore_handle, &Qhorizontal_handle, &Qafter_handle,
-  &Qleft, &Qright, &Qleftmost, &Qrightmost, &Qend_scroll, &Qratio
+/* An array of symbol indexes of scroll bar parts, indexed by an enum
+   scroll_bar_part value.  Note that Qnil corresponds to
+   scroll_bar_nowhere and should not appear in Lisp events.  */
+static short const scroll_bar_parts[] = {
+  SYMBOL_INDEX (Qnil), SYMBOL_INDEX (Qabove_handle), SYMBOL_INDEX (Qhandle),
+  SYMBOL_INDEX (Qbelow_handle), SYMBOL_INDEX (Qup), SYMBOL_INDEX (Qdown),
+  SYMBOL_INDEX (Qtop), SYMBOL_INDEX (Qbottom), SYMBOL_INDEX (Qend_scroll),
+  SYMBOL_INDEX (Qratio), SYMBOL_INDEX (Qbefore_handle),
+  SYMBOL_INDEX (Qhorizontal_handle), SYMBOL_INDEX (Qafter_handle),
+  SYMBOL_INDEX (Qleft), SYMBOL_INDEX (Qright), SYMBOL_INDEX (Qleftmost),
+  SYMBOL_INDEX (Qrightmost), SYMBOL_INDEX (Qend_scroll), SYMBOL_INDEX (Qratio)
 };
 
 /* A vector, indexed by button number, giving the down-going location
@@ -5514,7 +5445,8 @@ static Lisp_Object
 make_scroll_bar_position (struct input_event *ev, Lisp_Object type)
 {
   return list5 (ev->frame_or_window, type, Fcons (ev->x, ev->y),
-		make_number (ev->timestamp), *scroll_bar_parts[ev->part]);
+		make_number (ev->timestamp),
+		builtin_lisp_symbol (scroll_bar_parts[ev->part]));
 }
 
 /* Given a struct input_event, build the lisp event which represents
@@ -6153,7 +6085,7 @@ make_lispy_movement (struct frame *frame, Lisp_Object bar_window, enum scroll_ba
     {
       Lisp_Object part_sym;
 
-      part_sym = *scroll_bar_parts[(int) part];
+      part_sym = builtin_lisp_symbol (scroll_bar_parts[part]);
       return list2 (Qscroll_bar_movement,
 		    list5 (bar_window,
 			   Qvertical_scroll_bar,
@@ -6336,10 +6268,10 @@ apply_modifiers_uncached (int modifiers, char *base, int base_len, int base_len_
     if (modifiers & meta_modifier)  { *p++ = 'M'; *p++ = '-'; }
     if (modifiers & shift_modifier) { *p++ = 'S'; *p++ = '-'; }
     if (modifiers & super_modifier) { *p++ = 's'; *p++ = '-'; }
-    if (modifiers & double_modifier)  { strcpy (p, "double-");  p += 7; }
-    if (modifiers & triple_modifier)  { strcpy (p, "triple-");  p += 7; }
-    if (modifiers & down_modifier)  { strcpy (p, "down-");  p += 5; }
-    if (modifiers & drag_modifier)  { strcpy (p, "drag-");  p += 5; }
+    if (modifiers & double_modifier) p = stpcpy (p, "double-");
+    if (modifiers & triple_modifier) p = stpcpy (p, "triple-");
+    if (modifiers & down_modifier) p = stpcpy (p, "down-");
+    if (modifiers & drag_modifier) p = stpcpy (p, "drag-");
     /* The click modifier is denoted by the absence of other modifiers.  */
 
     *p = '\0';
@@ -8016,11 +7948,6 @@ static Lisp_Object tool_bar_item_properties;
 /* Next free index in tool_bar_items_vector.  */
 
 static int ntool_bar_items;
-
-/* The symbols `:image' and `:rtl'.  */
-
-static Lisp_Object QCimage;
-static Lisp_Object QCrtl;
 
 /* Function prototypes.  */
 
@@ -10280,7 +10207,6 @@ On such systems, Emacs starts a subshell instead of suspending.  */)
   int old_height, old_width;
   int width, height;
   struct gcpro gcpro1;
-  Lisp_Object hook;
 
   if (tty_list && tty_list->next)
     error ("There are other tty frames open; close them before suspending Emacs");
@@ -10288,9 +10214,7 @@ On such systems, Emacs starts a subshell instead of suspending.  */)
   if (!NILP (stuffstring))
     CHECK_STRING (stuffstring);
 
-  /* Run the functions in suspend-hook.  */
-  hook = intern ("suspend-hook");
-  Frun_hooks (1, &hook);
+  run_hook (intern ("suspend-hook"));
 
   GCPRO1 (stuffstring);
   get_tty_size (fileno (CURTTY ()->input), &old_width, &old_height);
@@ -10314,9 +10238,7 @@ On such systems, Emacs starts a subshell instead of suspending.  */)
 		       height - FRAME_MENU_BAR_LINES (SELECTED_FRAME ()),
 		       0, 0, 0, 0);
 
-  /* Run suspend-resume-hook.  */
-  hook = intern ("suspend-resume-hook");
-  Frun_hooks (1, &hook);
+  run_hook (intern ("suspend-resume-hook"));
 
   UNGCPRO;
   return Qnil;
@@ -10807,25 +10729,25 @@ The elements of this list correspond to the arguments of
 `set-input-mode'.  */)
   (void)
 {
-  Lisp_Object val[4];
   struct frame *sf = XFRAME (selected_frame);
 
-  val[0] = interrupt_input ? Qt : Qnil;
+  Lisp_Object interrupt = interrupt_input ? Qt : Qnil;
+  Lisp_Object flow, meta;
   if (FRAME_TERMCAP_P (sf) || FRAME_MSDOS_P (sf))
     {
-      val[1] = FRAME_TTY (sf)->flow_control ? Qt : Qnil;
-      val[2] = (FRAME_TTY (sf)->meta_key == 2
-                ? make_number (0)
-                : (CURTTY ()->meta_key == 1 ? Qt : Qnil));
+      flow = FRAME_TTY (sf)->flow_control ? Qt : Qnil;
+      meta = (FRAME_TTY (sf)->meta_key == 2
+	      ? make_number (0)
+	      : (CURTTY ()->meta_key == 1 ? Qt : Qnil));
     }
   else
     {
-      val[1] = Qnil;
-      val[2] = Qt;
+      flow = Qnil;
+      meta = Qt;
     }
-  XSETFASTINT (val[3], quit_char);
+  Lisp_Object quit = make_number (quit_char);
 
-  return Flist (ARRAYELTS (val), val);
+  return list4 (interrupt, flow, meta, quit);
 }
 
 DEFUN ("posn-at-x-y", Fposn_at_x_y, Sposn_at_x_y, 2, 4, 0,
@@ -11060,26 +10982,29 @@ init_keyboard (void)
 #endif
 }
 
-/* This type's only use is in syms_of_keyboard, to initialize the
-   event header symbols and put properties on them.  */
-struct event_head {
-  Lisp_Object *var;
-  const char *name;
-  Lisp_Object *kind;
+/* This type's only use is in syms_of_keyboard, to put properties on the
+   event header symbols.  */
+struct event_head
+{
+  short var;
+  short kind;
 };
 
 static const struct event_head head_table[] = {
-  {&Qmouse_movement,      "mouse-movement",      &Qmouse_movement},
-  {&Qscroll_bar_movement, "scroll-bar-movement", &Qmouse_movement},
-  {&Qswitch_frame,        "switch-frame",        &Qswitch_frame},
-  {&Qfocus_in,            "focus-in",            &Qfocus_in},
-  {&Qfocus_out,           "focus-out",	         &Qfocus_out},
-  {&Qdelete_frame,        "delete-frame",        &Qdelete_frame},
-  {&Qiconify_frame,       "iconify-frame",       &Qiconify_frame},
-  {&Qmake_frame_visible,  "make-frame-visible",  &Qmake_frame_visible},
+  {SYMBOL_INDEX (Qmouse_movement),      SYMBOL_INDEX (Qmouse_movement)},
+  {SYMBOL_INDEX (Qscroll_bar_movement), SYMBOL_INDEX (Qmouse_movement)},
+
+  /* Some of the event heads.  */
+  {SYMBOL_INDEX (Qswitch_frame),        SYMBOL_INDEX (Qswitch_frame)},
+
+  {SYMBOL_INDEX (Qfocus_in),            SYMBOL_INDEX (Qfocus_in)},
+  {SYMBOL_INDEX (Qfocus_out),           SYMBOL_INDEX (Qfocus_out)},
+  {SYMBOL_INDEX (Qdelete_frame),        SYMBOL_INDEX (Qdelete_frame)},
+  {SYMBOL_INDEX (Qiconify_frame),       SYMBOL_INDEX (Qiconify_frame)},
+  {SYMBOL_INDEX (Qmake_frame_visible),  SYMBOL_INDEX (Qmake_frame_visible)},
   /* `select-window' should be handled just like `switch-frame'
      in read_key_sequence.  */
-  {&Qselect_window,       "select-window",       &Qswitch_frame}
+  {SYMBOL_INDEX (Qselect_window),       SYMBOL_INDEX (Qswitch_frame)}
 };
 
 void
@@ -11118,17 +11043,29 @@ syms_of_keyboard (void)
   DEFSYM (Qself_insert_command, "self-insert-command");
   DEFSYM (Qforward_char, "forward-char");
   DEFSYM (Qbackward_char, "backward-char");
+
+  /* Non-nil disable property on a command means do not execute it;
+     call disabled-command-function's value instead.  */
   DEFSYM (Qdisabled, "disabled");
+
   DEFSYM (Qundefined, "undefined");
+
+  /* Hooks to run before and after each command.  */
   DEFSYM (Qpre_command_hook, "pre-command-hook");
   DEFSYM (Qpost_command_hook, "post-command-hook");
+
   DEFSYM (Qdeferred_action_function, "deferred-action-function");
   DEFSYM (Qdelayed_warnings_hook, "delayed-warnings-hook");
   DEFSYM (Qfunction_key, "function-key");
+
+  /* The values of Qevent_kind properties.  */
   DEFSYM (Qmouse_click, "mouse-click");
+
   DEFSYM (Qdrag_n_drop, "drag-n-drop");
   DEFSYM (Qsave_session, "save-session");
   DEFSYM (Qconfig_changed_event, "config-changed-event");
+
+  /* Menu and tool bar item parts.  */
   DEFSYM (Qmenu_enable, "menu-enable");
 
 #ifdef HAVE_NTGUI
@@ -11143,6 +11080,7 @@ syms_of_keyboard (void)
   DEFSYM (Qfile_notify, "file-notify");
 #endif /* USE_FILE_NOTIFY */
 
+  /* Menu and tool bar item parts.  */
   DEFSYM (QCenable, ":enable");
   DEFSYM (QCvisible, ":visible");
   DEFSYM (QChelp, ":help");
@@ -11150,14 +11088,16 @@ syms_of_keyboard (void)
   DEFSYM (QCbutton, ":button");
   DEFSYM (QCkeys, ":keys");
   DEFSYM (QCkey_sequence, ":key-sequence");
+
+  /* Non-nil disable property on a command means
+     do not execute it; call disabled-command-function's value instead.  */
   DEFSYM (QCtoggle, ":toggle");
   DEFSYM (QCradio, ":radio");
   DEFSYM (QClabel, ":label");
   DEFSYM (QCvert_only, ":vert-only");
 
-  DEFSYM (Qmode_line, "mode-line");
+  /* Symbols to use for parts of windows.  */
   DEFSYM (Qvertical_line, "vertical-line");
-  DEFSYM (Qmenu_bar, "menu-bar");
   DEFSYM (Qright_divider, "right-divider");
   DEFSYM (Qbottom_divider, "bottom-divider");
 
@@ -11180,9 +11120,21 @@ syms_of_keyboard (void)
   DEFSYM (Qleftmost, "leftmost");
   DEFSYM (Qrightmost, "rightmost");
 
+  /* Properties of event headers.  */
   DEFSYM (Qevent_kind, "event-kind");
   DEFSYM (Qevent_symbol_elements, "event-symbol-elements");
+
+  /* An event header symbol HEAD may have a property named
+     Qevent_symbol_element_mask, which is of the form (BASE MODIFIERS);
+     BASE is the base, unmodified version of HEAD, and MODIFIERS is the
+     mask of modifiers applied to it.  If present, this is used to help
+     speed up parse_modifiers.  */
   DEFSYM (Qevent_symbol_element_mask, "event-symbol-element-mask");
+
+  /* An unmodified event header BASE may have a property named
+     Qmodifier_cache, which is an alist mapping modifier masks onto
+     modified versions of BASE.  If present, this helps speed up
+     apply_modifiers.  */
   DEFSYM (Qmodifier_cache, "modifier-cache");
 
   DEFSYM (Qrecompute_lucid_menubar, "recompute-lucid-menubar");
@@ -11191,7 +11143,10 @@ syms_of_keyboard (void)
   DEFSYM (Qpolling_period, "polling-period");
 
   DEFSYM (Qgui_set_selection, "gui-set-selection");
+
+  /* The primary selection.  */
   DEFSYM (QPRIMARY, "PRIMARY");
+
   DEFSYM (Qhandle_switch_frame, "handle-switch-frame");
   DEFSYM (Qhandle_select_window, "handle-select-window");
 
@@ -11206,17 +11161,26 @@ syms_of_keyboard (void)
   Fset (Qinput_method_exit_on_first_char, Qnil);
   Fset (Qinput_method_use_echo_area, Qnil);
 
+  /* Symbols to head events.  */
+  DEFSYM (Qmouse_movement, "mouse-movement");
+  DEFSYM (Qscroll_bar_movement, "scroll-bar-movement");
+  DEFSYM (Qswitch_frame, "switch-frame");
+  DEFSYM (Qfocus_in, "focus-in");
+  DEFSYM (Qfocus_out, "focus-out");
+  DEFSYM (Qdelete_frame, "delete-frame");
+  DEFSYM (Qiconify_frame, "iconify-frame");
+  DEFSYM (Qmake_frame_visible, "make-frame-visible");
+  DEFSYM (Qselect_window, "select-window");
   {
     int i;
-    int len = ARRAYELTS (head_table);
 
-    for (i = 0; i < len; i++)
+    for (i = 0; i < ARRAYELTS (head_table); i++)
       {
 	const struct event_head *p = &head_table[i];
-	*p->var = intern_c_string (p->name);
-	staticpro (p->var);
-	Fput (*p->var, Qevent_kind, *p->kind);
-	Fput (*p->var, Qevent_symbol_elements, list1 (*p->var));
+	Lisp_Object var = builtin_lisp_symbol (p->var);
+	Lisp_Object kind = builtin_lisp_symbol (p->kind);
+	Fput (var, Qevent_kind, kind);
+	Fput (var, Qevent_symbol_elements, list1 (var));
       }
   }
 
@@ -11542,13 +11506,13 @@ with no modifiers; thus, setting `extra-keyboard-modifiers' to zero
 cancels any modification.  */);
   extra_keyboard_modifiers = 0;
 
+  DEFSYM (Qdeactivate_mark, "deactivate-mark");
   DEFVAR_LISP ("deactivate-mark", Vdeactivate_mark,
 	       doc: /* If an editing command sets this to t, deactivate the mark afterward.
 The command loop sets this to nil before each command,
 and tests the value when the command returns.
 Buffer modification stores t in this variable.  */);
   Vdeactivate_mark = Qnil;
-  DEFSYM (Qdeactivate_mark, "deactivate-mark");
   Fmake_variable_buffer_local (Qdeactivate_mark);
 
   DEFVAR_LISP ("pre-command-hook", Vpre_command_hook,
@@ -11868,7 +11832,7 @@ keys_of_keyboard (void)
      - we enter the second prompt.
        current-prefix-arg is non-nil, prefix-arg is nil.
      - before running the first real event, we run the special iconify-frame
-       event, but we pass the `special' arg to execute-command so
+       event, but we pass the `special' arg to command-execute so
        current-prefix-arg and prefix-arg are left untouched.
      - here we foolishly copy the non-nil current-prefix-arg to prefix-arg.
      - the next key event will have a spuriously non-nil current-prefix-arg.  */

@@ -1,6 +1,6 @@
 ;;; vc-dir.el --- Directory status display under VC  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2007-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2015 Free Software Foundation, Inc.
 
 ;; Author:   Dan Nicolaescu <dann@ics.uci.edu>
 ;; Keywords: vc tools
@@ -169,6 +169,9 @@ See `run-hooks'."
     (define-key map [ise]
       '(menu-item "Isearch Files..." vc-dir-isearch
 		  :help "Incremental search a string in the marked files"))
+    (define-key map [display]
+      '(menu-item "Display in Other Window" vc-dir-display-file
+		  :help "Display the file on the current line, in another window"))
     (define-key map [open-other]
       '(menu-item "Open in Other Window" vc-dir-find-file-other-window
 		  :help "Find the file on the current line, in another window"))
@@ -273,6 +276,7 @@ See `run-hooks'."
     (define-key map "e" 'vc-dir-find-file) ; dired-mode compatibility
     (define-key map "\C-m" 'vc-dir-find-file)
     (define-key map "o" 'vc-dir-find-file-other-window)
+    (define-key map "\C-o" 'vc-dir-display-file)
     (define-key map "\C-c\C-c" 'vc-dir-kill-dir-status-process)
     (define-key map [down-mouse-3] 'vc-dir-menu)
     (define-key map [mouse-2] 'vc-dir-toggle-mark)
@@ -755,6 +759,13 @@ that share the same state."
   (if event (posn-set-point (event-end event)))
   (find-file-other-window (vc-dir-current-file)))
 
+(defun vc-dir-display-file (&optional event)
+  "Display the file on the current line, in another window."
+  (interactive (list last-nonmenu-event))
+  (if event (posn-set-point (event-end event)))
+  (display-buffer (find-file-noselect (vc-dir-current-file))
+		  t))
+
 (defun vc-dir-isearch ()
   "Search for a string through all marked buffers using Isearch."
   (interactive)
@@ -1014,7 +1025,7 @@ specific headers."
    (vc-call-backend backend 'dir-extra-headers dir)
    "\n"))
 
-(defun vc-dir-refresh-files (files default-state)
+(defun vc-dir-refresh-files (files)
   "Refresh some files in the *VC-dir* buffer."
   (let ((def-dir default-directory)
 	(backend vc-dir-backend))
@@ -1032,7 +1043,7 @@ specific headers."
         (setq default-directory def-dir)
         (erase-buffer)
         (vc-call-backend
-         backend 'dir-status-files def-dir files default-state
+         backend 'dir-status-files def-dir files
          (lambda (entries &optional more-to-come)
            ;; ENTRIES is a list of (FILE VC_STATE EXTRA) items.
            ;; If MORE-TO-COME is true, then more updates will come from
@@ -1097,7 +1108,7 @@ Throw an error if another update process is in progress."
           (setq default-directory def-dir)
           (erase-buffer)
           (vc-call-backend
-           backend 'dir-status def-dir
+           backend 'dir-status-files def-dir nil
            (lambda (entries &optional more-to-come)
              ;; ENTRIES is a list of (FILE VC_STATE EXTRA) items.
              ;; If MORE-TO-COME is true, then more updates will come from
@@ -1110,8 +1121,7 @@ Throw an error if another update process is in progress."
                          vc-ewoc 'vc-dir-fileinfo->needs-update)))
                    (if remaining
                        (vc-dir-refresh-files
-                        (mapcar 'vc-dir-fileinfo->name remaining)
-                        'up-to-date)
+                        (mapcar 'vc-dir-fileinfo->name remaining))
                      (setq mode-line-process nil))))))))))))
 
 (defun vc-dir-show-fileentry (file)
@@ -1231,7 +1241,7 @@ These are the commands available for use in the file status buffer:
     ;; Otherwise if you do C-x v d -> C-x C-f -> C-c v d
     ;; you may get a new *vc-dir* buffer, different from the original
     (file-truename (read-directory-name "VC status for directory: "
-					default-directory default-directory t
+					(vc-root-dir) nil t
 					nil))
     (if current-prefix-arg
 	(intern

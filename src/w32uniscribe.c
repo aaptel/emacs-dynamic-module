@@ -1,5 +1,5 @@
 /* Font backend for the Microsoft W32 Uniscribe API.
-   Copyright (C) 2008-2014 Free Software Foundation, Inc.
+   Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -47,10 +47,6 @@ struct uniscribe_font_info
 
 int uniscribe_available = 0;
 
-/* Defined in w32font.c, since it is required there as well.  */
-extern Lisp_Object Quniscribe;
-extern Lisp_Object Qopentype;
-
 /* EnumFontFamiliesEx callback.  */
 static int CALLBACK ALIGN_STACK add_opentype_font_name_to_list (ENUMLOGFONTEX *,
 								NEWTEXTMETRICEX *,
@@ -71,7 +67,7 @@ memq_no_quit (Lisp_Object elt, Lisp_Object list)
 static Lisp_Object
 uniscribe_list (struct frame *f, Lisp_Object font_spec)
 {
-  Lisp_Object fonts = w32font_list_internal (f, font_spec, 1);
+  Lisp_Object fonts = w32font_list_internal (f, font_spec, true);
   FONT_ADD_LOG ("uniscribe-list", font_spec, fonts);
   return fonts;
 }
@@ -79,7 +75,7 @@ uniscribe_list (struct frame *f, Lisp_Object font_spec)
 static Lisp_Object
 uniscribe_match (struct frame *f, Lisp_Object font_spec)
 {
-  Lisp_Object entity = w32font_match_internal (f, font_spec, 1);
+  Lisp_Object entity = w32font_match_internal (f, font_spec, true);
   FONT_ADD_LOG ("uniscribe-match", font_spec, entity);
   return entity;
 }
@@ -187,8 +183,9 @@ uniscribe_otf_capability (struct font *font)
 static Lisp_Object
 uniscribe_shape (Lisp_Object lgstring)
 {
-  struct font * font;
-  struct uniscribe_font_info * uniscribe_font;
+  struct font *font = CHECK_FONT_GET_OBJECT (LGSTRING_FONT (lgstring));
+  struct uniscribe_font_info *uniscribe_font
+    = (struct uniscribe_font_info *) font;
   EMACS_UINT nchars;
   int nitems, max_items, i, max_glyphs, done_glyphs;
   wchar_t *chars;
@@ -202,9 +199,6 @@ uniscribe_shape (Lisp_Object lgstring)
   struct frame * f = NULL;
   HDC context = NULL;
   HFONT old_font = NULL;
-
-  CHECK_FONT_GET_OBJECT (LGSTRING_FONT (lgstring), font);
-  uniscribe_font = (struct uniscribe_font_info *) font;
 
   /* Get the chars from lgstring in a form we can use with uniscribe.  */
   max_glyphs = nchars = LGSTRING_GLYPH_LEN (lgstring);

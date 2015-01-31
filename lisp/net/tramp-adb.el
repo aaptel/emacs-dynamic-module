@@ -1,6 +1,6 @@
 ;;; tramp-adb.el --- Functions for calling Android Debug Bridge from Tramp
 
-;; Copyright (C) 2011-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2015 Free Software Foundation, Inc.
 
 ;; Author: Jürgen Hötzel <juergen@archlinux.org>
 ;; Keywords: comm, processes
@@ -34,7 +34,6 @@
 ;;; Code:
 
 (require 'tramp)
-(require 'time-date)
 
 ;; Pacify byte-compiler.
 (defvar directory-sep-char)
@@ -468,7 +467,7 @@ Emacs dired can't find files."
     (setq time-a (apply 'encode-time (parse-time-string (match-string 0 a))))
     (string-match tramp-adb-ls-date-regexp b)
     (setq time-b (apply 'encode-time (parse-time-string (match-string 0 b))))
-    (tramp-time-less-p time-b time-a)))
+    (time-less-p time-b time-a)))
 
 (defun tramp-adb-ls-output-name-less-p (a b)
   "Sort \"ls\" output by name, ascending."

@@ -1,6 +1,6 @@
 ;;; tramp-sh.el --- Tramp access functions for (s)sh-like connections
 
-;; Copyright (C) 1998-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2015 Free Software Foundation, Inc.
 
 ;; (copyright statements below in code to be updated with the above notice)
 
@@ -63,6 +63,22 @@ confused by ANSI color escape sequences and suchlike.  Often, shell init
 files conditionalize this setup based on the TERM environment variable."
   :group 'tramp
   :type 'string)
+
+;;;###tramp-autoload
+(defcustom tramp-histfile-override "/dev/null"
+  "When invoking a shell, override the HISTFILE with this value.
+By default, the HISTFILE is set to the \"/dev/null\" value, which
+is special on Unix systems and indicates the shell history should
+not be logged (this avoids clutter due to Tramp commands).
+
+If you set this variable to nil, however, the *override* is
+disabled, so the history will go to the default storage
+location, e.g. \"$HOME/.sh_history\"."
+  :group 'tramp
+  :version "25.1"
+  :type '(choice (const :tag "Do not override HISTFILE" nil)
+                 (const :tag "Empty the history (/dev/null)" "/dev/null")
+                 (string :tag "Redirect to a file")))
 
 ;;;###tramp-autoload
 (defconst tramp-color-escape-sequence-regexp "\e[[;0-9]+m"
@@ -720,7 +736,7 @@ on the remote host.")
 (defconst tramp-perl-encode
   "%s -e '
 # This script contributed by Juanma Barranquero <lektu@terra.es>.
-# Copyright (C) 2002-2014 Free Software Foundation, Inc.
+# Copyright (C) 2002-2015 Free Software Foundation, Inc.
 use strict;
 
 my %%trans = do {
@@ -758,7 +774,7 @@ This string is passed to `format', so percent characters need to be doubled.")
 (defconst tramp-perl-decode
   "%s -e '
 # This script contributed by Juanma Barranquero <lektu@terra.es>.
-# Copyright (C) 2002-2014 Free Software Foundation, Inc.
+# Copyright (C) 2002-2015 Free Software Foundation, Inc.
 use strict;
 
 my %%trans = do {
@@ -2455,8 +2471,12 @@ The method used must be an out-of-band method."
 		   (mapconcat 'identity (process-command p) " "))
 		  (tramp-set-connection-property p "vector" orig-vec)
 		  (tramp-compat-set-process-query-on-exit-flag p nil)
-		  (tramp-process-actions
-		   p v nil tramp-actions-copy-out-of-band)
+
+		  ;; We must adapt `tramp-local-end-of-line' for
+		  ;; sending the password.
+		  (let ((tramp-local-end-of-line tramp-rsh-end-of-line))
+		    (tramp-process-actions
+		     p v nil tramp-actions-copy-out-of-band))
 
 		  ;; Check the return code.
 		  (goto-char (point-max))
@@ -2835,16 +2855,27 @@ the result will be a local, non-Tramp, file name."
 			(list (replace-match " \\\\\n" nil nil (cadr args))))
 		       (setq i (+ i 250))))
 		   (cdr args)))
+	   ;; Use a human-friendly prompt, for example for `shell'.
+	   (prompt (format "PS1=%s"
+			   (format "%s %s"
+				   (file-remote-p default-directory)
+				   tramp-initial-end-of-output)))
+	   ;; We use as environment the difference to toplevel
+	   ;; `process-environment'.
+	   env
+	   (env
+	    (dolist
+		(elt
+		 (cons prompt (nreverse (copy-sequence process-environment)))
+		 env)
+	      (or (member elt (default-toplevel-value 'process-environment))
+		  (setq env (cons elt env)))))
 	   (command
 	    (when (stringp program)
-	      (format "cd %s && exec %s env PS1=%s %s"
+	      (format "cd %s && exec %s env %s %s"
 		      (tramp-shell-quote-argument localname)
 		      (if heredoc (format "<<'%s'" tramp-end-of-heredoc) "")
-		      ;; Use a human-friendly prompt, for example for `shell'.
-		      (tramp-shell-quote-argument
-		       (format "%s %s"
-			       (file-remote-p default-directory)
-			       tramp-initial-end-of-output))
+		      (mapconcat 'tramp-shell-quote-argument env " ")
 		      (if heredoc
 			  (format "%s\n(\n%s\n) </dev/tty\n%s"
 				  program (car args) tramp-end-of-heredoc)
@@ -2856,7 +2887,7 @@ the result will be a local, non-Tramp, file name."
 	   (name1 name)
 	   (i 0)
 	   ;; We do not want to raise an error when
-	   ;; `start-file-process' has been started several time in
+	   ;; `start-file-process' has been started several times in
 	   ;; `eshell' and friends.
 	   (tramp-current-connection nil))
 
@@ -2931,10 +2962,20 @@ the result will be a local, non-Tramp, file name."
     (error "Implementation does not handle immediate return"))
 
   (with-parsed-tramp-file-name default-directory nil
-    (let (command input tmpinput stderr tmpstderr outbuf ret)
+    (let (command env input tmpinput stderr tmpstderr outbuf ret)
       ;; Compute command.
       (setq command (mapconcat 'tramp-shell-quote-argument
 			       (cons program args) " "))
+      ;; We use as environment the difference to toplevel `process-environment'.
+      (setq env
+	    (dolist (elt (nreverse (copy-sequence process-environment)) env)
+	      (or (member elt (default-toplevel-value 'process-environment))
+		  (setq env (cons elt env)))))
+      (when env
+	(setq command
+	      (format
+	       "env %s %s"
+	       (mapconcat 'tramp-shell-quote-argument env " ") command)))
       ;; Determine input.
       (if (null infile)
 	  (setq input "/dev/null")
@@ -3847,9 +3888,24 @@ file exists and nonzero exit status otherwise."
 	(setq item (pop alist))
 	(when (string-match (car item) shell)
 	  (setq extra-args (cdr item))))
+      ;; It is useful to set the prompt in the following command
+      ;; because some people have a setting for $PS1 which /bin/sh
+      ;; doesn't know about and thus /bin/sh will display a strange
+      ;; prompt.  For example, if $PS1 has "${CWD}" in the value, then
+      ;; ksh will display the current working directory but /bin/sh
+      ;; will display a dollar sign.  The following command line sets
+      ;; $PS1 to a sane value, and works under Bourne-ish shells as
+      ;; well as csh-like shells.  We also unset the variable $ENV
+      ;; because that is read by some sh implementations (eg, bash
+      ;; when called as sh) on startup; this way, we avoid the startup
+      ;; file clobbering $PS1.  $PROMPT_COMMAND is another way to set
+      ;; the prompt in /bin/bash, it must be discarded as well.
       (tramp-send-command
        vec (format
-	    "exec env ENV='' HISTFILE=/dev/null PROMPT_COMMAND='' PS1=%s PS2='' PS3='' %s %s"
+	    "exec env ENV=''%s PROMPT_COMMAND='' PS1=%s PS2='' PS3='' %s %s"
+            (if tramp-histfile-override
+                (concat " HISTFILE=" tramp-histfile-override)
+              "")
 	    (tramp-shell-quote-argument tramp-end-of-output)
 	    shell (or extra-args ""))
        t))
@@ -3923,20 +3979,6 @@ seconds.  If not, it produces an error message with the given ERROR-ARGS."
 Mainly sets the prompt and the echo correctly.  PROC is the shell
 process to set up.  VEC specifies the connection."
   (let ((tramp-end-of-output tramp-initial-end-of-output))
-    ;; It is useful to set the prompt in the following command because
-    ;; some people have a setting for $PS1 which /bin/sh doesn't know
-    ;; about and thus /bin/sh will display a strange prompt.  For
-    ;; example, if $PS1 has "${CWD}" in the value, then ksh will
-    ;; display the current working directory but /bin/sh will display
-    ;; a dollar sign.  The following command line sets $PS1 to a sane
-    ;; value, and works under Bourne-ish shells as well as csh-like
-    ;; shells.  Daniel Pittman reports that the unusual positioning of
-    ;; the single quotes makes it work under `rc', too.  We also unset
-    ;; the variable $ENV because that is read by some sh
-    ;; implementations (eg, bash when called as sh) on startup; this
-    ;; way, we avoid the startup file clobbering $PS1.  $PROMPT_COMMAND
-    ;; is another way to set the prompt in /bin/bash, it must be
-    ;; discarded as well.
     (tramp-open-shell
      vec
      (or (tramp-get-connection-property vec "remote-shell" nil)
@@ -3971,9 +4013,9 @@ process to set up.  VEC specifies the connection."
     (if (featurep 'mule)
 	;; Use MULE to select the right EOL convention for communicating
 	;; with the process.
-	(let ((cs (or (when (string-match
-			     "utf8" (or (tramp-get-remote-locale vec) ""))
-			(cons 'utf-8 'utf-8))
+	(let ((cs (or (and (memq 'utf-8 (coding-system-list))
+			   (string-match "utf8" (tramp-get-remote-locale vec))
+			   (cons 'utf-8 'utf-8))
 		      (tramp-compat-funcall 'process-coding-system proc)
 		      (cons 'undecided 'undecided)))
 	      cs-decode cs-encode)
@@ -4079,8 +4121,7 @@ process to set up.  VEC specifies the connection."
   ;; Set the environment.
   (tramp-message vec 5 "Setting default environment")
 
-  (let ((env (append (when (tramp-get-remote-locale vec) ; Discard `(nil)'.
-		       `(,(tramp-get-remote-locale vec)))
+  (let ((env (append `(,(tramp-get-remote-locale vec))
 		     (copy-sequence tramp-remote-process-environment)))
 	unset vars item)
     (while env
@@ -4473,7 +4514,8 @@ Gateway hops are already opened."
 	;; Therefore, we must remember the gateway vector.  But we
 	;; cannot do it as connection property, because it shouldn't
 	;; be persistent.  And we have no started process yet either.
-	(tramp-set-file-property (car target-alist) "" "gateway" hop)))
+	(let ((tramp-verbose 0))
+	  (tramp-set-file-property (car target-alist) "" "gateway" hop))))
 
     ;; Foreign and out-of-band methods are not supported for multi-hops.
     (when (cdr target-alist)
@@ -4585,7 +4627,8 @@ connection if a previous connection has died for some reason."
 		(delete-process p))
 	      (setenv "TERM" tramp-terminal-type)
 	      (setenv "LC_ALL" "en_US.utf8")
-	      (setenv "HISTFILE" "/dev/null")
+	      (when tramp-histfile-override
+                (setenv "HISTFILE" tramp-histfile-override))
 	      (setenv "PROMPT_COMMAND")
 	      (setenv "PS1" tramp-initial-end-of-output)
 	      (let* ((target-alist (tramp-compute-multi-hops vec))
@@ -4649,7 +4692,8 @@ connection if a previous connection has died for some reason."
 			   l-method 'tramp-connection-timeout))
 			 (gw-args
 			  (tramp-get-method-parameter l-method 'tramp-gw-args))
-			 (gw (tramp-get-file-property hop "" "gateway" nil))
+			 (gw (let ((tramp-verbose 0))
+			       (tramp-get-file-property hop "" "gateway" nil)))
 			 (g-method (and gw (tramp-file-name-method gw)))
 			 (g-user (and gw (tramp-file-name-user gw)))
 			 (g-host (and gw (tramp-file-name-real-host gw)))
@@ -4677,8 +4721,10 @@ connection if a previous connection has died for some reason."
 		      (setq login-args (append async-args login-args)))
 
 		    ;; Add gateway arguments if necessary.
-		    (when (and gw gw-args)
-		      (setq login-args (append gw-args login-args)))
+		    (when gw
+		      (tramp-set-connection-property p "gateway" t)
+		      (when gw-args
+			(setq login-args (append gw-args login-args))))
 
 		    ;; Check for port number.  Until now, there's no
 		    ;; need for handling like method, user, host.
@@ -4864,8 +4910,9 @@ FMT and ARGS which are passed to `error'."
   (or (tramp-send-command-and-check vec command)
       (apply 'tramp-error vec 'file-error fmt args)))
 
-(defun tramp-send-command-and-read (vec command &optional noerror)
+(defun tramp-send-command-and-read (vec command &optional noerror marker)
   "Run COMMAND and return the output, which must be a Lisp expression.
+If MARKER is a regexp, read the output after that string.
 In case there is no valid Lisp expression and NOERROR is nil, it
 raises an error."
   (when (if noerror
@@ -4873,8 +4920,17 @@ raises an error."
 	  (tramp-barf-unless-okay
 	   vec command "`%s' returns with error" command))
     (with-current-buffer (tramp-get-connection-buffer vec)
-      ;; Read the expression.
       (goto-char (point-min))
+      ;; Read the marker.
+      (when (stringp marker)
+	(condition-case nil
+	    (re-search-forward marker)
+	  (error (unless noerror
+		   (tramp-error
+		    vec 'file-error
+		    "`%s' does not return the marker `%s': `%s'"
+		    command marker (buffer-string))))))
+      ;; Read the expression.
       (condition-case nil
 	  (prog1 (read (current-buffer))
 	    ;; Error handling.
@@ -5026,13 +5082,22 @@ Return ATTR."
 		   "/bin:/usr/bin")
 		  "/bin:/usr/bin"))))
 	   (own-remote-path
-	     (when elt2
-	       (condition-case nil
-		   (tramp-send-command-and-read vec "echo \\\"$PATH\\\"")
-		 (error
-		  (tramp-message
-		   vec 3 "$PATH not set, ignoring `tramp-own-remote-path'.")
-		  nil)))))
+	    ;; The login shell could return more than just the $PATH
+	    ;; string.  So we use `tramp-end-of-heredoc' as marker.
+	    (when elt2
+	      (tramp-send-command-and-read
+	       vec
+	       (format
+		"%s -l %s 'echo %s \\\"$PATH\\\"'"
+		(tramp-get-method-parameter
+		 (tramp-file-name-method vec) 'tramp-remote-shell)
+		(mapconcat
+		 'identity
+		 (tramp-get-method-parameter
+		  (tramp-file-name-method vec) 'tramp-remote-shell-args)
+		 " ")
+		(tramp-shell-quote-argument tramp-end-of-heredoc))
+	       nil (regexp-quote tramp-end-of-heredoc)))))
 
       ;; Replace place holder `tramp-default-remote-path'.
       (when elt1
@@ -5076,7 +5141,7 @@ Return ATTR."
 (defun tramp-get-remote-locale (vec)
   (with-tramp-connection-property vec "locale"
     (tramp-send-command vec "locale -a")
-    (let ((candidates '("en_US.utf8" "C.utf8" "C"))
+    (let ((candidates '("en_US.utf8" "C.utf8"))
 	  locale)
       (with-current-buffer (tramp-get-connection-buffer vec)
 	(while candidates
@@ -5086,7 +5151,7 @@ Return ATTR."
 		    candidates nil)
 	    (setq candidates (cdr candidates)))))
       ;; Return value.
-      (when locale (format "LC_ALL=%s" locale)))))
+      (format "LC_ALL=%s" (or locale "C")))))
 
 (defun tramp-get-ls-command (vec)
   (with-tramp-connection-property vec "ls"

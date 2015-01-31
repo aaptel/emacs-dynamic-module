@@ -1,6 +1,6 @@
 /* Fontset handler.
 
-Copyright (C) 2001-2014 Free Software Foundation, Inc.
+Copyright (C) 2001-2015 Free Software Foundation, Inc.
 Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
   2005, 2006, 2007, 2008, 2009, 2010, 2011
   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -151,11 +151,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 */
 
 /********** VARIABLES and FUNCTION PROTOTYPES **********/
-
-static Lisp_Object Qfontset;
-static Lisp_Object Qfontset_info;
-static Lisp_Object Qprepend, Qappend;
-Lisp_Object Qlatin;
 
 /* Vector containing all fontsets.  */
 static Lisp_Object Vfontset_table;
@@ -354,16 +349,17 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 	from1 = from, to1 = to;
 	args[idx] = char_table_ref_and_range (fontset, from, &from1, &to1);
 	char_table_set_range (fontset, from, to1,
-			      NILP (args[idx]) ? args[1 - idx]
-			      : Fvconcat (2, args));
+			      (NILP (args[idx]) ? args[1 - idx]
+			       : CALLMANY (Fvconcat, args)));
 	from = to1 + 1;
       } while (from < to);
     }
   else
     {
       args[idx] = FONTSET_FALLBACK (fontset);
-      set_fontset_fallback
-	(fontset, NILP (args[idx]) ? args[1 - idx] : Fvconcat (2, args));
+      set_fontset_fallback (fontset,
+			    (NILP (args[idx]) ? args[1 - idx]
+			     : CALLMANY (Fvconcat, args)));
     }
 }
 
@@ -389,7 +385,7 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
   Lisp_Object vec, font_object;
   int size;
   int i;
-  bool score_changed = 0;
+  bool score_changed = false;
 
   if (font)
     XSETFONT (font_object, font);
@@ -444,14 +440,15 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
       if (RFONT_DEF_SCORE (rfont_def) != score)
 	{
 	  RFONT_DEF_SET_SCORE (rfont_def, score);
-	  score_changed = 1;
+	  score_changed = true;
 	}
     }
 
   if (score_changed)
     qsort (XVECTOR (vec)->contents, size, word_size,
 	   fontset_compare_rfontdef);
-  XSETCAR (font_group, make_number (charset_ordered_list_tick));
+  EMACS_INT low_tick_bits = charset_ordered_list_tick & MOST_POSITIVE_FIXNUM;
+  XSETCAR (font_group, make_number (low_tick_bits));
 }
 
 /* Return a font-group (actually a cons (-1 . FONT-GROUP-VECTOR)) for
@@ -1436,12 +1433,8 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
     }
   else if (STRINGP (font_spec))
     {
-      Lisp_Object args[2];
-
       fontname = font_spec;
-      args[0] = QCname;
-      args[1] = font_spec;
-      font_spec = Ffont_spec (2, args);
+      font_spec = CALLN (Ffont_spec, QCname, fontname);
     }
   else if (FONT_SPEC_P (font_spec))
     fontname = Ffont_xlfd_name (font_spec, Qnil);
@@ -1835,7 +1828,7 @@ DEFUN ("internal-char-font", Finternal_char_font, Sinternal_char_font, 1, 2, 0,
       w = XWINDOW (window);
       f = XFRAME (w->frame);
       face_id = face_at_buffer_position (w, pos, &dummy,
-					 pos + 100, 0, -1);
+					 pos + 100, false, -1);
     }
   if (! CHAR_VALID_P (c))
     return Qnil;

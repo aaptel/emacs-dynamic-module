@@ -1,6 +1,6 @@
 ;;; message.el --- composing mail and news messages
 
-;; Copyright (C) 1996-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: mail, news
@@ -1756,13 +1756,17 @@ no, only reply back to the author."
   :type '(radio (const :format "%v  " nil)
 		(string :format "FQDN: %v")))
 
-(defcustom message-use-idna (and (condition-case nil (require 'idna)
-				   (file-error))
-				 (mm-coding-system-p 'utf-8)
-				 (executable-find idna-program)
-				 (string= (idna-to-ascii "räksmörgås")
-					  "xn--rksmrgs-5wao1o")
-				 t)
+(defcustom message-use-idna
+  (and (or (mm-coding-system-p 'utf-8)
+	   (condition-case nil
+	       (let (mucs-ignore-version-incompatibilities)
+		 (require 'un-define))
+	     (error)))
+       (condition-case nil (require 'idna) (file-error))
+       idna-program
+       (executable-find idna-program)
+       (string= (idna-to-ascii "räksmörgås") "xn--rksmrgs-5wao1o")
+       t)
   "Whether to encode non-ASCII in domain names into ASCII according to IDNA.
 GNU Libidn, and in particular the elisp package \"idna.el\" and
 the external program \"idn\", must be installed for this
@@ -2302,7 +2306,7 @@ Leading \"Re: \" is not stripped by this function.  Use the function
 		   ((not (string-match
 			  (concat "^[ \t]*"
 				  (regexp-quote new-subject)
-				  " \t]*$")
+				  "[ \t]*$")
 			  old-subject))  ; yes, it really is a new subject
 		    ;; delete eventual Re: prefix
 		    (setq old-subject
@@ -4902,6 +4906,11 @@ evaluates `message-send-mail-hook' just before sending a message.
 It is useful if your ISP requires the POP-before-SMTP
 authentication.  See the Gnus manual for details."
   (run-hooks 'message-send-mail-hook)
+  ;; Change header-delimiter to be what smtpmail expects.
+  (goto-char (point-min))
+  (when (re-search-forward
+	 (concat "^" (regexp-quote mail-header-separator) "\n"))
+    (replace-match "\n"))
   (smtpmail-send-it))
 
 (defun message-send-mail-with-mailclient ()
@@ -5845,7 +5854,7 @@ give as trustworthy answer as possible."
 
 (defun message-make-fqdn ()
   "Return user's fully qualified domain name."
-  (let* ((system-name (system-name))
+  (let* ((sysname (system-name))
 	 (user-mail (message-user-mail-address))
 	 (user-domain
 	  (if (and user-mail
@@ -5859,10 +5868,10 @@ give as trustworthy answer as possible."
 	   (not (string-match message-bogus-system-names message-user-fqdn)))
       ;; `message-user-fqdn' seems to be valid
       message-user-fqdn)
-     ((and (string-match message-valid-fqdn-regexp system-name)
-	   (not (string-match message-bogus-system-names system-name)))
+     ((and (string-match message-valid-fqdn-regexp sysname)
+	   (not (string-match message-bogus-system-names sysname)))
       ;; `system-name' returned the right result.
-      system-name)
+      sysname)
      ;; Try `mail-host-address'.
      ((and (boundp 'mail-host-address)
 	   (stringp mail-host-address)
@@ -5877,7 +5886,7 @@ give as trustworthy answer as possible."
       user-domain)
      ;; Default to this bogus thing.
      (t
-      (concat system-name
+      (concat sysname
 	      ".i-did-not-set--mail-host-address--so-tickle-me")))))
 
 (defun message-make-domain ()

@@ -1,5 +1,5 @@
 /* Define frame-object for GNU Emacs.
-   Copyright (C) 1993-1994, 1999-2014 Free Software Foundation, Inc.
+   Copyright (C) 1993-1994, 1999-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -335,6 +335,10 @@ struct frame
   /* True means run_window_configuration_change_hook can be processed
      for this frame.  */
   bool_bf can_run_window_configuration_change_hook : 1;
+
+  /* True means tool bar has been redisplayed at least once in current
+     session.  */
+  bool_bf tool_bar_redisplayed_once : 1;
 
   /* Bitfield area ends here.  */
 
@@ -1095,11 +1099,8 @@ SET_FRAME_VISIBLE (struct frame *f, int v)
   (f)->iconified = (eassert (0 <= (i) && (i) <= 1), (i))
 
 extern Lisp_Object selected_frame;
-extern Lisp_Object Qframep, Qframe_live_p;
-extern Lisp_Object Qtty, Qtty_type;
-extern Lisp_Object Qtty_color_mode;
-extern Lisp_Object Qterminal;
-extern Lisp_Object Qnoelisp;
+
+extern int frame_default_tool_bar_height;
 
 extern struct frame *decode_window_system_frame (Lisp_Object);
 extern struct frame *decode_live_frame (Lisp_Object);
@@ -1344,51 +1345,6 @@ extern Lisp_Object Vframe_list;
 				Frame Parameters
  ***********************************************************************/
 
-extern Lisp_Object Qauto_raise, Qauto_lower;
-extern Lisp_Object Qborder_color, Qborder_width;
-extern Lisp_Object Qbuffer_predicate;
-extern Lisp_Object Qcursor_color, Qcursor_type;
-extern Lisp_Object Qfont;
-extern Lisp_Object Qicon, Qicon_name, Qicon_type, Qicon_left, Qicon_top;
-extern Lisp_Object Qinternal_border_width;
-extern Lisp_Object Qright_divider_width, Qbottom_divider_width;
-extern Lisp_Object Qtooltip;
-extern Lisp_Object Qmenu_bar_lines, Qtool_bar_lines, Qtool_bar_position;
-extern Lisp_Object Qmouse_color;
-extern Lisp_Object Qname, Qtitle;
-extern Lisp_Object Qparent_id;
-extern Lisp_Object Qunsplittable, Qvisibility;
-extern Lisp_Object Qscroll_bar_width, Qvertical_scroll_bars;
-extern Lisp_Object Qscroll_bar_height, Qhorizontal_scroll_bars;
-extern Lisp_Object Qscroll_bar_foreground, Qscroll_bar_background;
-extern Lisp_Object Qscreen_gamma;
-extern Lisp_Object Qline_spacing;
-extern Lisp_Object Qwait_for_wm;
-extern Lisp_Object Qfullscreen;
-extern Lisp_Object Qfullwidth, Qfullheight, Qfullboth, Qmaximized;
-extern Lisp_Object Qsticky;
-extern Lisp_Object Qfont_backend;
-extern Lisp_Object Qalpha;
-
-extern Lisp_Object Qleft_fringe, Qright_fringe;
-extern Lisp_Object Qheight, Qwidth;
-extern Lisp_Object Qminibuffer, Qmodeline;
-extern Lisp_Object Qx, Qw32, Qpc, Qns;
-extern Lisp_Object Qvisible;
-extern Lisp_Object Qdisplay_type;
-
-extern Lisp_Object Qx_resource_name;
-
-extern Lisp_Object Qtop, Qbox, Qbottom;
-extern Lisp_Object Qdisplay;
-
-extern Lisp_Object Qframe_position, Qframe_outer_size, Qframe_inner_size;
-extern Lisp_Object Qexternal_border_size, Qtitle_height;
-extern Lisp_Object Qmenu_bar_external, Qmenu_bar_size;
-extern Lisp_Object Qtool_bar_external, Qtool_bar_size;
-
-extern Lisp_Object Qrun_hook_with_args;
-
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* The class of this X application.  */
@@ -1399,7 +1355,6 @@ extern void x_set_scroll_bar_default_height (struct frame *);
 extern void x_set_offset (struct frame *, int, int, int);
 extern void x_wm_set_size_hint (struct frame *f, long flags, bool user_position);
 extern Lisp_Object x_new_font (struct frame *, Lisp_Object, int);
-extern Lisp_Object Qface_set_after_frame_default;
 extern void x_set_frame_parameters (struct frame *, Lisp_Object);
 extern void x_set_fullscreen (struct frame *, Lisp_Object, Lisp_Object);
 extern void x_set_line_spacing (struct frame *, Lisp_Object, Lisp_Object);
@@ -1435,7 +1390,7 @@ extern Lisp_Object display_x_get_resource (Display_Info *,
 					   Lisp_Object subclass);
 
 extern void set_frame_menubar (struct frame *f, bool first_time, bool deep_p);
-extern void x_set_window_size (struct frame *f, int change_grav,
+extern void x_set_window_size (struct frame *f, bool change_gravity,
 			       int width, int height, bool pixelwise);
 extern Lisp_Object x_get_focus_frame (struct frame *);
 extern void frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y);
@@ -1462,7 +1417,7 @@ extern void x_focus_frame (struct frame *);
 
 #ifndef HAVE_NS
 
-extern int x_bitmap_icon (struct frame *, Lisp_Object);
+extern bool x_bitmap_icon (struct frame *, Lisp_Object);
 
 /* Set F's bitmap icon, if specified among F's parameters.  */
 

@@ -1,3 +1,379 @@
+2015-01-31  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el (eieio-test-23-inheritance-check): Simplify.
+
+2015-01-30  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/core-elisp-tests.el (core-elisp-tests-3-backquote): New test.
+
+2015-01-28  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el (python-indent-pep8-1)
+	(python-indent-pep8-2, python-indent-pep8-3)
+	(python-indent-after-comment-1, python-indent-after-comment-2)
+	(python-indent-inside-paren-1, python-indent-inside-paren-2)
+	(python-indent-after-block-1, python-indent-after-block-2)
+	(python-indent-after-backslash-1, python-indent-after-backslash-2)
+	(python-indent-after-backslash-3, python-indent-block-enders-1)
+	(python-indent-block-enders-2, python-indent-block-enders-3)
+	(python-indent-block-enders-4, python-indent-block-enders-5)
+	(python-indent-dedenters-1, python-indent-dedenters-2)
+	(python-indent-dedenters-3, python-indent-dedenters-4)
+	(python-indent-dedenters-5, python-indent-dedenters-6)
+	(python-indent-dedenters-7, python-indent-dedenters-8): Fix tests.
+	(python-indent-base-case, python-indent-after-block-3)
+	(python-indent-after-backslash-5, python-indent-inside-paren-3)
+	(python-indent-inside-paren-4, python-indent-inside-paren-5)
+	(python-indent-inside-paren-6, python-indent-inside-string-1)
+	(python-indent-inside-string-2, python-indent-inside-string-3)
+	(python-indent-dedent-line-backspace-1): New Tests.
+
+2015-01-28  Glenn Morris  <rgm@gnu.org>
+
+	* automated/regexp-tests.el: Require regexp-opt, which is
+	not preloaded --without-x.
+
+2015-01-26  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/cl-generic-tests.el: Try and make sure cl-lib is not
+	required at run-time.
+
+2015-01-26  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/cl-generic-tests.el (cl-generic-test-11-next-method-p):
+	New test.
+
+2015-01-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* indent/shell.sh (bar): Use '[ $# -eq 0 ]', not '[ $# == 0 ]'.
+	This is more portable in shell scripts.
+	Fixes: bug#19658
+
+2015-01-23  Dmitry Gutov  <dgutov@yandex.ru>
+
+	Fix package tests when TMPDIR is in HOME.  (Bug#19657)
+	* automated/package-test.el (with-package-test):
+	Bind `abbreviated-home-dir' to nil.
+	(package-test-describe-package, package-test-signed):
+	Expect abbreviated directory names.
+
+2015-01-22  Jorgen Schaefer  <contact@jorgenschaefer.de>
+
+	* automated/package-test.el (package-test-install-prioritized):
+	Re-add the test case and add priority to the correct repository
+	this time around.
+
+2015-01-21  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/cl-generic-tests.el (setf cl--generic-2): Make sure
+	the setf can be used already in the body of the method.
+
+2015-01-20  Jorgen Schaefer  <contact@jorgenschaefer.de>
+
+	* automated/package-test.el (package-test-install-prioritized):
+	Remove test due to unreproducible failures.
+
+2015-01-20  Michal Nazarewicz  <mina86@mina86.com>
+
+	* automated/descr-text-test.el: New file with tests for
+	`describe-char-eldoc--truncate', `describe-char-eldoc--format',
+	and `describe-char-eldoc'.
+
+2015-01-20  Michal Nazarewicz  <mina86@mina86.com>
+
+	* automated/tildify-tests.el (tildify-space-undo-test--test):
+	A new helper function for testing `tildify-double-space-undos'
+	behaviour in the `tildify-space' function.
+	(tildify-space-undo-test-html, tildify-space-undo-test-html-nbsp)
+	(tildify-space-undo-test-xml, tildify-space-undo-test-tex):
+	New tests for `tildify-doule-space-undos' behaviour.
+
+	* automated/tildify-tests.el (tildify-space-test--test):
+	A new helper function for testing `tildify-space' function.
+	(tildify-space-test-html, tildify-space-test-html-nbsp)
+	(tildify-space-test-xml, tildify-space-test-tex): New tests for
+	`tildify-space' function.
+
+2015-01-18  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/Makefile.in (EMACS_EXTRAOPT): New var.
+	(EMACSOPT): Use it.
+
+	* automated/cl-generic-tests.el (cl-generic-test-10-weird): New test.
+	Rename other tests to preserve ordering.
+
+2015-01-18  Leo Liu  <sdl.web@gmail.com>
+
+	* automated/seq-tests.el (test-seq-subseq): Add more tests.
+	(Bug#19434)
+
+2015-01-18  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-cl-generic-1):
+	Test `subclass' specializer.
+
+2015-01-17  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el
+	(eieio-test-37-obsolete-name-in-constructor): New test.
+
+2015-01-17  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el (eieio-test-25-slot-tests)
+	(eieio-test-26-default-inheritance, eieio-test-28-slot-protection)
+	(eieio-test-30-slot-attribute-override)
+	(eieio-test-31-slot-attribute-override-class-allocation): Don't check
+	that we enforce :protection since we don't any more.
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-method-store):
+	Use an explicit arg instead of eieio--scoped-class.  Update all callers.
+
+2015-01-17  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-cl-generic-1):
+	Reset eieio-test--1.
+
+	* automated/cl-generic-tests.el (cl-generic-test-8-after/before):
+	Rename from cl-generic-test-7-after/before.
+	(cl--generic-test-advice): New function.
+	(cl-generic-test-9-advice): New test.
+
+2015-01-16  Jorgen Schaefer  <contact@jorgenschaefer.de>
+
+	* automated/package-test.el (package-test-install-prioritized):
+	New test.
+
+2015-01-15  Wolfgang Jenkner  <wjenkner@inode.at>
+
+	* automated/calc-tests.el (calc-tests-equal, calc-tests-simple):
+	New functions.
+	(test-calc-remove-units, test-calc-extract-units)
+	(test-calc-convert-units): New tests.
+
+2015-01-15  Wolfgang Jenkner  <wjenkner@inode.at>
+
+	* automated/Makefile.in (WRITE_LOG): Use POSIX redirection.
+
+2015-01-15  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-method-store): Add
+	keysym arg instead of relying on internal var eieio--generic-call-key.
+	Update all callers.
+	(eieio-test-cl-generic-1): New tests.
+
+2015-01-14  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/cl-generic-tests.el: New file.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el (eieio-test-23-inheritance-check): Don't use
+	<foo>-child-p.
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-method-store):
+	Update reference to eieio--generic-call-key.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el: Use cl-lib.  Don't use <class> as a variable.
+	Don't use <class>-list types and <class>-list-p predicates.
+
+	* automated/eieio-test-persist.el (persistent-with-objs-list-slot):
+	Don't use <class>-list type.
+
+	* automated/eieio-test-methodinvoke.el
+	(eieio-test-method-order-list-4):
+	Don't use <class> as a variable.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el (eieio-test-04-static-method)
+	(eieio-test-05-static-method-2): Use oref-default to access
+	class slots.
+	(eieio-test-23-inheritance-check): Don't assume that
+	eieio-class-parents returns class names, or that a class can only have
+	a single name.
+
+	* automated/eieio-test-persist.el (eieio--attribute-to-initarg):
+	Move from eieio-core.el.  Rename from eieio-attribute-to-initarg.
+	Change arg to be a class object.  Update all callers.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-method-store):
+	Adjust to new semantics of eieio--scoped-class.
+	(eieio-test-match): Improve error feedback.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-tests.el: Remove dummy object names.
+
+	* automated/eieio-test-persist.el (persistent-with-objs-slot-subs):
+	The type FOO-child is the same as FOO.
+
+2015-01-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* automated/eieio-test-methodinvoke.el (eieio-test-method-store):
+	Remove use of eieio-generic-call-methodname.
+	(eieio-test-method-order-list-3, eieio-test-method-order-list-6)
+	(eieio-test-method-order-list-7, eieio-test-method-order-list-8):
+	Adjust the expected result accordingly.
+
+2015-01-01  Michael Albinus  <michael.albinus@gmx.de>
+
+	* automated/tramp-tests.el (tramp--test-smb-or-windows-nt-p):
+	New defun.
+	(tramp-test30-special-characters): Use it.  (Bug#19463)
+	(tramp--test-check-files): Filter nil file names out.
+
+2015-01-01  Michael Albinus  <michael.albinus@gmx.de>
+
+	Sync with Tramp 2.2.11.
+
+	* automated/tramp-tests.el (tramp-test30-special-characters):
+	Skip test on MS-Windows.
+
+2014-12-27  Glenn Morris  <rgm@gnu.org>
+
+	* automated/let-alist.el: Load dependency.
+
+2014-12-27  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el
+	(python-shell-completion-native-interpreter-disabled-p-1): New test.
+
+2014-12-27  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el (python-shell-get-or-create-process-1)
+	(python-shell-get-or-create-process-2)
+	(python-shell-get-or-create-process-3): Remove tests.
+
+2014-12-27  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el (python-shell-buffer-substring-9): New test.
+
+2014-12-27  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el (python-shell-buffer-substring-1)
+	(python-shell-buffer-substring-2, python-shell-buffer-substring-3)
+	(python-shell-buffer-substring-4, python-shell-buffer-substring-5)
+	(python-shell-buffer-substring-6, python-shell-buffer-substring-7)
+	(python-shell-buffer-substring-8)
+	(python-info-encoding-from-cookie-1)
+	(python-info-encoding-from-cookie-2)
+	(python-info-encoding-from-cookie-3)
+	(python-info-encoding-from-cookie-4)
+	(python-info-encoding-from-cookie-5)
+	(python-info-encoding-from-cookie-6)
+	(python-info-encoding-from-cookie-7, python-info-encoding-1)
+	(python-info-encoding-2): New tests.
+
+2014-12-27  Michael Albinus  <michael.albinus@gmx.de>
+
+	* automated/tramp-tests.el (tramp-test17-insert-directory): Do not
+	expect a given order of "." and "..".
+
+2014-12-27  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el (python-indent-electric-colon-2)
+	(python-indent-electric-colon-3): New tests.
+
+2014-12-27  João Távora  <joaotavora@gmail.com>
+
+	* automated/electric-tests.el (autowrapping-7): Tests for
+	tex-mode.
+
+2014-12-27  Glenn Morris  <rgm@gnu.org>
+
+	* automated/flymake/warnpred/test.pl: Tweak format, since the
+	previous one seems to have stopped giving a warning with perl 5.20.1.
+
+2014-12-26  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el (python-shell-get-process-name-1)
+	(python-shell-internal-get-process-name-1): Cleanup.
+	(python-shell-get-process-name-2)
+	(python-shell-internal-get-process-name-2): New tests.
+	(python-shell-calculate-command-1)
+	(python-shell-calculate-process-environment-3)
+	(python-shell-calculate-exec-path-2, python-shell-make-comint-1)
+	(python-shell-make-comint-2, python-shell-make-comint-4)
+	(python-shell-get-process-1, python-util-clone-local-variables-1):
+	Replace obsolete function and variable references with current.
+
+2014-12-19  Artur Malabarba  <bruce.connor.am@gmail.com>
+
+	* automated/let-alist.el: require `cl-lib'
+	New tests for accessing alists inside alists.
+
+2014-12-18  Artur Malabarba  <bruce.connor.am@gmail.com>
+
+	* automated/let-alist.el: New file.
+
+2014-12-16  Nicolas Petton <petton.nicolas@gmail.com>
+
+	* automated/seq-tests.el: New file.
+
+2014-12-16  Glenn Morris  <rgm@gnu.org>
+
+	* automated/data/flymake/Makefile (check-syntax):
+	Prevent colorized gcc output from confusing flymake.
+
+	* automated/flymake-tests.el (flymake-tests-data-directory):
+	Change from flymake/warnpred to more standard data/flymake.
+	* automated/flymake/warnpred/: Rename to automated/data/flymake/.
+
+2014-12-11  Michael Albinus  <michael.albinus@gmx.de>
+
+	* automated/vc-tests.el (vc-test--revision-granularity-function):
+	New defun.
+	(vc-test--create-repo-function): Rename from
+	`vc-test--create-repo-if-not-supported'.  Adapt all callees.
+	(vc-test--create-repo): Check also for revision-granularity.
+	(vc-test--unregister-function): Additional argument FILE.
+	Adapt all callees.
+	(vc-test--working-revision): New defun.
+	(vc-test-*-working-revision): New tests.
+
+2014-12-10  Michael Albinus  <michael.albinus@gmx.de>
+
+	* automated/vc-tests.el (vc-test--register): Check, that the file
+	still exists after register and unregister operations.
+
+2014-12-06  Michael Albinus  <michael.albinus@gmx.de>
+
+	* automated/vc-tests.el: New file.
+
+2014-12-03  Michael Albinus  <michael.albinus@gmx.de>
+
+	* automated/tramp-tests.el (tramp-test29-vc-registered):
+	Fallback for changed `vc-register' argument list.
+
+2014-12-03  Glenn Morris  <rgm@gnu.org>
+
+	* automated/tramp-tests.el (tramp-test29-vc-registered):
+	Update for recent incompatible change in vc-register.
+
+2014-11-29  Fabián Ezequiel Gallina  <fgallina@gnu.org>
+
+	* automated/python-tests.el
+	(python-shell-calculate-process-environment-4)
+	(python-shell-calculate-process-environment-5): New tests.
+	(python-shell-make-comint-3): Use file-equal-p.
+	(python-shell-get-or-create-process-1)
+	(python-shell-get-or-create-process-2)
+	(python-shell-get-or-create-process-3): Fix interpreter for
+	Windows (Bug#18595).
+
+2014-11-21  Ulf Jasper  <ulf.jasper@web.de>
+
+	* automated/libxml-tests.el
+	(libxml-tests--data-comments-preserved): Rename from
+	'libxml-tests--data'.
+	(libxml-tests--data-comments-discarded): New.
+	(libxml-tests): Check whether 'libxml-parse-xml-region' is
+	discarding comments correctly.
+
 2014-11-17  Michal Nazarewicz  <mina86@mina86.com>
 
 	* automated/tildify-tests.el (tildify-test-html, tildify-test-xml):
@@ -19,8 +395,8 @@
 
 2014-11-17  Ulf Jasper  <ulf.jasper@web.de>
 
-	* automated/icalendar-tests.el (icalendar-tests--test-export): New
-	optional parameter `alarms'.
+	* automated/icalendar-tests.el (icalendar-tests--test-export):
+	New optional parameter `alarms'.
 	(icalendar-export-alarms): New test for exporting icalendar
 	alarms.
 	(icalendar-tests--test-cycle): Let `icalendar-export-alarms' be nil.
@@ -34,8 +410,8 @@
 
 2014-11-16  Ulf Jasper  <ulf.jasper@web.de>
 
-	* automated/icalendar-tests.el (icalendar--parse-vtimezone): Add
-	testcase where offsets of standard time and daylight saving time
+	* automated/icalendar-tests.el (icalendar--parse-vtimezone):
+	Add testcase where offsets of standard time and daylight saving time
 	are equal.
 	(icalendar-real-world): Fix error in test case.  Expected result
 	was wrong when offsets of standard time and daylight saving time
@@ -70,7 +446,7 @@
 
 2014-10-22  Noam Postavsky  <npostavs@users.sourceforget.net>
 
-	* test/automated/process-tests.el (process-test-quoted-batfile):
+	* automated/process-tests.el (process-test-quoted-batfile):
 	New test.
 
 2014-10-20  Glenn Morris  <rgm@gnu.org>
@@ -2316,7 +2692,7 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 2008-2014 Free Software Foundation, Inc.
+  Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

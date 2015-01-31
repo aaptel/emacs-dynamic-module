@@ -1,6 +1,6 @@
 /* Lisp functions pertaining to editing.
 
-Copyright (C) 1985-1987, 1989, 1993-2014 Free Software Foundation, Inc.
+Copyright (C) 1985-1987, 1989, 1993-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -76,22 +76,23 @@ static void update_buffer_properties (ptrdiff_t, ptrdiff_t);
 # define HAVE_TM_GMTOFF false
 #endif
 
-static Lisp_Object Qbuffer_access_fontify_functions;
-
-/* Symbol for the text property used to mark fields.  */
-
-Lisp_Object Qfield;
-
-/* A special value for Qfield properties.  */
-
-static Lisp_Object Qboundary;
-
 /* The startup value of the TZ environment variable; null if unset.  */
 static char const *initial_tz;
 
 /* A valid but unlikely setting for the TZ environment variable.
    It is OK (though a bit slower) if the user chooses this value.  */
 static char dump_tz_string[] = "TZ=UtC0";
+
+/* The cached value of Vsystem_name.  This is used only to compare it
+   to Vsystem_name, so it need not be visible to the GC.  */
+static Lisp_Object cached_system_name;
+
+static void
+init_and_cache_system_name (void)
+{
+  init_system_name ();
+  cached_system_name = Vsystem_name;
+}
 
 void
 init_editfns (void)
@@ -102,7 +103,7 @@ init_editfns (void)
   Lisp_Object tem;
 
   /* Set up system_name even when dumping.  */
-  init_system_name ();
+  init_and_cache_system_name ();
 
 #ifndef CANNOT_DUMP
   /* When just dumping out, set the time zone to a known unlikely value
@@ -904,17 +905,11 @@ save_excursion_restore (Lisp_Object info)
   if (! NILP (tem))
     {
       if (! EQ (omark, nmark))
-        {
-          tem = intern ("activate-mark-hook");
-          Frun_hooks (1, &tem);
-        }
+	run_hook (intern ("activate-mark-hook"));
     }
   /* If mark has ceased to be active, run deactivate hook.  */
   else if (! NILP (tem1))
-    {
-      tem = intern ("deactivate-mark-hook");
-      Frun_hooks (1, &tem);
-    }
+    run_hook (intern ("deactivate-mark-hook"));
 
   /* If buffer was visible in a window, and a different window was
      selected, and the old selected window is still showing this
@@ -1350,10 +1345,9 @@ name, or nil if there is no such user.  */)
       USE_SAFE_ALLOCA;
       char *r = SAFE_ALLOCA (strlen (p) + SBYTES (login) + 1);
       memcpy (r, p, q - p);
-      r[q - p] = 0;
-      strcat (r, SSDATA (login));
+      char *s = lispstpcpy (&r[q - p], login);
       r[q - p] = upcase ((unsigned char) r[q - p]);
-      strcat (r, q + 1);
+      strcpy (s, q + 1);
       full = build_string (r);
       SAFE_FREE ();
     }
@@ -1366,6 +1360,8 @@ DEFUN ("system-name", Fsystem_name, Ssystem_name, 0, 0, 0,
        doc: /* Return the host name of the machine you are running on, as a string.  */)
   (void)
 {
+  if (EQ (Vsystem_name, cached_system_name))
+    init_and_cache_system_name ();
   return Vsystem_name;
 }
 
@@ -2037,20 +2033,20 @@ DOW and ZONE.)  */)
   /* Avoid overflow when INT_MAX < EMACS_INT_MAX.  */
   EMACS_INT tm_year_base = TM_YEAR_BASE;
 
-  return Flist (9, ((Lisp_Object [])
-		    {make_number (local_tm.tm_sec),
-		     make_number (local_tm.tm_min),
-		     make_number (local_tm.tm_hour),
-		     make_number (local_tm.tm_mday),
-		     make_number (local_tm.tm_mon + 1),
-		     make_number (local_tm.tm_year + tm_year_base),
-		     make_number (local_tm.tm_wday),
-		     local_tm.tm_isdst ? Qt : Qnil,
-		     (HAVE_TM_GMTOFF
-		      ? make_number (tm_gmtoff (&local_tm))
-		      : gmtime_r (&time_spec, &gmt_tm)
-		      ? make_number (tm_diff (&local_tm, &gmt_tm))
-		      : Qnil)}));
+  return CALLN (Flist,
+		make_number (local_tm.tm_sec),
+		make_number (local_tm.tm_min),
+		make_number (local_tm.tm_hour),
+		make_number (local_tm.tm_mday),
+		make_number (local_tm.tm_mon + 1),
+		make_number (local_tm.tm_year + tm_year_base),
+		make_number (local_tm.tm_wday),
+		local_tm.tm_isdst ? Qt : Qnil,
+		(HAVE_TM_GMTOFF
+		 ? make_number (tm_gmtoff (&local_tm))
+		 : gmtime_r (&time_spec, &gmt_tm)
+		 ? make_number (tm_diff (&local_tm, &gmt_tm))
+		 : Qnil));
 }
 
 /* Return OBJ - OFFSET, checking that OBJ is a valid fixnum and that
@@ -2065,6 +2061,29 @@ check_tm_member (Lisp_Object obj, int offset)
   if (! (INT_MIN + offset <= n && n - offset <= INT_MAX))
     time_overflow ();
   return n - offset;
+}
+
+/* Decode ZONE as a time zone specification.  */
+
+static Lisp_Object
+decode_time_zone (Lisp_Object zone)
+{
+  if (EQ (zone, Qt))
+    return build_string ("UTC0");
+  else if (STRINGP (zone))
+    return zone;
+  else if (INTEGERP (zone))
+    {
+      static char const tzbuf_format[] = "XXX%s%"pI"d:%02d:%02d";
+      char tzbuf[sizeof tzbuf_format + INT_STRLEN_BOUND (EMACS_INT)];
+      EMACS_INT abszone = eabs (XINT (zone)), zone_hr = abszone / (60 * 60);
+      int zone_min = (abszone / 60) % 60, zone_sec = abszone % 60;
+
+      return make_formatted_string (tzbuf, tzbuf_format, &"-"[XINT (zone) < 0],
+				    zone_hr, zone_min, zone_sec);
+    }
+  else
+    xsignal2 (Qerror, build_string ("Invalid time zone specification"), zone);
 }
 
 DEFUN ("encode-time", Fencode_time, Sencode_time, 6, MANY, 0,
@@ -2109,30 +2128,7 @@ usage: (encode-time SECOND MINUTE HOUR DAY MONTH YEAR &optional ZONE)  */)
     value = mktime (&tm);
   else
     {
-      static char const tzbuf_format[] = "XXX%s%"pI"d:%02d:%02d";
-      char tzbuf[sizeof tzbuf_format + INT_STRLEN_BOUND (EMACS_INT)];
-      const char *tzstring;
-
-      if (EQ (zone, Qt))
-	tzstring = "UTC0";
-      else if (STRINGP (zone))
-	tzstring = SSDATA (zone);
-      else if (INTEGERP (zone))
-	{
-	  EMACS_INT abszone = eabs (XINT (zone));
-	  EMACS_INT zone_hr = abszone / (60*60);
-	  int zone_min = (abszone/60) % 60;
-	  int zone_sec = abszone % 60;
-	  sprintf (tzbuf, tzbuf_format, &"-"[XINT (zone) < 0],
-		   zone_hr, zone_min, zone_sec);
-	  tzstring = tzbuf;
-	}
-      else
-	tzstring = 0;
-
-      timezone_t tz = tzstring ? tzalloc (tzstring) : 0;
-      if (! tz)
-	error ("Invalid time zone specification");
+      timezone_t tz = tzalloc (SSDATA (decode_time_zone (zone)));
       value = mktime_z (tz, &tm);
       tzfree (tz);
     }
@@ -2269,7 +2265,8 @@ the data it can't find.  */)
 DEFUN ("set-time-zone-rule", Fset_time_zone_rule, Sset_time_zone_rule, 1, 1, 0,
        doc: /* Set the local time zone using TZ, a string specifying a time zone rule.
 If TZ is nil, use implementation-defined default time zone information.
-If TZ is t, use Universal Time.
+If TZ is t, use Universal Time.  If TZ is an integer, it is treated as in
+`encode-time'.
 
 Instead of calling this function, you typically want (setenv "TZ" TZ).
 That changes both the environment of the Emacs process and the
@@ -2277,17 +2274,7 @@ variable `process-environment', whereas `set-time-zone-rule' affects
 only the former.  */)
   (Lisp_Object tz)
 {
-  const char *tzstring;
-
-  if (! (NILP (tz) || EQ (tz, Qt)))
-    CHECK_STRING (tz);
-
-  if (NILP (tz))
-    tzstring = initial_tz;
-  else if (EQ (tz, Qt))
-    tzstring = "UTC0";
-  else
-    tzstring = SSDATA (tz);
+  const char *tzstring = NILP (tz) ? initial_tz : SSDATA (decode_time_zone (tz));
 
   block_input ();
   set_time_zone_rule (tzstring);
@@ -2637,15 +2624,34 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
 			 ptrdiff_t end, ptrdiff_t end_byte, bool props)
 {
   Lisp_Object result, tem, tem1;
+  ptrdiff_t beg0, end0, beg1, end1, size;
 
-  if (start < GPT && GPT < end)
-    move_gap_both (start, start_byte);
+  if (start_byte < GPT_BYTE && GPT_BYTE < end_byte)
+    {
+      /* Two regions, before and after the gap.  */
+      beg0 = start_byte;
+      end0 = GPT_BYTE;
+      beg1 = GPT_BYTE + GAP_SIZE - BEG_BYTE;
+      end1 = end_byte + GAP_SIZE - BEG_BYTE;
+    }
+  else
+    {
+      /* The only region.  */
+      beg0 = start_byte;
+      end0 = end_byte;
+      beg1 = -1;
+      end1 = -1;
+    }
 
   if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
     result = make_uninit_multibyte_string (end - start, end_byte - start_byte);
   else
     result = make_uninit_string (end - start);
-  memcpy (SDATA (result), BYTE_POS_ADDR (start_byte), end_byte - start_byte);
+
+  size = end0 - beg0;
+  memcpy (SDATA (result), BYTE_POS_ADDR (beg0), size);
+  if (beg1 != -1)
+    memcpy (SDATA (result) + size, BEG_ADDR + beg1, end1 - beg1);
 
   /* If desired, update and copy the text properties.  */
   if (props)
@@ -2673,25 +2679,20 @@ update_buffer_properties (ptrdiff_t start, ptrdiff_t end)
      call them, specifying the range of the buffer being accessed.  */
   if (!NILP (Vbuffer_access_fontify_functions))
     {
-      Lisp_Object args[3];
-      Lisp_Object tem;
-
-      args[0] = Qbuffer_access_fontify_functions;
-      XSETINT (args[1], start);
-      XSETINT (args[2], end);
-
       /* But don't call them if we can tell that the work
 	 has already been done.  */
       if (!NILP (Vbuffer_access_fontified_property))
 	{
-	  tem = Ftext_property_any (args[1], args[2],
-				    Vbuffer_access_fontified_property,
-				    Qnil, Qnil);
-	  if (! NILP (tem))
-	    Frun_hook_with_args (3, args);
+	  Lisp_Object tem
+	    = Ftext_property_any (make_number (start), make_number (end),
+				  Vbuffer_access_fontified_property,
+				  Qnil, Qnil);
+	  if (NILP (tem))
+	    return;
 	}
-      else
-	Frun_hook_with_args (3, args);
+
+      CALLN (Frun_hook_with_args, Qbuffer_access_fontify_functions,
+	     make_number (start), make_number (end));
     }
 }
 
@@ -4510,7 +4511,7 @@ Lisp_Object
 format2 (const char *string1, Lisp_Object arg0, Lisp_Object arg1)
 {
   AUTO_STRING (format, string1);
-  return Fformat (3, (Lisp_Object []) {format, arg0, arg1});
+  return CALLN (Fformat, format, arg0, arg1);
 }
 
 DEFUN ("char-equal", Fchar_equal, Schar_equal, 2, 2, 0,
@@ -4966,6 +4967,7 @@ functions if all the text being accessed has this property.  */);
 
   DEFVAR_LISP ("system-name", Vsystem_name,
 	       doc: /* The host name of the machine Emacs is running on.  */);
+  Vsystem_name = cached_system_name = Qnil;
 
   DEFVAR_LISP ("user-full-name", Vuser_full_name,
 	       doc: /* The full name of the user logged in.  */);
@@ -4996,8 +4998,12 @@ functions if all the text being accessed has this property.  */);
   defsubr (&Sregion_beginning);
   defsubr (&Sregion_end);
 
+  /* Symbol for the text property used to mark fields.  */
   DEFSYM (Qfield, "field");
+
+  /* A special value for Qfield properties.  */
   DEFSYM (Qboundary, "boundary");
+
   defsubr (&Sfield_beginning);
   defsubr (&Sfield_end);
   defsubr (&Sfield_string);

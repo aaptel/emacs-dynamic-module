@@ -1,6 +1,6 @@
 ;;; electric.el --- window maker and Command loop for `electric' modes
 
-;; Copyright (C) 1985-1986, 1995, 2001-2014 Free Software Foundation,
+;; Copyright (C) 1985-1986, 1995, 2001-2015 Free Software Foundation,
 ;; Inc.
 
 ;; Author: K. Shane Hartman
@@ -164,7 +164,10 @@
       ;; Don't shrink the window, but expand it if necessary.
       (goto-char (point-min))
       (unless (= (point-max) (window-end win t))
-	(fit-window-to-buffer win max-height))
+	;; This call is executed even if the window existed before, was
+	;; reused, ... contradicting a claim in the comment before this
+	;; function.
+	(fit-window-to-buffer win max-height nil nil nil t))
       win)))
 
 ;;; Electric keys.

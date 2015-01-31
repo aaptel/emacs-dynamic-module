@@ -1,6 +1,6 @@
 ;;; gnus-sum.el --- summary mode commands for Gnus
 
-;; Copyright (C) 1996-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -9870,6 +9870,7 @@ installed for this command to work."
   (if (not (and (condition-case nil (require 'idna)
 		  (file-error))
 		(mm-coding-system-p 'utf-8)
+		(symbol-value 'idna-program)
 		(executable-find (symbol-value 'idna-program))))
       (gnus-message
        5 "GNU Libidn not installed properly (`idn' or `idna.el' missing)")

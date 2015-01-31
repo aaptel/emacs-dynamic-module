@@ -1,5 +1,5 @@
 /* Composite sequence support.
-   Copyright (C) 2001-2014 Free Software Foundation, Inc.
+   Copyright (C) 2001-2015 Free Software Foundation, Inc.
    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H14PRO021
@@ -134,8 +134,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 */
 
 
-Lisp_Object Qcomposition;
-
 /* Table of pointers to the structure `composition' indexed by
    COMPOSITION-ID.  This structure is for storing information about
    each composition except for COMPONENTS-VEC.  */
@@ -152,8 +150,6 @@ ptrdiff_t n_compositions;
    COMPOSITION-ID.  */
 Lisp_Object composition_hash_table;
 
-static Lisp_Object Qauto_composed;
-static Lisp_Object Qauto_composition_function;
 /* Maximum number of characters to look back for
    auto-compositions.  */
 #define MAX_AUTO_COMPOSITION_LOOKBACK 3
@@ -1032,7 +1028,8 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos, 
 		}
 	    }
 	}
-      if (charpos == endpos)
+      if (charpos == endpos
+	  && !(STRINGP (string) && endpos == SCHARS (string)))
 	{
 	  /* We couldn't find a composition point before ENDPOS.  But,
 	     some character after ENDPOS may be composed with
@@ -1894,36 +1891,18 @@ syms_of_composite (void)
   DEFSYM (Qcomposition, "composition");
 
   /* Make a hash table for static composition.  */
-  {
-    Lisp_Object args[6];
-
-    args[0] = QCtest;
-    args[1] = Qequal;
-    args[2] = QCweakness;
-    /* We used to make the hash table weak so that unreferenced
-       compositions can be garbage-collected.  But, usually once
-       created compositions are repeatedly used in an Emacs session,
-       and thus it's not worth to save memory in such a way.  So, we
-       make the table not weak.  */
-    args[3] = Qnil;
-    args[4] = QCsize;
-    args[5] = make_number (311);
-    composition_hash_table = Fmake_hash_table (6, args);
-    staticpro (&composition_hash_table);
-  }
+  /* We used to make the hash table weak so that unreferenced
+     compositions can be garbage-collected.  But, usually once
+     created compositions are repeatedly used in an Emacs session,
+     and thus it's not worth to save memory in such a way.  So, we
+     make the table not weak.  */
+  Lisp_Object args[] = {QCtest, Qequal, QCsize, make_number (311)};
+  composition_hash_table = CALLMANY (Fmake_hash_table, args);
+  staticpro (&composition_hash_table);
 
   /* Make a hash table for glyph-string.  */
-  {
-    Lisp_Object args[6];
-    args[0] = QCtest;
-    args[1] = Qequal;
-    args[2] = QCweakness;
-    args[3] = Qnil;
-    args[4] = QCsize;
-    args[5] = make_number (311);
-    gstring_hash_table = Fmake_hash_table (6, args);
-    staticpro (&gstring_hash_table);
-  }
+  gstring_hash_table = CALLMANY (Fmake_hash_table, args);
+  staticpro (&gstring_hash_table);
 
   staticpro (&gstring_work_headers);
   gstring_work_headers = make_uninit_vector (8);

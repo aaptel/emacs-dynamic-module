@@ -1,6 +1,6 @@
 ;;; gnus-cloud.el --- storing and retrieving data via IMAP
 
-;; Copyright (C) 2014 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: mail
@@ -30,6 +30,7 @@
 
 (defgroup gnus-cloud nil
   "Syncing Gnus data via IMAP."
+  :version "25.1"
   :group 'gnus)
 
 (defcustom gnus-cloud-synced-files
@@ -39,6 +40,7 @@
     (:directory "~/News" :match ".*.SCORE\\'"))
   "List of file regexps that should be kept up-to-date via the cloud."
   :group 'gnus-cloud
+  ;; FIXME this type does not match the default.  Nor does the documentation.
   :type '(repeat regexp))
 
 (defvar gnus-cloud-group-name "*Emacs Cloud*")
@@ -326,6 +328,15 @@
 
 (defun gnus-cloud-server-p (server)
   (member server gnus-cloud-covered-servers))
+
+(defun gnus-cloud-collect-full-newsrc ()
+  (let ((infos nil))
+    (dolist (info (cdr gnus-newsrc-alist))
+      (when (gnus-cloud-server-p
+	     (gnus-method-to-server
+	      (gnus-find-method-for-group (gnus-info-group info))))
+	(push info infos)))
+    ))
 
 (provide 'gnus-cloud)
 

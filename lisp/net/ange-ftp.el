@@ -1,6 +1,6 @@
 ;;; ange-ftp.el --- transparent FTP support for GNU Emacs
 
-;; Copyright (C) 1989-1996, 1998, 2000-2014 Free Software Foundation,
+;; Copyright (C) 1989-1996, 1998, 2000-2015 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Andy Norman (ange@hplb.hpl.hp.com)
@@ -1536,8 +1536,8 @@ then kill the related FTP process."
       (signal 'file-error
 	      (list "Opening directory"
 		    (if (file-exists-p directory)
-			"not a directory"
-		      "no such file or directory")
+			"Not a directory"
+		      "No such file or directory")
 		    directory))))
 
 ;;;; ------------------------------------------------------------
@@ -2831,16 +2831,24 @@ match subdirectories as well.")
 		      files ange-ftp-files-hashtable)))
 
 (defun ange-ftp-switches-ok (switches)
-  "Return SWITCHES (a string) if suitable for our use."
+  "Return SWITCHES (a string) if suitable for use with ls over ftp."
   (and (stringp switches)
-       ;; We allow the A switch, which lists all files except "." and
-       ;; "..".  This is OK because we manually insert these entries
-       ;; in the hash table.
+       ;; We allow the --almost-all switch, which lists all files
+       ;; except "." and "..".  This is OK because we manually
+       ;; insert these entries in the hash table.
        (string-match
-	"--\\(almost-\\)?all\\>\\|\\(\\`\\| \\)-[[:alpha:]]*[aA]" switches)
+        "--\\(almost-\\)?all\\>\\|\\(\\`\\| \\)-[[:alpha:]]*[aA]"
+        switches)
+       ;; Disallow other long flags except --(almost-)all.
+       (not (string-match "\\(\\`\\| \\)--\\w+"
+                          (replace-regexp-in-string
+                           "--\\(almost-\\)?all\\>" ""
+                           switches)))
+       ;; Must include 'l'.
        (string-match "\\(\\`\\| \\)-[[:alpha:]]*l" switches)
+       ;; Disallow recursive flag.
        (not (string-match
-	     "--recursive\\>\\|\\(\\`\\| \\)-[[:alpha:]]*R" switches))
+             "\\(\\`\\| \\)-[[:alpha:]]*R" switches))
        switches))
 
 (defun ange-ftp-get-files (directory &optional no-error)
@@ -3656,7 +3664,7 @@ so return the size on the remote host exactly. See RFC 3659."
 
   (or (file-exists-p filename)
       (signal 'file-error
-	      (list "Copy file" "no such file or directory" filename)))
+	      (list "Copy file" "No such file or directory" filename)))
 
   ;; canonicalize newname if a directory.
   (if (file-directory-p newname)

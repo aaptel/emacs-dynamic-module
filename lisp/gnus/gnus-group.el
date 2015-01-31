@@ -1,6 +1,6 @@
 ;;; gnus-group.el --- group mode commands for Gnus
 
-;; Copyright (C) 1996-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -2455,27 +2455,27 @@ the bug number, and browsing the URL must return mbox output."
     (setq ids (string-to-number ids)))
   (unless (listp ids)
     (setq ids (list ids)))
-  (let ((tmpfile (mm-make-temp-file "gnus-temp-group-"))
-	(coding-system-for-write 'binary)
-	(coding-system-for-read 'binary))
-    (with-temp-file tmpfile
-      (dolist (id ids)
-	(url-insert-file-contents (format mbox-url id)))
-      (goto-char (point-min))
-      ;; Add the debbugs address so that we can respond to reports easily.
-      (while (re-search-forward "^To: " nil t)
-	(end-of-line)
-	(insert (format ", %s@%s" (car ids)
-			(gnus-replace-in-string
-			 (gnus-replace-in-string mbox-url "^http://" "")
-			 "/.*$" ""))))
-      (write-region (point-min) (point-max) tmpfile)
-      (gnus-group-read-ephemeral-group
-       (format "nndoc+ephemeral:bug#%s"
-	       (mapconcat 'number-to-string ids ","))
-       `(nndoc ,tmpfile
-	       (nndoc-article-type mbox))
-       nil window-conf))
+  (let ((tmpfile (mm-make-temp-file "gnus-temp-group-")))
+    (let ((coding-system-for-write 'binary)
+	  (coding-system-for-read 'binary))
+      (with-temp-file tmpfile
+	(mm-disable-multibyte)
+	(dolist (id ids)
+	  (url-insert-file-contents (format mbox-url id)))
+	(goto-char (point-min))
+	;; Add the debbugs address so that we can respond to reports easily.
+	(while (re-search-forward "^To: " nil t)
+	  (end-of-line)
+	  (insert (format ", %s@%s" (car ids)
+			  (gnus-replace-in-string
+			   (gnus-replace-in-string mbox-url "^http://" "")
+			   "/.*$" ""))))))
+    (gnus-group-read-ephemeral-group
+     (format "nndoc+ephemeral:bug#%s"
+	     (mapconcat 'number-to-string ids ","))
+     `(nndoc ,tmpfile
+	     (nndoc-article-type mbox))
+     nil window-conf)
     (delete-file tmpfile)))
 
 (defun gnus-read-ephemeral-debian-bug-group (number)
@@ -4075,7 +4075,9 @@ If DONT-SCAN is non-nil, scan non-activated groups as well."
       (gnus-group-remove-mark group)
       ;; Bypass any previous denials from the server.
       (gnus-remove-denial (setq method (gnus-find-method-for-group group)))
-      (if (gnus-activate-group group (if dont-scan nil 'scan) nil method)
+      (if (or (and (not dont-scan)
+		   (gnus-request-group-scan group (gnus-get-info group)))
+	      (gnus-activate-group group (if dont-scan nil 'scan) nil method))
 	  (let ((info (gnus-get-info group))
 		(active (gnus-active group)))
 	    (when info
@@ -4312,6 +4314,11 @@ The hook `gnus-suspend-gnus-hook' is called before actually suspending."
 	(gnus-kill-buffer buf)))
     (setq gnus-backlog-articles nil)
     (gnus-kill-gnus-frames)
+    ;; Closing all the backends is useful (for instance) when when the
+    ;; IP addresses have changed and you need to reconnect.
+    (dolist (elem gnus-opened-servers)
+      (gnus-close-server (car elem))
+      (setcar (cdr elem) 'closed))
     (when group-buf
       (bury-buffer group-buf)
       (delete-windows-on group-buf t))))

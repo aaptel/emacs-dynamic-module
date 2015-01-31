@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t -*-
 ;;; ielm.el --- interaction mode for Emacs Lisp
 
-;; Copyright (C) 1994, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1994, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: David Smith <maa036@lancaster.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -380,7 +380,7 @@ nonempty, then flushes the buffer."
                      (*3 ***)
                      (active-process (ielm-process))
                      (old-standard-output standard-output)
-                     new-standard-output 
+                     new-standard-output
                      ielm-temp-buffer)
                 (set-match-data ielm-match-data)
                 (save-excursion
@@ -542,8 +542,8 @@ Customized bindings may be defined in `ielm-map', which currently contains:
   (set (make-local-variable 'completion-at-point-functions)
        '(comint-replace-by-expanded-history
          ielm-complete-filename elisp-completion-at-point))
-  (setq-local eldoc-documentation-function
-              #'elisp-eldoc-documentation-function)
+  (add-function :before-until (local 'eldoc-documentation-function)
+                #'elisp-eldoc-documentation-function)
   (set (make-local-variable 'ielm-prompt-internal) ielm-prompt)
   (set (make-local-variable 'comint-prompt-read-only) ielm-prompt-read-only)
   (setq comint-get-old-input 'ielm-get-old-input)

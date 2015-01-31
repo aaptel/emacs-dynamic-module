@@ -1,6 +1,6 @@
 /* font.c -- "Font" primitives.
 
-Copyright (C) 2006-2014 Free Software Foundation, Inc.
+Copyright (C) 2006-2015 Free Software Foundation, Inc.
 Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
   National Institute of Advanced Industrial Science and Technology (AIST)
   Registration Number H13PRO009
@@ -41,15 +41,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-Lisp_Object Qopentype;
-
-/* Important character set strings.  */
-Lisp_Object Qascii_0, Qiso8859_1, Qiso10646_1, Qunicode_bmp, Qunicode_sip;
-
 #define DEFAULT_ENCODING Qiso8859_1
-
-/* Unicode category `Cf'.  */
-static Lisp_Object QCf;
 
 /* Vector of Vfont_weight_table, Vfont_slant_table, and Vfont_width_table. */
 static Lisp_Object font_style_table;
@@ -110,21 +102,6 @@ static const struct table_entry width_table[] =
   { 200, { "ultra-expanded", "ultraexpanded", "wide" }}
 };
 
-Lisp_Object QCfoundry;
-static Lisp_Object QCadstyle, QCregistry;
-/* Symbols representing keys of font extra info.  */
-Lisp_Object QCspacing, QCdpi, QCscalable, QCotf, QClang, QCscript, QCavgwidth;
-Lisp_Object QCantialias, QCfont_entity;
-static Lisp_Object QCfc_unknown_spec;
-/* Symbols representing values of font spacing property.  */
-static Lisp_Object Qc, Qm, Qd;
-Lisp_Object Qp;
-/* Special ADSTYLE properties to avoid fonts used for Latin
-   characters; used in xfont.c and ftfont.c.  */
-Lisp_Object Qja, Qko;
-
-static Lisp_Object QCuser_spec;
-
 /* Alist of font registry symbols and the corresponding charset
    information.  The information is retrieved from
    Vfont_encoding_alist on demand.
@@ -179,7 +156,7 @@ font_make_spec (void)
   struct font_spec *spec
     = ((struct font_spec *)
        allocate_pseudovector (VECSIZE (struct font_spec),
-			      FONT_SPEC_MAX, PVEC_FONT));
+			      FONT_SPEC_MAX, FONT_SPEC_MAX, PVEC_FONT));
   XSETFONT (font_spec, spec);
   return font_spec;
 }
@@ -191,7 +168,7 @@ font_make_entity (void)
   struct font_entity *entity
     = ((struct font_entity *)
        allocate_pseudovector (VECSIZE (struct font_entity),
-			      FONT_ENTITY_MAX, PVEC_FONT));
+			      FONT_ENTITY_MAX, FONT_ENTITY_MAX, PVEC_FONT));
   XSETFONT (font_entity, entity);
   return font_entity;
 }
@@ -204,7 +181,8 @@ font_make_object (int size, Lisp_Object entity, int pixelsize)
 {
   Lisp_Object font_object;
   struct font *font
-    = (struct font *) allocate_pseudovector (size, FONT_OBJECT_MAX, PVEC_FONT);
+    = (struct font *) allocate_pseudovector (size, FONT_OBJECT_MAX,
+					     FONT_OBJECT_MAX, PVEC_FONT);
   int i;
 
   /* GC can happen before the driver is set up,
@@ -309,7 +287,7 @@ font_intern_prop (const char *str, ptrdiff_t len, bool force_symbol)
     return tem;
   name = make_specified_string (str, nchars, len,
 				len != nchars && len == nbytes);
-  return intern_driver (name, obarray, XINT (tem));
+  return intern_driver (name, obarray, tem);
 }
 
 /* Return a pixel size of font-spec SPEC on frame F.  */
@@ -396,8 +374,7 @@ font_style_to_value (enum font_property_index prop, Lisp_Object val,
       elt = Fmake_vector (make_number (2), make_number (100));
       ASET (elt, 1, val);
       ASET (font_style_table, prop - FONT_WEIGHT_INDEX,
-	    Fvconcat (2, ((Lisp_Object [])
-	      { table, Fmake_vector (make_number (1), elt) })));
+	    CALLN (Fvconcat, table, Fmake_vector (make_number (1), elt)));
       return (100 << 8) | (i << 4);
     }
   else
@@ -662,30 +639,30 @@ font_prop_validate_otf (Lisp_Object prop, Lisp_Object val)
    values.  */
 static const struct
 {
-  /* Pointer to the key symbol.  */
-  Lisp_Object *key;
+  /* Index of the key symbol.  */
+  int key;
   /* Function to validate PROP's value VAL, or NULL if any value is
      ok.  The value is VAL or its regularized value if VAL is valid,
      and Qerror if not.  */
   Lisp_Object (*validator) (Lisp_Object prop, Lisp_Object val);
 } font_property_table[] =
-  { { &QCtype, font_prop_validate_symbol },
-    { &QCfoundry, font_prop_validate_symbol },
-    { &QCfamily, font_prop_validate_symbol },
-    { &QCadstyle, font_prop_validate_symbol },
-    { &QCregistry, font_prop_validate_symbol },
-    { &QCweight, font_prop_validate_style },
-    { &QCslant, font_prop_validate_style },
-    { &QCwidth, font_prop_validate_style },
-    { &QCsize, font_prop_validate_non_neg },
-    { &QCdpi, font_prop_validate_non_neg },
-    { &QCspacing, font_prop_validate_spacing },
-    { &QCavgwidth, font_prop_validate_non_neg },
+  { { SYMBOL_INDEX (QCtype), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCfoundry), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCfamily), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCadstyle), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCregistry), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCweight), font_prop_validate_style },
+    { SYMBOL_INDEX (QCslant), font_prop_validate_style },
+    { SYMBOL_INDEX (QCwidth), font_prop_validate_style },
+    { SYMBOL_INDEX (QCsize), font_prop_validate_non_neg },
+    { SYMBOL_INDEX (QCdpi), font_prop_validate_non_neg },
+    { SYMBOL_INDEX (QCspacing), font_prop_validate_spacing },
+    { SYMBOL_INDEX (QCavgwidth), font_prop_validate_non_neg },
     /* The order of the above entries must match with enum
        font_property_index.  */
-    { &QClang, font_prop_validate_symbol },
-    { &QCscript, font_prop_validate_symbol },
-    { &QCotf, font_prop_validate_otf }
+    { SYMBOL_INDEX (QClang), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCscript), font_prop_validate_symbol },
+    { SYMBOL_INDEX (QCotf), font_prop_validate_otf }
   };
 
 /* Return an index number of font property KEY or -1 if KEY is not an
@@ -697,7 +674,7 @@ get_font_prop_index (Lisp_Object key)
   int i;
 
   for (i = 0; i < ARRAYELTS (font_property_table); i++)
-    if (EQ (key, *font_property_table[i].key))
+    if (EQ (key, builtin_lisp_symbol (font_property_table[i].key)))
       return i;
   return -1;
 }
@@ -714,7 +691,7 @@ font_prop_validate (int idx, Lisp_Object prop, Lisp_Object val)
   if (NILP (val))
     return val;
   if (NILP (prop))
-    prop = *font_property_table[idx].key;
+    prop = builtin_lisp_symbol (font_property_table[idx].key);
   else
     {
       idx = get_font_prop_index (prop);
@@ -1011,15 +988,14 @@ font_expand_wildcards (Lisp_Object *field, int n)
 	  if (i == 0 || ! NILP (tmp[i - 1]))
 	    /* None of TMP[X] corresponds to Jth field.  */
 	    return -1;
-	  for (; j < range[i].from; j++)
-	    field[j] = Qnil;
+	  memclear (field + j, (range[i].from - j) * word_size);
+	  j = range[i].from;
 	}
       field[j++] = tmp[i];
     }
   if (! NILP (tmp[n - 1]) && j < XLFD_REGISTRY_INDEX)
     return -1;
-  for (; j < XLFD_LAST_INDEX; j++)
-    field[j] = Qnil;
+  memclear (field + j, (XLFD_LAST_INDEX - j) * word_size);
   if (INTEGERP (field[XLFD_ENCODING_INDEX]))
     field[XLFD_ENCODING_INDEX]
       = Fintern (Fnumber_to_string (field[XLFD_ENCODING_INDEX]), Qnil);
@@ -3423,16 +3399,11 @@ font_open_by_spec (struct frame *f, Lisp_Object spec)
 Lisp_Object
 font_open_by_name (struct frame *f, Lisp_Object name)
 {
-  Lisp_Object args[2];
-  Lisp_Object spec, ret;
-
-  args[0] = QCname;
-  args[1] = name;
-  spec = Ffont_spec (2, args);
-  ret = font_open_by_spec (f, spec);
+  Lisp_Object spec = CALLN (Ffont_spec, QCname, name);
+  Lisp_Object ret = font_open_by_spec (f, spec);
   /* Do not lose name originally put in.  */
   if (!NILP (ret))
-    font_put_extra (ret, QCuser_spec, args[1]);
+    font_put_extra (ret, QCuser_spec, name);
 
   return ret;
 }
@@ -3736,10 +3707,10 @@ font_at (int c, ptrdiff_t pos, struct face *face, struct window *w,
 
       if (STRINGP (string))
 	face_id = face_at_string_position (w, string, pos, 0, &endptr,
-					   DEFAULT_FACE_ID, 0);
+					   DEFAULT_FACE_ID, false);
       else
 	face_id = face_at_buffer_position (w, pos, &endptr,
-					   pos + 100, 0, -1);
+					   pos + 100, false, -1);
       face = FACE_FROM_ID (f, face_id);
     }
   if (multibyte)
@@ -3783,7 +3754,7 @@ font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
 	  int face_id;
 
 	  face_id = face_at_buffer_position (w, pos, &ignore,
-					     *limit, 0, -1);
+					     *limit, false, -1);
 	  face = FACE_FROM_ID (XFRAME (w->frame), face_id);
 	}
     }
@@ -4204,13 +4175,7 @@ how close they are to PREFER.  */)
   else
     vec = font_vconcat_entity_vectors (list);
   if (n == 0 || n >= ASIZE (vec))
-    {
-      Lisp_Object args[2];
-
-      args[0] = vec;
-      args[1] = Qnil;
-      list = Fappend (2, args);
-    }
+    list = CALLN (Fappend, vec, Qnil);
   else
     {
       for (list = Qnil, n--; n >= 0; n--)
@@ -4555,12 +4520,11 @@ character code corresponding to the glyph or nil if there's no
 corresponding character.  */)
   (Lisp_Object font_object, Lisp_Object character, Lisp_Object otf_features)
 {
-  struct font *font;
+  struct font *font = CHECK_FONT_GET_OBJECT (font_object);
   Lisp_Object gstring_in, gstring_out, g;
   Lisp_Object alternates;
   int i, num;
 
-  CHECK_FONT_GET_OBJECT (font_object, font);
   if (! font->driver->otf_drive)
     error ("Font backend %s can't drive OpenType GSUB table",
 	   SDATA (SYMBOL_NAME (font->driver->type)));
@@ -4670,12 +4634,9 @@ FEATURE is a symbol representing OpenType feature tag.
 If the font is not OpenType font, CAPABILITY is nil.  */)
   (Lisp_Object font_object)
 {
-  struct font *font;
-  Lisp_Object val;
+  struct font *font = CHECK_FONT_GET_OBJECT (font_object);
+  Lisp_Object val = make_uninit_vector (9);
 
-  CHECK_FONT_GET_OBJECT (font_object, font);
-
-  val = make_uninit_vector (9);
   ASET (val, 0, AREF (font_object, FONT_NAME_INDEX));
   ASET (val, 1, AREF (font_object, FONT_FILE_INDEX));
   ASET (val, 2, make_number (font->pixel_size));
@@ -4714,12 +4675,11 @@ the corresponding element is nil.  */)
   (Lisp_Object font_object, Lisp_Object from, Lisp_Object to,
    Lisp_Object object)
 {
-  struct font *font;
+  struct font *font = CHECK_FONT_GET_OBJECT (font_object);
   ptrdiff_t i, len;
   Lisp_Object *chars, vec;
   USE_SAFE_ALLOCA;
 
-  CHECK_FONT_GET_OBJECT (font_object, font);
   if (NILP (object))
     {
       ptrdiff_t charpos, bytepos;
@@ -4921,8 +4881,11 @@ If FRAME is omitted or nil, use the selected frame.  */)
 DEFUN ("font-info", Ffont_info, Sfont_info, 1, 2, 0,
        doc: /* Return information about a font named NAME on frame FRAME.
 If FRAME is omitted or nil, use the selected frame.
-The returned value is a vector of OPENED-NAME, FULL-NAME, SIZE,
-  HEIGHT, BASELINE-OFFSET, RELATIVE-COMPOSE, and DEFAULT-ASCENT,
+
+The returned value is a vector:
+  [ OPENED-NAME FULL-NAME SIZE HEIGHT BASELINE-OFFSET RELATIVE-COMPOSE
+    DEFAULT-ASCENT MAX-WIDTH ASCENT DESCENT SPACE-WIDTH AVERAGE-WIDTH
+    CAPABILITY ]
 where
   OPENED-NAME is the name used for opening the font,
   FULL-NAME is the full name of the font,
@@ -4930,7 +4893,33 @@ where
   HEIGHT is the pixel-height of the font (i.e., ascent + descent),
   BASELINE-OFFSET is the upward offset pixels from ASCII baseline,
   RELATIVE-COMPOSE and DEFAULT-ASCENT are the numbers controlling
-    how to compose characters.
+    how to compose characters,
+  MAX-WIDTH is the maximum advance width of the font,
+  ASCENT, DESCENT, SPACE-WIDTH, AVERAGE-WIDTH are metrics of the font
+    in pixels,
+  FILENAME is the font file name, a string (or nil if the font backend
+    doesn't provide a file name).
+  CAPABILITY is a list whose first element is a symbol representing the
+    font format, one of x, opentype, truetype, type1, pcf, or bdf.
+    The remaining elements describe the details of the font capabilities,
+    as follows:
+
+      If the font is OpenType font, the form of the list is
+        \(opentype GSUB GPOS)
+      where GSUB shows which "GSUB" features the font supports, and GPOS
+      shows which "GPOS" features the font supports.  Both GSUB and GPOS are
+      lists of the form:
+	\((SCRIPT (LANGSYS FEATURE ...) ...) ...)
+
+      where
+        SCRIPT is a symbol representing OpenType script tag.
+        LANGSYS is a symbol representing OpenType langsys tag, or nil
+         representing the default langsys.
+        FEATURE is a symbol representing OpenType feature tag.
+
+      If the font is not an OpenType font, there are no elements
+      in CAPABILITY except the font format symbol.
+
 If the named font is not yet loaded, return nil.  */)
   (Lisp_Object name, Lisp_Object frame)
 {
@@ -4966,7 +4955,7 @@ If the named font is not yet loaded, return nil.  */)
     return Qnil;
   font = XFONT_OBJECT (font_object);
 
-  info = make_uninit_vector (7);
+  info = make_uninit_vector (14);
   ASET (info, 0, AREF (font_object, FONT_NAME_INDEX));
   ASET (info, 1, AREF (font_object, FONT_FULLNAME_INDEX));
   ASET (info, 2, make_number (font->pixel_size));
@@ -4974,6 +4963,16 @@ If the named font is not yet loaded, return nil.  */)
   ASET (info, 4, make_number (font->baseline_offset));
   ASET (info, 5, make_number (font->relative_compose));
   ASET (info, 6, make_number (font->default_ascent));
+  ASET (info, 7, make_number (font->max_width));
+  ASET (info, 8, make_number (font->ascent));
+  ASET (info, 9, make_number (font->descent));
+  ASET (info, 10, make_number (font->space_width));
+  ASET (info, 11, make_number (font->average_width));
+  ASET (info, 12, AREF (font_object, FONT_FILE_INDEX));
+  if (font->driver->otf_capability)
+    ASET (info, 13, Fcons (Qopentype, font->driver->otf_capability (font)));
+  else
+    ASET (info, 13, Qnil);
 
 #if 0
   /* As font_object is still in FONT_OBJLIST of the entity, we can't
@@ -5130,19 +5129,21 @@ syms_of_font (void)
 
   DEFSYM (Qopentype, "opentype");
 
+  /* Important character set symbols.  */
   DEFSYM (Qascii_0, "ascii-0");
   DEFSYM (Qiso8859_1, "iso8859-1");
   DEFSYM (Qiso10646_1, "iso10646-1");
   DEFSYM (Qunicode_bmp, "unicode-bmp");
   DEFSYM (Qunicode_sip, "unicode-sip");
 
+  /* Unicode category `Cf'.  */
   DEFSYM (QCf, "Cf");
 
+  /* Symbols representing keys of font extra info.  */
   DEFSYM (QCotf, ":otf");
   DEFSYM (QClang, ":lang");
   DEFSYM (QCscript, ":script");
   DEFSYM (QCantialias, ":antialias");
-
   DEFSYM (QCfoundry, ":foundry");
   DEFSYM (QCadstyle, ":adstyle");
   DEFSYM (QCregistry, ":registry");
@@ -5153,11 +5154,14 @@ syms_of_font (void)
   DEFSYM (QCfont_entity, ":font-entity");
   DEFSYM (QCfc_unknown_spec, ":fc-unknown-spec");
 
+  /* Symbols representing values of font spacing property.  */
   DEFSYM (Qc, "c");
   DEFSYM (Qm, "m");
   DEFSYM (Qp, "p");
   DEFSYM (Qd, "d");
 
+  /* Special ADSTYLE properties to avoid fonts used for Latin
+     characters; used in xfont.c and ftfont.c.  */
   DEFSYM (Qja, "ja");
   DEFSYM (Qko, "ko");
 

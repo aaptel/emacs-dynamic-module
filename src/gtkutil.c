@@ -1,6 +1,6 @@
 /* Functions for creating and updating GTK widgets.
 
-Copyright (C) 2003-2014 Free Software Foundation, Inc.
+Copyright (C) 2003-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -78,6 +78,20 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #else
 #define remove_submenu(w) gtk_menu_item_remove_submenu ((w))
 #endif
+
+#if ! GTK_CHECK_VERSION (2, 14, 0)
+#define gtk_adjustment_configure(adj, xvalue, xlower,            \
+                                 xupper, xstep_increment,        \
+                                 xpage_increment, xpagesize)     \
+  do {                                                           \
+    adj->lower = xlower;                                         \
+    adj->upper = xupper;                                         \
+    adj->page_size = xpagesize;                                  \
+    gtk_adjustment_set_value (adj, xvalue);                      \
+    adj->page_increment = xpage_increment;                       \
+    adj->step_increment = xstep_increment;                       \
+  } while (0)
+#endif /* < Gtk+ 2.14 */
 
 #ifdef HAVE_FREETYPE
 #if GTK_CHECK_VERSION (3, 2, 0)
@@ -940,7 +954,7 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
       x_wait_for_event (f, ConfigureNotify);
     }
   else
-    adjust_frame_size (f, -1, -1, 5, 0, Qnil);
+    adjust_frame_size (f, -1, -1, 5, 0, Qxg_frame_set_char_size);
 }
 
 /* Handle height/width changes (i.e. add/remove/move menu/toolbar).
@@ -1825,12 +1839,12 @@ xg_get_file_with_chooser (struct frame *f,
 
   if (x_gtk_file_dialog_help_text)
     {
-      msgbuf[0] = '\0';
+      char *z = msgbuf;
       /* Gtk+ 2.10 has the file name text entry box integrated in the dialog.
          Show the C-l help text only for versions < 2.10.  */
       if (gtk_check_version (2, 10, 0) && action != GTK_FILE_CHOOSER_ACTION_SAVE)
-        strcat (msgbuf, "\nType C-l to display a file name text entry box.\n");
-      strcat (msgbuf, "\nIf you don't like this file selector, use the "
+        z = stpcpy (z, "\nType C-l to display a file name text entry box.\n");
+      strcpy (z, "\nIf you don't like this file selector, use the "
               "corresponding\nkey binding or customize "
               "use-file-dialog to turn it off.");
 
@@ -2058,28 +2072,17 @@ xg_get_font (struct frame *f, const char *default_name)
 
       if (desc)
 	{
-	  Lisp_Object args[10];
 	  const char *name   = pango_font_description_get_family (desc);
 	  gint        size   = pango_font_description_get_size (desc);
 	  PangoWeight weight = pango_font_description_get_weight (desc);
 	  PangoStyle  style  = pango_font_description_get_style (desc);
 
-	  args[0] = QCname;
-	  args[1] = build_string (name);
-
-	  args[2] = QCsize;
-	  args[3] = make_float (pango_units_to_double (size));
-
-	  args[4] = QCweight;
-	  args[5] = XG_WEIGHT_TO_SYMBOL (weight);
-
-	  args[6] = QCslant;
-	  args[7] = XG_STYLE_TO_SYMBOL (style);
-
-	  args[8] = QCtype;
-	  args[9] = Qxft;
-
-	  font = Ffont_spec (8, args);
+	  font = CALLN (Ffont_spec,
+			QCname, build_string (name),
+			QCsize, make_float (pango_units_to_double (size)),
+			QCweight, XG_WEIGHT_TO_SYMBOL (weight),
+			QCslant, XG_STYLE_TO_SYMBOL (style),
+			QCtype, Qxft);
 
 	  pango_font_description_free (desc);
 	  dupstring (&x_last_font_name, name);
@@ -3938,18 +3941,9 @@ xg_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
 
       block_input ();
       adj = gtk_range_get_adjustment (GTK_RANGE (wscroll));
-#if GTK_CHECK_VERSION (2, 3, 16)
       gtk_adjustment_configure (adj, (gdouble) value, (gdouble) lower,
 				(gdouble) upper, (gdouble) step_increment,
 				(gdouble) page_increment, (gdouble) pagesize);
-#else
-      gtk_adjustment_set_lower (adj, (gdouble) lower);
-      gtk_adjustment_set_upper (adj, (gdouble) upper);
-      gtk_adjustment_set_page_size (adj, (gdouble) pagesize);
-      gtk_adjustment_set_value (adj, (gdouble) value);
-      gtk_adjustment_set_page_increment (adj, (gdouble) page_increment);
-      gtk_adjustment_set_step_increment (adj, (gdouble) step_increment);
-#endif
       gtk_adjustment_changed (adj);
       unblock_input ();
     }

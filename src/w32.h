@@ -2,7 +2,7 @@
 #define EMACS_W32_H
 
 /* Support routines for the NT version of Emacs.
-   Copyright (C) 1994, 2001-2014 Free Software Foundation, Inc.
+   Copyright (C) 1994, 2001-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -172,7 +172,6 @@ extern void init_timers (void);
 extern int _sys_read_ahead (int fd);
 extern int _sys_wait_accept (int fd);
 
-extern Lisp_Object QCloaded_from;
 extern HMODULE w32_delayed_load (Lisp_Object);
 
 extern int (WINAPI *pMultiByteToWideChar)(UINT,DWORD,LPCSTR,int,LPWSTR,int);
@@ -224,5 +223,18 @@ extern ssize_t emacs_gnutls_pull (gnutls_transport_ptr_t p,
 extern ssize_t emacs_gnutls_push (gnutls_transport_ptr_t p,
                                   const void* buf, size_t sz);
 #endif /* HAVE_GNUTLS */
+
+/* Definine a function that will be loaded from a DLL.  */
+#define DEF_DLL_FN(type, func, args) static type (FAR CDECL *fn_##func) args
+
+/* Load a function from the DLL.  */
+#define LOAD_DLL_FN(lib, func)						\
+  do									\
+    {									\
+      fn_##func = (void *) GetProcAddress (lib, #func);			\
+      if (!fn_##func)							\
+	return false;							\
+    }									\
+  while (false)
 
 #endif /* EMACS_W32_H */

@@ -32494,7 +32494,7 @@
 	(bibtex-field-list, bibtex-find-crossref): Fix typos in error messages.
 
 2005-01-24  Dan Nicolaescu  <dann@ics.uci.edu>
-            Juri Linkov  <juri@jurta.org>
+	    Juri Linkov  <juri@jurta.org>
 
 	* textmodes/reftex-global.el (reftex-isearch-push-state-function)
 	(reftex-isearch-pop-state-function, reftex-isearch-isearch-search)
@@ -33334,7 +33334,7 @@ See ChangeLog.11 for earlier changes.
 ;; add-log-time-zone-rule: t
 ;; End:
 
-    Copyright (C) 2005-2014 Free Software Foundation, Inc.
+    Copyright (C) 2005-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

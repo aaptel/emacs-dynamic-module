@@ -1,6 +1,6 @@
 /* Lisp object printing and output streams.
 
-Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2014 Free Software
+Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2015 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -37,14 +37,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "termhooks.h"		/* For struct terminal.  */
 #include "font.h"
 
-Lisp_Object Qstandard_output;
-
-static Lisp_Object Qtemp_buffer_setup_hook;
-
-/* These are used to print like we read.  */
-
-static Lisp_Object Qfloat_output_format;
-
 #include <float.h>
 #include <ftoastr.h>
 
@@ -71,9 +63,6 @@ static ptrdiff_t print_buffer_size;
 static ptrdiff_t print_buffer_pos;
 /* Bytes stored in print_buffer.  */
 static ptrdiff_t print_buffer_pos_byte;
-
-Lisp_Object Qprint_escape_newlines;
-static Lisp_Object Qprint_escape_multibyte, Qprint_escape_nonascii;
 
 /* Vprint_number_table is a table, that keeps objects that are going to
    be printed, to allow use of #n= and #n# to express sharing.
@@ -507,7 +496,7 @@ temp_output_buffer_setup (const char *bufname)
   Ferase_buffer ();
   XSETBUFFER (buf, current_buffer);
 
-  Frun_hooks (1, &Qtemp_buffer_setup_hook);
+  run_hook (Qtemp_buffer_setup_hook);
 
   unbind_to (count, Qnil);
 
@@ -715,10 +704,6 @@ is used instead.  */)
   UNGCPRO;
   return object;
 }
-
-/* The subroutine object for external-debugging-output is kept here
-   for the convenience of the debugger.  */
-Lisp_Object Qexternal_debugging_output;
 
 DEFUN ("external-debugging-output", Fexternal_debugging_output, Sexternal_debugging_output, 1, 1, 0,
        doc: /* Write CHARACTER to stderr.
@@ -1186,12 +1171,7 @@ print_preprocess (Lisp_Object obj)
   if (PRINT_CIRCLE_CANDIDATE_P (obj))
     {
       if (!HASH_TABLE_P (Vprint_number_table))
-	{
-	  Lisp_Object args[2];
-	  args[0] = QCtest;
-	  args[1] = Qeq;
-	  Vprint_number_table = Fmake_hash_table (2, args);
-	}
+	Vprint_number_table = CALLN (Fmake_hash_table, QCtest, Qeq);
 
       /* In case print-circle is nil and print-gensym is t,
 	 add OBJ to Vprint_number_table only when OBJ is a symbol.  */
@@ -2098,14 +2078,16 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		for (i = 0; i < limit; i++)
 		  {
 		    Lisp_Object maybe = area[i];
+		    int valid = valid_lisp_object_p (maybe);
 
-		    if (valid_lisp_object_p (maybe) > 0)
+		    if (0 < valid)
 		      {
 			PRINTCHAR (' ');
 			print_object (maybe, printcharfun, escapeflag);
 		      }
 		    else
-		      strout (" <invalid>", -1, -1, printcharfun);
+		      strout (valid ? " <some>" : " <invalid>",
+			      -1, -1, printcharfun);
 		  }
 		if (i == limit && i < amount)
 		  strout (" ...", 4, 4, printcharfun);
@@ -2218,7 +2200,10 @@ print_interval (INTERVAL interval, Lisp_Object printcharfun)
 void
 init_print_once (void)
 {
+  /* The subroutine object for external-debugging-output is kept here
+     for the convenience of the debugger.  */
   DEFSYM (Qexternal_debugging_output, "external-debugging-output");
+
   defsubr (&Sexternal_debugging_output);
 }
 

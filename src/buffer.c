@@ -1,6 +1,7 @@
 /* Buffer manipulation primitives for GNU Emacs.
 
-Copyright (C) 1985-1989, 1993-1995, 1997-2014 Free Software Foundation, Inc.
+Copyright (C) 1985-1989, 1993-1995, 1997-2015 Free Software Foundation,
+Inc.
 
 This file is part of GNU Emacs.
 
@@ -114,40 +115,7 @@ static void reset_buffer_local_variables (struct buffer *, bool);
    due to user rplac'ing this alist or its elements.  */
 Lisp_Object Vbuffer_alist;
 
-static Lisp_Object Qkill_buffer_query_functions;
-
-/* Hook run before changing a major mode.  */
-static Lisp_Object Qchange_major_mode_hook;
-
-Lisp_Object Qfirst_change_hook;
-Lisp_Object Qbefore_change_functions;
-Lisp_Object Qafter_change_functions;
-
-static Lisp_Object Qfundamental_mode, Qmode_class, Qpermanent_local;
-static Lisp_Object Qpermanent_local_hook;
-
-static Lisp_Object Qprotected_field;
-
 static Lisp_Object QSFundamental;	/* A string "Fundamental".  */
-
-static Lisp_Object Qkill_buffer_hook;
-static Lisp_Object Qbuffer_list_update_hook;
-
-static Lisp_Object Qget_file_buffer;
-
-static Lisp_Object Qoverlayp;
-
-Lisp_Object Qpriority, Qbefore_string, Qafter_string;
-
-static Lisp_Object Qevaporate;
-
-Lisp_Object Qmodification_hooks;
-Lisp_Object Qinsert_in_front_hooks;
-Lisp_Object Qinsert_behind_hooks;
-
-Lisp_Object Qchoice, Qrange, Qleft, Qright;
-Lisp_Object Qvertical_scroll_bar, Qhorizontal_scroll_bar;
-static Lisp_Object Qoverwrite_mode, Qfraction;
 
 static void alloc_buffer_text (struct buffer *, ptrdiff_t);
 static void free_buffer_text (struct buffer *b);
@@ -419,7 +387,6 @@ followed by the rest of the buffers.  */)
   if (FRAMEP (frame))
     {
       Lisp_Object framelist, prevlist, tail;
-      Lisp_Object args[3];
 
       framelist = Fcopy_sequence (XFRAME (frame)->buffer_list);
       prevlist = Fnreverse (Fcopy_sequence
@@ -440,10 +407,7 @@ followed by the rest of the buffers.  */)
 	  tail = XCDR (tail);
 	}
 
-      args[0] = framelist;
-      args[1] = general;
-      args[2] = prevlist;
-      return Fnconc (3, args);
+      return CALLN (Fnconc, framelist, general, prevlist);
     }
   else
     return general;
@@ -1686,15 +1650,14 @@ cleaning up all windows currently displaying the buffer to be killed. */)
   /* Run hooks with the buffer to be killed the current buffer.  */
   {
     ptrdiff_t count = SPECPDL_INDEX ();
-    Lisp_Object arglist[1];
 
     record_unwind_protect (save_excursion_restore, save_excursion_save ());
     set_buffer_internal (b);
 
     /* First run the query functions; if any query is answered no,
        don't kill the buffer.  */
-    arglist[0] = Qkill_buffer_query_functions;
-    tem = Frun_hook_with_args_until_failure (1, arglist);
+    tem = CALLN (Frun_hook_with_args_until_failure,
+		 Qkill_buffer_query_functions);
     if (NILP (tem))
       return unbind_to (count, Qnil);
 
@@ -1715,7 +1678,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
       return unbind_to (count, Qt);
 
     /* Then run the hooks.  */
-    Frun_hooks (1, &Qkill_buffer_hook);
+    run_hook (Qkill_buffer_hook);
     unbind_to (count, Qnil);
   }
 
@@ -2739,7 +2702,7 @@ The first thing this function does is run
 the normal hook `change-major-mode-hook'.  */)
   (void)
 {
-  Frun_hooks (1, &Qchange_major_mode_hook);
+  run_hook (Qchange_major_mode_hook);
 
   /* Make sure none of the bindings in local_var_alist
      remain swapped in, in their symbols.  */
@@ -5059,12 +5022,99 @@ init_buffer_once (void)
 
   memset (buffer_permanent_local_flags, 0, sizeof buffer_permanent_local_flags);
 
+  /* 0 means not a lisp var, -1 means always local, else mask.  */
+  memset (&buffer_local_flags, 0, sizeof buffer_local_flags);
+  bset_filename (&buffer_local_flags, make_number (-1));
+  bset_directory (&buffer_local_flags, make_number (-1));
+  bset_backed_up (&buffer_local_flags, make_number (-1));
+  bset_save_length (&buffer_local_flags, make_number (-1));
+  bset_auto_save_file_name (&buffer_local_flags, make_number (-1));
+  bset_read_only (&buffer_local_flags, make_number (-1));
+  bset_major_mode (&buffer_local_flags, make_number (-1));
+  bset_mode_name (&buffer_local_flags, make_number (-1));
+  bset_undo_list (&buffer_local_flags, make_number (-1));
+  bset_mark_active (&buffer_local_flags, make_number (-1));
+  bset_point_before_scroll (&buffer_local_flags, make_number (-1));
+  bset_file_truename (&buffer_local_flags, make_number (-1));
+  bset_invisibility_spec (&buffer_local_flags, make_number (-1));
+  bset_file_format (&buffer_local_flags, make_number (-1));
+  bset_auto_save_file_format (&buffer_local_flags, make_number (-1));
+  bset_display_count (&buffer_local_flags, make_number (-1));
+  bset_display_time (&buffer_local_flags, make_number (-1));
+  bset_enable_multibyte_characters (&buffer_local_flags, make_number (-1));
+
+  /* These used to be stuck at 0 by default, but now that the all-zero value
+     means Qnil, we have to initialize them explicitly.  */
+  bset_name (&buffer_local_flags, make_number (0));
+  bset_mark (&buffer_local_flags, make_number (0));
+  bset_local_var_alist (&buffer_local_flags, make_number (0));
+  bset_keymap (&buffer_local_flags, make_number (0));
+  bset_downcase_table (&buffer_local_flags, make_number (0));
+  bset_upcase_table (&buffer_local_flags, make_number (0));
+  bset_case_canon_table (&buffer_local_flags, make_number (0));
+  bset_case_eqv_table (&buffer_local_flags, make_number (0));
+  bset_minor_modes (&buffer_local_flags, make_number (0));
+  bset_width_table (&buffer_local_flags, make_number (0));
+  bset_pt_marker (&buffer_local_flags, make_number (0));
+  bset_begv_marker (&buffer_local_flags, make_number (0));
+  bset_zv_marker (&buffer_local_flags, make_number (0));
+  bset_last_selected_window (&buffer_local_flags, make_number (0));
+
+  idx = 1;
+  XSETFASTINT (BVAR (&buffer_local_flags, mode_line_format), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, abbrev_mode), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, overwrite_mode), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, case_fold_search), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, auto_fill_function), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, selective_display), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, selective_display_ellipses), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, tab_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, truncate_lines), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, word_wrap), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, ctl_arrow), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, fill_column), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, left_margin), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, abbrev_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, display_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, syntax_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, cache_long_scans), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, category_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, bidi_display_reordering), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, bidi_paragraph_direction), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, buffer_file_coding_system), idx);
+  /* Make this one a permanent local.  */
+  buffer_permanent_local_flags[idx++] = 1;
+  XSETFASTINT (BVAR (&buffer_local_flags, left_margin_cols), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, right_margin_cols), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, left_fringe_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, right_fringe_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, fringes_outside_margins), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, scroll_bar_width), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, scroll_bar_height), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, vertical_scroll_bar_type), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, horizontal_scroll_bar_type), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, indicate_empty_lines), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, indicate_buffer_boundaries), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, fringe_indicator_alist), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, fringe_cursor_alist), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, scroll_up_aggressively), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, scroll_down_aggressively), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, header_line_format), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, cursor_type), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, extra_line_spacing), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_local_flags, cursor_in_non_selected_windows), idx); ++idx;
+
+  /* Need more room? */
+  if (idx >= MAX_PER_BUFFER_VARS)
+    emacs_abort ();
+  last_per_buffer_idx = idx;
+
   /* Make sure all markable slots in buffer_defaults
      are initialized reasonably, so mark_buffer won't choke.  */
   reset_buffer (&buffer_defaults);
-  eassert (EQ (BVAR (&buffer_defaults, name), make_number (0)));
+  eassert (NILP (BVAR (&buffer_defaults, name)));
   reset_buffer_local_variables (&buffer_defaults, 1);
-  eassert (EQ (BVAR (&buffer_local_symbols, name), make_number (0)));
+  eassert (NILP (BVAR (&buffer_local_symbols, name)));
   reset_buffer (&buffer_local_symbols);
   reset_buffer_local_variables (&buffer_local_symbols, 1);
   /* Prevent GC from getting confused.  */
@@ -5145,78 +5195,8 @@ init_buffer_once (void)
      to say that it has its own local value for the slot.
      The local flag bits are in the local_var_flags slot of the buffer.  */
 
-  /* Nothing can work if this isn't true */
+  /* Nothing can work if this isn't true.  */
   { verify (sizeof (EMACS_INT) == word_size); }
-
-  /* 0 means not a lisp var, -1 means always local, else mask */
-  memset (&buffer_local_flags, 0, sizeof buffer_local_flags);
-  bset_filename (&buffer_local_flags, make_number (-1));
-  bset_directory (&buffer_local_flags, make_number (-1));
-  bset_backed_up (&buffer_local_flags, make_number (-1));
-  bset_save_length (&buffer_local_flags, make_number (-1));
-  bset_auto_save_file_name (&buffer_local_flags, make_number (-1));
-  bset_read_only (&buffer_local_flags, make_number (-1));
-  bset_major_mode (&buffer_local_flags, make_number (-1));
-  bset_mode_name (&buffer_local_flags, make_number (-1));
-  bset_undo_list (&buffer_local_flags, make_number (-1));
-  bset_mark_active (&buffer_local_flags, make_number (-1));
-  bset_point_before_scroll (&buffer_local_flags, make_number (-1));
-  bset_file_truename (&buffer_local_flags, make_number (-1));
-  bset_invisibility_spec (&buffer_local_flags, make_number (-1));
-  bset_file_format (&buffer_local_flags, make_number (-1));
-  bset_auto_save_file_format (&buffer_local_flags, make_number (-1));
-  bset_display_count (&buffer_local_flags, make_number (-1));
-  bset_display_time (&buffer_local_flags, make_number (-1));
-  bset_enable_multibyte_characters (&buffer_local_flags, make_number (-1));
-
-  idx = 1;
-  XSETFASTINT (BVAR (&buffer_local_flags, mode_line_format), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, abbrev_mode), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, overwrite_mode), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, case_fold_search), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, auto_fill_function), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, selective_display), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, selective_display_ellipses), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, tab_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, truncate_lines), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, word_wrap), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, ctl_arrow), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fill_column), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, left_margin), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, abbrev_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, display_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, syntax_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, cache_long_scans), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, category_table), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, bidi_display_reordering), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, bidi_paragraph_direction), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, buffer_file_coding_system), idx);
-  /* Make this one a permanent local.  */
-  buffer_permanent_local_flags[idx++] = 1;
-  XSETFASTINT (BVAR (&buffer_local_flags, left_margin_cols), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, right_margin_cols), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, left_fringe_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, right_fringe_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fringes_outside_margins), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_bar_width), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_bar_height), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, vertical_scroll_bar_type), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, horizontal_scroll_bar_type), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, indicate_empty_lines), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, indicate_buffer_boundaries), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fringe_indicator_alist), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, fringe_cursor_alist), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_up_aggressively), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, scroll_down_aggressively), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, header_line_format), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, cursor_type), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, extra_line_spacing), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_local_flags, cursor_in_non_selected_windows), idx); ++idx;
-
-  /* Need more room? */
-  if (idx >= MAX_PER_BUFFER_VARS)
-    emacs_abort ();
-  last_per_buffer_idx = idx;
 
   Vbuffer_alist = Qnil;
   current_buffer = 0;
@@ -5224,19 +5204,17 @@ init_buffer_once (void)
 
   QSFundamental = build_pure_c_string ("Fundamental");
 
-  Qfundamental_mode = intern_c_string ("fundamental-mode");
+  DEFSYM (Qfundamental_mode, "fundamental-mode");
   bset_major_mode (&buffer_defaults, Qfundamental_mode);
 
-  Qmode_class = intern_c_string ("mode-class");
+  DEFSYM (Qmode_class, "mode-class");
+  DEFSYM (Qprotected_field, "protected-field");
 
-  Qprotected_field = intern_c_string ("protected-field");
-
-  Qpermanent_local = intern_c_string ("permanent-local");
-
-  Qkill_buffer_hook = intern_c_string ("kill-buffer-hook");
+  DEFSYM (Qpermanent_local, "permanent-local");
+  DEFSYM (Qkill_buffer_hook, "kill-buffer-hook");
   Fput (Qkill_buffer_hook, Qpermanent_local, Qt);
 
-  /* super-magic invisible buffer */
+  /* Super-magic invisible buffer.  */
   Vprin1_to_string_buffer = Fget_buffer_create (build_pure_c_string (" prin1"));
   Vbuffer_alist = Qnil;
 
@@ -5397,13 +5375,8 @@ syms_of_buffer (void)
   last_overlay_modification_hooks
     = Fmake_vector (make_number (10), Qnil);
 
-  staticpro (&Qfundamental_mode);
-  staticpro (&Qmode_class);
   staticpro (&QSFundamental);
   staticpro (&Vbuffer_alist);
-  staticpro (&Qprotected_field);
-  staticpro (&Qpermanent_local);
-  staticpro (&Qkill_buffer_hook);
 
   DEFSYM (Qchoice, "choice");
   DEFSYM (Qleft, "left");
@@ -6073,9 +6046,9 @@ from happening repeatedly and making Emacs nonfunctional.  */);
 	       doc: /* List of functions to call after each text change.
 Three arguments are passed to each function: the positions of
 the beginning and end of the range of changed text,
-and the length in bytes of the pre-change text replaced by that range.
+and the length in chars of the pre-change text replaced by that range.
 \(For an insertion, the pre-change length is zero;
-for a deletion, that length is the number of bytes deleted,
+for a deletion, that length is the number of chars deleted,
 and the post-change beginning and end are at the same place.)
 
 Buffer changes made while executing the `after-change-functions'

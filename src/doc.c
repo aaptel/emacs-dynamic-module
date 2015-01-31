@@ -1,6 +1,7 @@
 /* Record indices of function doc strings stored in a file.
 
-Copyright (C) 1985-1986, 1993-1995, 1997-2014 Free Software Foundation, Inc.
+Copyright (C) 1985-1986, 1993-1995, 1997-2015 Free Software Foundation,
+Inc.
 
 This file is part of GNU Emacs.
 
@@ -34,13 +35,13 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "keymap.h"
 
-Lisp_Object Qfunction_documentation;
-
 /* Buffer used for reading from documentation file.  */
 static char *get_doc_string_buffer;
 static ptrdiff_t get_doc_string_buffer_size;
 
 static unsigned char *read_bytecode_pointer;
+
+static char const sibling_etc[] = "../etc/";
 
 /* `readchar' in lread.c calls back here to fetch the next byte.
    If UNREADFLAG is 1, we unread a byte.  */
@@ -89,7 +90,6 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 {
   char *from, *to, *name, *p, *p1;
   int fd;
-  ptrdiff_t minsize;
   int offset;
   EMACS_INT position;
   Lisp_Object file, tem, pos;
@@ -122,21 +122,14 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 
   tem = Ffile_name_absolute_p (file);
   file = ENCODE_FILE (file);
-  if (NILP (tem) && !doc_is_from_module_p (SSDATA (file)))
-    {
-      Lisp_Object docdir = ENCODE_FILE (Vdoc_directory);
-      minsize = SCHARS (docdir);
-      /* sizeof ("../etc/") == 8 */
-      if (minsize < 8)
-	minsize = 8;
-      name = SAFE_ALLOCA (minsize + SCHARS (file) + 8);
-      char *z = lispstpcpy (name, docdir);
-      strcpy (z, SSDATA (file));
-    }
-  else
-    {
-      name = SSDATA (file);
-    }
+  Lisp_Object docdir
+      = (NILP (tem) && !doc_is_from_module_p (SSDATA (file))) ? ENCODE_FILE (Vdoc_directory) : empty_unibyte_string;
+  ptrdiff_t docdir_sizemax = SBYTES (docdir) + 1;
+#ifndef CANNOT_DUMP
+  docdir_sizemax = max (docdir_sizemax, sizeof sibling_etc);
+#endif
+  name = SAFE_ALLOCA (docdir_sizemax + SBYTES (file));
+  lispstpcpy (lispstpcpy (name, docdir), file);
 
   fd = emacs_open (name, O_RDONLY, 0);
   if (fd < 0)
@@ -146,8 +139,7 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 	{
 	  /* Preparing to dump; DOC file is probably not installed.
 	     So check in ../etc.  */
-	  strcpy (name, "../etc/");
-	  strcat (name, SSDATA (file));
+	  lispstpcpy (stpcpy (name, sibling_etc), file);
 
 	  fd = emacs_open (name, O_RDONLY, 0);
 	}
@@ -316,19 +308,6 @@ read_doc_string (Lisp_Object filepos)
 static bool
 reread_doc_file (Lisp_Object file)
 {
-#if 0
-  Lisp_Object reply, prompt[3];
-  struct gcpro gcpro1;
-  GCPRO1 (file);
-  prompt[0] = build_string ("File ");
-  prompt[1] = NILP (file) ? Vdoc_file_name : file;
-  prompt[2] = build_string (" is out of sync.  Reload? ");
-  reply = Fy_or_n_p (Fconcat (3, prompt));
-  UNGCPRO;
-  if (NILP (reply))
-    return 0;
-#endif
-
   if (NILP (file))
     Fsnarf_documentation (Vdoc_file_name, Qnil);
   else
@@ -624,11 +603,10 @@ the same file name is found in the `doc-directory'.  */)
 #else /* CANNOT_DUMP */
         (0)
 #endif /* CANNOT_DUMP */
-          {
-            static char const sibling_etc[] = "../etc/";
-            dirname = sibling_etc;
-            dirlen = sizeof sibling_etc - 1;
-          }
+        {
+          dirname = sibling_etc;
+          dirlen = sizeof sibling_etc - 1;
+        }
       else
         {
           CHECK_STRING (Vdoc_directory);
@@ -638,16 +616,15 @@ the same file name is found in the `doc-directory'.  */)
     }
   else
     {
-      static char const empty_prefix_dir[] = "";
-      dirname = empty_prefix_dir;
-      dirlen = 0;
+      CHECK_STRING (Vdoc_directory);
+      dirname = SSDATA (Vdoc_directory);
+      dirlen = SBYTES (Vdoc_directory);
     }
 
   count = SPECPDL_INDEX ();
   USE_SAFE_ALLOCA;
   name = SAFE_ALLOCA (dirlen + SBYTES (filename) + 1);
-  strcpy (name, dirname);
-  strcat (name, SSDATA (filename)); 	/*** Add this line ***/
+  lispstpcpy (stpcpy (name, dirname), filename); 	/*** Add this line ***/
 
 
   fd = emacs_open (name, O_RDONLY, 0);

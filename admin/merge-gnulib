@@ -4,7 +4,7 @@
 #
 #	admin/merge-gnulib
 
-# Copyright 2012-2014 Free Software Foundation, Inc.
+# Copyright 2012-2015 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -35,8 +35,8 @@ GNULIB_MODULES='
   intprops largefile lstat
   manywarnings memrchr mkostemp mktime
   pipe2 pselect pthread_sigmask putenv qacl readlink readlinkat
-  sig2str socklen stat-time stdalign stdio
-  strftime strtoimax strtoumax symlink sys_stat
+  sig2str socklen stat-time stdalign stddef stdio
+  stpcpy strftime strtoimax strtoumax symlink sys_stat
   sys_time time time_r timer-time timespec-add timespec-sub
   unsetenv update-copyright utimens
   vla warnings

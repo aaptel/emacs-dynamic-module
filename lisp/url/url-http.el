@@ -1,6 +1,6 @@
 ;;; url-http.el --- HTTP retrieval routines
 
-;; Copyright (C) 1999, 2001, 2004-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1999, 2001, 2004-2015 Free Software Foundation, Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -25,7 +25,9 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(eval-when-compile
+  (require 'cl-lib)
+  (require 'subr-x))
 
 (defvar url-callback-arguments)
 (defvar url-callback-function)
@@ -40,6 +42,7 @@
 (defvar url-http-data)
 (defvar url-http-end-of-headers)
 (defvar url-http-extra-headers)
+(defvar url-http-noninteractive)
 (defvar url-http-method)
 (defvar url-http-no-retry)
 (defvar url-http-process)
@@ -491,7 +494,14 @@ should be shown to the user."
   (url-http-mark-connection-as-free (url-host url-current-object)
 				    (url-port url-current-object)
 				    url-http-process)
-
+  ;; Pass the https certificate on to the caller.
+  (when (gnutls-available-p)
+    (let ((status (gnutls-peer-status url-http-process)))
+      (when (or status
+		(plist-get (car url-callback-arguments) :peer))
+	(setcar url-callback-arguments
+		(plist-put (car url-callback-arguments)
+			   :peer status)))))
   (if (or (not (boundp 'url-http-end-of-headers))
 	  (not url-http-end-of-headers))
       (error "Trying to parse headers in odd buffer: %s" (buffer-name)))
@@ -891,7 +901,8 @@ should be shown to the user."
   (url-http-mark-connection-as-free (url-host url-current-object)
 				    (url-port url-current-object)
 				    url-http-process)
-  (url-http-debug "Activating callback in buffer (%s)" (buffer-name))
+  (url-http-debug "Activating callback in buffer (%s): %S %S"
+		  (buffer-name) url-callback-function url-callback-arguments)
   (apply url-callback-function url-callback-arguments))
 
 ;; )
@@ -1201,6 +1212,9 @@ overriding the value of `url-gateway-method'."
   (cl-check-type url vector "Need a pre-parsed URL.")
   (let* ((host (url-host (or url-using-proxy url)))
 	 (port (url-port (or url-using-proxy url)))
+	 (nsm-noninteractive (or url-request-noninteractive
+				 (and (boundp 'url-http-noninteractive)
+				      url-http-noninteractive)))
 	 (connection (url-http-find-free-connection host port gateway-method))
 	 (buffer (or retry-buffer
 		     (generate-new-buffer
@@ -1232,6 +1246,7 @@ overriding the value of `url-gateway-method'."
 		       url-http-process
 		       url-http-method
 		       url-http-extra-headers
+		       url-http-noninteractive
 		       url-http-data
 		       url-http-target-url
 		       url-http-no-retry
@@ -1241,6 +1256,7 @@ overriding the value of `url-gateway-method'."
 
 	(setq url-http-method (or url-request-method "GET")
 	      url-http-extra-headers url-request-extra-headers
+	      url-http-noninteractive url-request-noninteractive
 	      url-http-data url-request-data
 	      url-http-process connection
 	      url-http-chunked-length nil

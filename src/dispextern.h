@@ -1,6 +1,6 @@
 /* Interface definitions for display code.
 
-Copyright (C) 1985, 1993-1994, 1997-2014 Free Software Foundation, Inc.
+Copyright (C) 1985, 1993-1994, 1997-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -389,10 +389,9 @@ struct glyph
 
   /* Lisp object source of this glyph.  Currently either a buffer or a
      string, if the glyph was produced from characters which came from
-     a buffer or a string; or Lisp integer zero (a.k.a. "null object")
-     if the glyph was inserted by redisplay for its own purposes, such
-     as padding or truncation/continuation glyphs, or the
-     overlay-arrow glyphs on TTYs.  */
+     a buffer or a string; or nil if the glyph was inserted by
+     redisplay for its own purposes, such as padding, truncation, or
+     continuation glyphs, or the overlay-arrow glyphs on TTYs.  */
   Lisp_Object object;
 
   /* Width in pixels.  */
@@ -1717,8 +1716,8 @@ struct face
      attributes except the font.  */
   struct face *ascii_face;
 
-#ifdef HAVE_XFT
-  /* Extra member that a font-driver uses privately.  */
+#if defined HAVE_XFT || defined HAVE_FREETYPE
+/* Extra member that a font-driver uses privately.  */
   void *extra;
 #endif
 };
@@ -1851,10 +1850,10 @@ GLYPH_CODE_P (Lisp_Object gc)
 	       : TYPE_MAXIMUM (EMACS_INT)))));
 }
 
-/* Non-zero means face attributes have been changed since the last
+/* True means face attributes have been changed since the last
    redisplay.  Used in redisplay_internal.  */
 
-extern int face_change_count;
+extern bool face_change;
 
 /* For reordering of bidirectional text.  */
 
@@ -1908,7 +1907,7 @@ typedef enum {
 } bidi_bracket_type_t;
 
 /* The basic directionality data type.  */
-typedef enum { NEUTRAL_DIR, L2R, R2L } bidi_dir_t;
+typedef enum { NEUTRAL_DIR = 0, L2R, R2L } bidi_dir_t;
 
 /* Data type for storing information about characters we need to
    remember.  */
@@ -1920,15 +1919,16 @@ struct bidi_saved_info {
 
 /* Data type for keeping track of information about saved embedding
    levels, override status, isolate status, and isolating sequence
-   runs.  */
+   runs.  This should be as tightly packed as possible, because there
+   are 127 such entries in each iterator state, and so the size of
+   cache is directly affected by the size of this struct.  */
 struct bidi_stack {
-  struct bidi_saved_info last_strong;
-  struct bidi_saved_info next_for_neutral;
-  struct bidi_saved_info prev_for_neutral;
-  unsigned level : 7;
-  bool_bf isolate_status : 1;
-  unsigned override : 2;
-  unsigned sos : 2;
+  ptrdiff_t next_for_neutral_pos;
+  unsigned next_for_neutral_type : 3;
+  unsigned last_strong_type : 3;
+  unsigned prev_for_neutral_type : 3;
+  unsigned char level;
+  unsigned char flags;		/* sos, override, isolate_status */
 };
 
 /* Data type for storing information about a string being iterated on.  */
@@ -2234,7 +2234,10 @@ struct it
   ptrdiff_t base_level_stop;
 
   /* Maximum string or buffer position + 1.  ZV when iterating over
-     current_buffer.  */
+     current_buffer.  When iterating over a string in display_string,
+     this can be smaller or greater than the number of string
+     characters, depending on the values of PRECISION and FIELD_WIDTH
+     with which display_string was called.  */
   ptrdiff_t end_charpos;
 
   /* C string to iterate over.  Non-null means get characters from
@@ -2521,11 +2524,11 @@ struct it
      Object is normally the buffer which is being rendered, but it can
      also be a Lisp string in case the current display element comes
      from an overlay string or from a display string (before- or
-     after-string).  It may also be nil when a C string is being
-     rendered, e.g., during mode-line or header-line update.  It can
-     also be a cons cell of the form `(space ...)', when we produce a
-     stretch glyph from a `display' specification.  Finally, it can be
-     a zero-valued Lisp integer, but only temporarily, when we are
+     after-string).  It may also be a zero-valued Lisp integer when a
+     C string is being rendered, e.g., during mode-line or header-line
+     update.  It can also be a cons cell of the form `(space ...)',
+     when we produce a stretch glyph from a `display' specification.
+     Finally, it can be nil, but only temporarily, when we are
      producing special glyphs for display purposes, like truncation
      and continuation glyphs, or blanks that extend each line to the
      edge of the window on a TTY.
@@ -2903,8 +2906,8 @@ struct redisplay_interface
 
 struct image_type
 {
-  /* A symbol uniquely identifying the image type, .e.g `jpeg'.  */
-  Lisp_Object *type;
+  /* Index of a symbol uniquely identifying the image type, e.g., 'jpeg'.  */
+  int type;
 
   /* Check that SPEC is a valid image specification for the given
      image type.  Value is true if SPEC is valid.  */
@@ -3173,6 +3176,7 @@ extern void bidi_push_it (struct bidi_it *);
 extern void bidi_pop_it (struct bidi_it *);
 extern void *bidi_shelve_cache (void);
 extern void bidi_unshelve_cache (void *, bool);
+extern ptrdiff_t bidi_find_first_overridden (struct bidi_it *);
 
 /* Defined in xdisp.c */
 
@@ -3217,7 +3221,6 @@ void move_it_in_display_line (struct it *it,
 			      enum move_operation_enum op);
 bool in_display_vector_p (struct it *);
 int frame_mode_line_height (struct frame *);
-extern Lisp_Object Qtool_bar;
 extern bool redisplaying_p;
 extern bool help_echo_showing_p;
 extern Lisp_Object help_echo_string, help_echo_window;
@@ -3369,7 +3372,7 @@ void x_free_colors (struct frame *, unsigned long *, int);
 void update_face_from_frame_parameter (struct frame *, Lisp_Object,
                                        Lisp_Object);
 Lisp_Object tty_color_name (struct frame *, int);
-void clear_face_cache (int);
+void clear_face_cache (bool);
 unsigned long load_color (struct frame *, struct face *, Lisp_Object,
                           enum lface_attribute_index);
 char *choose_face_font (struct frame *, Lisp_Object *, Lisp_Object,
@@ -3377,27 +3380,23 @@ char *choose_face_font (struct frame *, Lisp_Object *, Lisp_Object,
 #ifdef HAVE_WINDOW_SYSTEM
 void prepare_face_for_display (struct frame *, struct face *);
 #endif
-int lookup_named_face (struct frame *, Lisp_Object, int);
+int lookup_named_face (struct frame *, Lisp_Object, bool);
 int lookup_basic_face (struct frame *, int);
 int smaller_face (struct frame *, int, int);
 int face_with_height (struct frame *, int, int);
-int lookup_derived_face (struct frame *, Lisp_Object, int, int);
+int lookup_derived_face (struct frame *, Lisp_Object, int, bool);
 void init_frame_faces (struct frame *);
 void free_frame_faces (struct frame *);
 void recompute_basic_faces (struct frame *);
-int face_at_buffer_position (struct window *w, ptrdiff_t pos,
-                             ptrdiff_t *endptr, ptrdiff_t limit,
-                             int mouse, int base_face_id);
-int face_for_overlay_string (struct window *w, ptrdiff_t pos,
-                             ptrdiff_t *endptr, ptrdiff_t limit,
-                             int mouse, Lisp_Object overlay);
-int face_at_string_position (struct window *w, Lisp_Object string,
-                             ptrdiff_t pos, ptrdiff_t bufpos,
-                             ptrdiff_t *endptr, enum face_id, int mouse);
+int face_at_buffer_position (struct window *, ptrdiff_t, ptrdiff_t *, ptrdiff_t,
+                             bool, int);
+int face_for_overlay_string (struct window *, ptrdiff_t, ptrdiff_t *, ptrdiff_t,
+                             bool, Lisp_Object);
+int face_at_string_position (struct window *, Lisp_Object, ptrdiff_t, ptrdiff_t,
+                             ptrdiff_t *, enum face_id, bool);
 int merge_faces (struct frame *, Lisp_Object, int, int);
 int compute_char_face (struct frame *, int, Lisp_Object);
 void free_all_realized_faces (Lisp_Object);
-extern Lisp_Object Qforeground_color, Qbackground_color;
 extern char unspecified_fg[], unspecified_bg[];
 
 /* Defined in xfns.c.  */
@@ -3442,11 +3441,11 @@ extern void cancel_hourglass (void);
 #endif /* HAVE_WINDOW_SYSTEM */
 
 
-/* Defined in xmenu.c  */
+/* Defined in xmenu.c.  */
 
 int popup_activated (void);
 
-/* Defined in dispnew.c */
+/* Defined in dispnew.c.  */
 
 extern Lisp_Object buffer_posn_from_coords (struct window *,
                                             int *, int *,
@@ -3482,16 +3481,15 @@ void blank_row (struct window *, struct glyph_row *, int);
 void clear_glyph_matrix_rows (struct glyph_matrix *, int, int);
 void clear_glyph_row (struct glyph_row *);
 void prepare_desired_row (struct window *, struct glyph_row *, bool);
-void update_single_window (struct window *, bool);
+void update_single_window (struct window *);
 void do_pending_window_change (bool);
 void change_frame_size (struct frame *, int, int, bool, bool, bool, bool);
 void init_display (void);
 void syms_of_display (void);
-extern Lisp_Object Qredisplay_dont_pause;
 extern void spec_glyph_lookup_face (struct window *, GLYPH *);
 extern void fill_up_frame_row_with_spaces (struct glyph_row *, int);
 
-/* Defined in terminal.c */
+/* Defined in terminal.c.  */
 
 extern void ring_bell (struct frame *);
 extern void update_begin (struct frame *);

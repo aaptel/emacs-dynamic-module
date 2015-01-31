@@ -1,6 +1,6 @@
 ;;; gulp.el --- ask for updates for Lisp packages
 
-;; Copyright (C) 1996, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: Sam Shteingold <shteingd@math.ucla.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -137,7 +137,7 @@ is left in the `*gulp*' buffer at the end."
   "Create the maintainer/package alist for files in FLIST in DIR.
 That is a list of elements, each of the form (MAINTAINER PACKAGES...)."
   (save-excursion
-    (let (mplist filen node mnt-tm mnt tm fl-tm)
+    (let (mplist filen node mnt tm fl-tm)
       (get-buffer-create gulp-tmp-buffer)
       (set-buffer gulp-tmp-buffer)
       (setq buffer-undo-list t)

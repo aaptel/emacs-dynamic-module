@@ -1,6 +1,6 @@
 ;;; cus-dep.el --- find customization dependencies
 ;;
-;; Copyright (C) 1997, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2001-2015 Free Software Foundation, Inc.
 ;;
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Keywords: internal
@@ -62,7 +62,8 @@ Usage: emacs -batch -l ./cus-dep.el -f custom-make-dependencies DIRS"
       (while (setq subdir (pop command-line-args-left))
         (message "Directory %s" subdir)
         (let ((files (directory-files subdir nil "\\`[^=.].*\\.el\\'"))
-              (default-directory (expand-file-name subdir))
+              (default-directory
+                (file-name-as-directory (expand-file-name subdir)))
               (preloaded (concat "\\`\\(\\./+\\)?"
                                  (regexp-opt preloaded-file-list t)
                                  "\\.el\\'")))

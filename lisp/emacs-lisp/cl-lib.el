@@ -1,6 +1,6 @@
 ;;; cl-lib.el --- Common Lisp extensions for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: Dave Gillespie <daveg@synaptics.com>
 ;; Version: 1.0
@@ -723,12 +723,11 @@ If ALIST is non-nil, the new pairs are prepended to it."
 (gv-define-expander substring
   (lambda (do place from &optional to)
     (gv-letplace (getter setter) place
-      (macroexp-let2 nil start from
-        (macroexp-let2 nil end to
-          (funcall do `(substring ,getter ,start ,end)
-                   (lambda (v)
-                     (funcall setter `(cl--set-substring
-                                       ,getter ,start ,end ,v)))))))))
+      (macroexp-let2* nil ((start from) (end to))
+        (funcall do `(substring ,getter ,start ,end)
+                 (lambda (v)
+                   (funcall setter `(cl--set-substring
+                                     ,getter ,start ,end ,v))))))))
 
 ;;; Miscellaneous.
 

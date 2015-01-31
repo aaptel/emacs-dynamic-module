@@ -4,7 +4,7 @@ dnl 	autoconf
 dnl in the directory containing this script.
 dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
-dnl Copyright (C) 1994-1996, 1999-2014 Free Software Foundation, Inc.
+dnl Copyright (C) 1994-1996, 1999-2015 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of GNU Emacs.
 dnl
@@ -137,12 +137,39 @@ AM_INIT_AUTOMAKE(1.11)
 
 dnl Canonicalize the configuration name.
 AC_CANONICAL_HOST
-canonical=$host
-configuration=${host_alias-${build_alias-$host}}
 
-dnl We get MINGW64 with MSYS2, MINGW32 with MSYS.
-case $canonical in
+case $host in
  *-mingw*)
+
+  if test -z "$host_alias"; then
+
+      # No --host argument was given to 'configure'; therefore $host
+      # was set to a default value based on the build platform.  But
+      # this default value may be wrong if we are building from a
+      # 64-bit MSYS[2] pre-configured to build 32-bit MinGW programs.
+      # Therefore, we'll try to get the right host platform from the
+      # compiler's target.
+
+      AC_MSG_CHECKING([the compiler's target])
+      if test -z "$CC"; then
+	  cc=gcc
+      else
+	  cc=$CC
+      fi
+      cc_target=`$cc -v 2>&1 | sed -n 's/Target: //p'`
+      case "$cc_target" in
+          *-*) host=$cc_target
+	      ;;
+          "") AC_MSG_ERROR([Impossible to obtain $cc compiler target.
+Please explicitly provide --host.])
+              ;;
+	  *) AC_MSG_WARN([Compiler reported non-standard target.
+Defaulting to $host.])
+              ;;
+      esac
+      AC_MSG_RESULT([$host])
+  fi
+
   . $srcdir/nt/mingw-cfg.site
 
   case $srcdir in
@@ -156,6 +183,9 @@ case $canonical in
       ;;
   esac;;
 esac
+
+canonical=$host
+configuration=${host_alias-${build_alias-$host}}
 
 dnl Support for --program-prefix, --program-suffix and
 dnl --program-transform-name options
@@ -364,14 +394,31 @@ OPTION_DEFAULT_ON([compress-install],
 make GZIP_PROG= install])
 
 AC_ARG_WITH(gameuser,dnl
-[AS_HELP_STRING([--with-gameuser=USER],[user for shared game score files])])
-test "X${with_gameuser}" != X && test "${with_gameuser}" != yes \
-  && gameuser="${with_gameuser}"
-test "X$gameuser" = X && gameuser=games
+[AS_HELP_STRING([--with-gameuser=USER_OR_GROUP],
+		[user for shared game score files.
+		An argument prefixed by ':' specifies a group instead.])])
+gameuser=
+gamegroup=
+case ${with_gameuser} in
+  no) ;;
+  "" | yes)
+    AC_MSG_CHECKING([whether a 'games' user exists])
+    if id -u games >/dev/null 2>&1; then
+      AC_MSG_RESULT([yes])
+      gameuser=games
+    else
+      AC_MSG_RESULT([no])
+    fi
+    ;;
+  :*) gamegroup=`echo "${with_gameuser}" | sed -e "s/://"` ;;
+  *) gameuser=${with_gameuser} ;;
+esac
 
 AC_ARG_WITH([gnustep-conf],dnl
 [AS_HELP_STRING([--with-gnustep-conf=FILENAME],
-   [name of GNUstep.conf; default $GNUSTEP_CONFIG_FILE, or /etc/GNUstep/GNUstep.conf])])
+   [name of GNUstep configuration file to use on systems where the command
+    'gnustep-config' does not work; default $GNUSTEP_CONFIG_FILE, or
+    /etc/GNUstep/GNUstep.conf])])
 test "X${with_gnustep_conf}" != X && test "${with_gnustep_conf}" != yes && \
   GNUSTEP_CONFIG_FILE="${with_gnustep_conf}"
 test "X$GNUSTEP_CONFIG_FILE" = "X" && \
@@ -864,6 +911,10 @@ else
   # Emacs's use of alloca inhibits protecting the stack.
   nw="$nw -Wstack-protector"
 
+  # Emacs's use of partly-const functions such as Fgnutls_available_p
+  # make this option problematic.
+  nw="$nw -Wsuggest-attribute=const"
+
   # Emacs's use of partly-pure functions such as CHECK_TYPE make this
   # option problematic.
   nw="$nw -Wsuggest-attribute=pure"
@@ -983,9 +1034,11 @@ if test "${enableval}" != "no"; then
    fi
 fi)
 
+dnl Prefer silent make output.  For verbose output, use
+dnl 'configure --disable-silent-rules' or 'make V=1' .
+AM_SILENT_RULES([yes])
 dnl Port to Automake 1.11.
 dnl This section can be removed once we assume Automake 1.14 or later.
-: ${AM_DEFAULT_VERBOSITY=1}
 : ${AM_V=$AM_DEFAULT_VERBOSITY}
 : ${AM_DEFAULT_V=$AM_DEFAULT_VERBOSITY}
 AC_SUBST([AM_V])
@@ -1703,6 +1756,7 @@ else
 fi
 
 HAVE_NS=no
+NS_GNUSTEP_CONFIG=no
 NS_IMPL_COCOA=no
 NS_IMPL_GNUSTEP=no
 tmp_CPPFLAGS="$CPPFLAGS"
@@ -1719,13 +1773,13 @@ if test "${with_ns}" != no; then
      ns_appresdir=${ns_appdir}/Contents/Resources
      ns_appsrc=Cocoa/Emacs.base
      ns_fontfile=macfont.o
+  elif flags=$( (gnustep-config --objc-flags) 2>/dev/null); then
+     NS_IMPL_GNUSTEP=yes
+     NS_GNUSTEP_CONFIG=yes
+     GNU_OBJC_CFLAGS=$flags
+     LIBS_GNUSTEP=$(gnustep-config --gui-libs) || exit
   elif test -f $GNUSTEP_CONFIG_FILE; then
      NS_IMPL_GNUSTEP=yes
-     ns_appdir=`pwd`/nextstep/Emacs.app
-     ns_appbindir=${ns_appdir}
-     ns_appresdir=${ns_appdir}/Resources
-     ns_appsrc=GNUstep/Emacs.base
-     ns_fontfile=nsfont.o
      dnl FIXME sourcing this several times in subshells seems inefficient.
      GNUSTEP_SYSTEM_HEADERS="$(. $GNUSTEP_CONFIG_FILE; echo $GNUSTEP_SYSTEM_HEADERS)"
      GNUSTEP_SYSTEM_LIBRARIES="$(. $GNUSTEP_CONFIG_FILE; echo $GNUSTEP_SYSTEM_LIBRARIES)"
@@ -1758,8 +1812,16 @@ fail;
        GNU_OBJC_CFLAGS="-fobjc-exceptions"
      fi
   fi
+  if test $NS_IMPL_GNUSTEP = yes; then
+     ns_appdir=`pwd`/nextstep/Emacs.app
+     ns_appbindir=${ns_appdir}
+     ns_appresdir=${ns_appdir}/Resources
+     ns_appsrc=GNUstep/Emacs.base
+     ns_fontfile=nsfont.o
+  fi
 
   dnl This is only used while we test the NS headers, it gets reset below.
+  CPPFLAGS="$CPPFLAGS $GNU_OBJC_CFLAGS"
   CFLAGS="$CFLAGS $GNU_OBJC_CFLAGS"
 
   AC_CHECK_HEADER([AppKit/AppKit.h], [HAVE_NS=yes],
@@ -1878,6 +1940,9 @@ CM_OBJ="cm.o"
 XARGS_LIMIT=
 if test "${HAVE_W32}" = "yes"; then
   AC_DEFINE(HAVE_NTGUI, 1, [Define to use native MS Windows GUI.])
+  if test "$with_toolkit_scroll_bars" = "no"; then
+    AC_MSG_ERROR([Non-toolkit scroll bars are not implemented for w32 build.])
+  fi
   AC_CHECK_TOOL(WINDRES, [windres],
                 [AC_MSG_ERROR([No resource compiler found.])])
   W32_OBJ="w32fns.o w32menu.o w32reg.o w32font.o w32term.o"
@@ -1887,6 +1952,13 @@ if test "${HAVE_W32}" = "yes"; then
     x86_64-*-*) EMACS_MANIFEST="emacs-x64.manifest" ;;
     *) EMACS_MANIFEST="emacs-x86.manifest" ;;
   esac
+  dnl Construct something of the form "24,4,0,0" with 4 components.
+  comma_version=`echo "${PACKAGE_VERSION}.0.0" | sed -e 's/\./,/g' -e 's/^\([[^,]]*,[[^,]]*,[[^,]]*,[[^,]]*\).*/\1/'`
+
+  comma_space_version=`echo "$comma_version" | sed 's/,/, /g'`
+  AC_SUBST(comma_version)
+  AC_SUBST(comma_space_version)
+  AC_CONFIG_FILES([nt/emacs.rc nt/emacsclient.rc])
   if test "${opsys}" = "cygwin"; then
     W32_LIBS="$W32_LIBS -lkernel32 -luser32 -lgdi32 -lole32 -lcomdlg32"
     W32_LIBS="$W32_LIBS -lusp10 -lcomctl32 -lwinspool"
@@ -1937,7 +2009,6 @@ fi
 if test "$window_system" = none && test "$gl_gcc_warnings" = yes; then
    # Too many warnings for now.
    nw=
-   nw="$nw -Wsuggest-attribute=const"
    nw="$nw -Wsuggest-attribute=noreturn"
    gl_MANYWARN_COMPLEMENT([WARN_CFLAGS], [$WARN_CFLAGS], [$nw])
 
@@ -2564,19 +2635,13 @@ fi
 AC_SUBST(LIBSELINUX_LIBS)
 
 HAVE_GNUTLS=no
-HAVE_GNUTLS3=no
 if test "${with_gnutls}" = "yes" ; then
-  EMACS_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.0.0],
-    [HAVE_GNUTLS3=yes], [HAVE_GNUTLS3=no])
-  if test "${HAVE_GNUTLS3}" = "yes"; then
-    AC_DEFINE(HAVE_GNUTLS3, 1, [Define if using GnuTLS v3.])
-    HAVE_GNUTLS="yes"
-  else
-    EMACS_CHECK_MODULES([LIBGNUTLS], [gnutls >= 2.6.6],
-      [HAVE_GNUTLS=yes], [HAVE_GNUTLS=no])
-  fi
+  EMACS_CHECK_MODULES([LIBGNUTLS], [gnutls >= 2.6.6],
+    [HAVE_GNUTLS=yes], [HAVE_GNUTLS=no])
   if test "${HAVE_GNUTLS}" = "yes"; then
     AC_DEFINE(HAVE_GNUTLS, 1, [Define if using GnuTLS.])
+    EMACS_CHECK_MODULES([LIBGNUTLS3], [gnutls >= 3.0.0],
+      [AC_DEFINE(HAVE_GNUTLS3, 1, [Define if using GnuTLS v3.])], [])
   fi
 
   # Windows loads GnuTLS dynamically
@@ -3338,11 +3403,13 @@ if test "${HAVE_NS}" = "yes"; then
   fi
   if test "${NS_IMPL_GNUSTEP}" = "yes"; then
     AC_DEFINE(NS_IMPL_GNUSTEP, 1, [Define to 1 if you are using NS windowing under GNUstep.])
-    # See also .m.o rule in Makefile.in */
-    # FIXME: are all these flags really needed?  Document here why.  */
-    GNUSTEP_CFLAGS="-D_REENTRANT -fPIC -fno-strict-aliasing -I${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
-    ## Extra CFLAGS applied to src/*.m files.
-    GNU_OBJC_CFLAGS="$GNU_OBJC_CFLAGS -fgnu-runtime -Wno-import -fconstant-string-class=NSConstantString -DGNUSTEP_BASE_LIBRARY=1 -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGSWARN -DGSDIAGNOSE"
+    if test $NS_GNUSTEP_CONFIG != yes; then
+      # See also .m.o rule in src/Makefile.in.  */
+      # FIXME: are all these flags really needed?  Document here why.  */
+      GNUSTEP_CFLAGS="-D_REENTRANT -fPIC -fno-strict-aliasing -I${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
+      ## Extra CFLAGS applied to src/*.m files.
+      GNU_OBJC_CFLAGS="$GNU_OBJC_CFLAGS -fgnu-runtime -Wno-import -fconstant-string-class=NSConstantString -DGNUSTEP_BASE_LIBRARY=1 -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGSWARN -DGSDIAGNOSE"
+    fi
   fi
   OTHER_FILES=ns-app
 fi
@@ -4631,7 +4698,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2014 Free Software Foundation, Inc."
+copyright="Copyright (C) 2015 Free Software Foundation, Inc."
 AC_DEFINE_UNQUOTED(COPYRIGHT, ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST(copyright)
@@ -4662,6 +4729,7 @@ AC_SUBST(etcdocdir)
 AC_SUBST(bitmapdir)
 AC_SUBST(gamedir)
 AC_SUBST(gameuser)
+AC_SUBST(gamegroup)
 ## FIXME? Nothing uses @LD_SWITCH_X_SITE@.
 ## src/Makefile.in did add LD_SWITCH_X_SITE (as a cpp define) to the
 ## end of LIBX_BASE, but nothing ever set it.
@@ -4955,7 +5023,7 @@ AC_SUBST(WINDOW_SYSTEM_OBJ)
 
 AH_TOP([/* GNU Emacs site configuration template file.
 
-Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2014
+Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2015
   Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.

@@ -1,6 +1,6 @@
 ### lisp.mk --- src/Makefile fragment for GNU Emacs
 
-## Copyright (C) 1985, 1987-1988, 1993-1995, 1999-2014 Free Software
+## Copyright (C) 1985, 1987-1988, 1993-1995, 1999-2015 Free Software
 ## Foundation, Inc.
 
 ## This file is part of GNU Emacs.
@@ -71,6 +71,7 @@ lisp = \
 	$(lispsource)/faces.elc \
 	$(lispsource)/button.elc \
 	$(lispsource)/startup.elc \
+	$(lispsource)/emacs-lisp/cl-preloaded.elc \
 	$(lispsource)/emacs-lisp/nadvice.elc \
 	$(lispsource)/minibuffer.elc \
 	$(lispsource)/abbrev.elc \

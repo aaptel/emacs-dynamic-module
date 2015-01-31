@@ -1,7 +1,8 @@
 #!/bin/sh
 ### make-dist: create an Emacs distribution tar file from current srcdir
 
-## Copyright (C) 1995, 1997-1998, 2000-2014 Free Software Foundation, Inc.
+## Copyright (C) 1995, 1997-1998, 2000-2015 Free Software Foundation,
+## Inc.
 
 ## This file is part of GNU Emacs.
 
@@ -382,7 +383,7 @@ echo "Making links to \`lib-src'"
 (cd lib-src
  ln [a-zA-Z]*.[ch] ../${tempdir}/lib-src
  ln ChangeLog Makefile.in README ../${tempdir}/lib-src
- ln grep-changelog rcs2log ../${tempdir}/lib-src
+ ln rcs2log ../${tempdir}/lib-src
  ln makefile.w32-in ../${tempdir}/lib-src
  ln update-game-score.exe.manifest ../${tempdir}/lib-src)
 
@@ -392,10 +393,10 @@ echo "Making links to \`m4'"
 
 echo "Making links to \`nt'"
 (cd nt
- ln emacs-x86.manifest emacs-x64.manifest emacs.rc ../${tempdir}/nt
- ln config.nt emacsclient.rc emacs-src.tags ../${tempdir}/nt
+ ln emacs-x86.manifest emacs-x64.manifest ../${tempdir}/nt
+ ln config.nt emacs-src.tags ../${tempdir}/nt
  ln nmake.defs gmake.defs subdirs.el [a-z]*.bat [a-z]*.[ch] ../${tempdir}/nt
- ln Makefile.in gnulib.mk ../${tempdir}/nt
+ ln *.in gnulib.mk ../${tempdir}/nt
  ln mingw-cfg.site epaths.nt INSTALL.OLD ../${tempdir}/nt
  ln ChangeLog INSTALL README README.W32 makefile.w32-in ../${tempdir}/nt)
 

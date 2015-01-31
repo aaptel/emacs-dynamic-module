@@ -1,4 +1,4 @@
-# Copyright (C) 1992-1998, 2000-2014 Free Software Foundation, Inc.
+# Copyright (C) 1992-1998, 2000-2015 Free Software Foundation, Inc.
 #
 # This file is part of GNU Emacs.
 #
@@ -68,6 +68,20 @@ define xgettype
     set $bugfix = $arg0
   end
   set $type = (enum Lisp_Type) (USE_LSB_TAG ? $bugfix & (1 << GCTYPEBITS) - 1 : (EMACS_UINT) $bugfix >> VALBITS)
+end
+
+define xgetsym
+  xgetptr $arg0
+  if (!USE_LSB_TAG)
+    set $ptr = ($ptr << GCTYPEBITS)
+  end
+  set $ptr = ((struct Lisp_Symbol *) ((char *)lispsym + $ptr))
+end
+
+# Access the name of a symbol
+define xsymname
+  xgetsym $arg0
+  set $symname = $ptr->name
 end
 
 # Set up something to print out s-expressions.
@@ -750,7 +764,7 @@ end
 
 define xsymbol
   set $sym = $
-  xgetptr $sym
+  xgetsym $sym
   print (struct Lisp_Symbol *) $ptr
   xprintsym $sym
   echo \n
@@ -1072,9 +1086,8 @@ define xprintstr
 end
 
 define xprintsym
-  xgetptr $arg0
-  set $sym = (struct Lisp_Symbol *) $ptr
-  xgetptr $sym->name
+  xsymname $arg0
+  xgetptr $symname
   set $sym_name = (struct Lisp_String *) $ptr
   xprintstr $sym_name
 end
@@ -1258,8 +1271,8 @@ tbreak init_sys_modes
 commands
   silent
   xgetptr globals.f_Vinitial_window_system
-  set $tem = (struct Lisp_Symbol *) $ptr
-  xgetptr $tem->name
+  xsymname $ptr
+  xgetptr $symname
   set $tem = (struct Lisp_String *) $ptr
   set $tem = (char *) $tem->data
   # If we are running in synchronous mode, we want a chance to look

@@ -1,6 +1,6 @@
 /* Basic character set support.
 
-Copyright (C) 2001-2014 Free Software Foundation, Inc.
+Copyright (C) 2001-2015 Free Software Foundation, Inc.
 
 Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
   2005, 2006, 2007, 2008, 2009, 2010, 2011
@@ -66,16 +66,7 @@ struct charset *charset_table;
 static ptrdiff_t charset_table_size;
 static int charset_table_used;
 
-Lisp_Object Qcharsetp;
-
-/* Special charset symbols.  */
-Lisp_Object Qascii;
-static Lisp_Object Qeight_bit;
-static Lisp_Object Qiso_8859_1;
-static Lisp_Object Qunicode;
-static Lisp_Object Qemacs;
-
-/* The corresponding charsets.  */
+/* Special charsets corresponding to symbols.  */
 int charset_ascii;
 int charset_eight_bit;
 static int charset_iso_8859_1;
@@ -88,9 +79,6 @@ int charset_jisx0208_1978;
 int charset_jisx0208;
 int charset_ksc5601;
 
-/* Value of charset attribute `charset-iso-plane'.  */
-static Lisp_Object Qgl, Qgr;
-
 /* Charset of unibyte characters.  */
 int charset_unibyte;
 
@@ -101,10 +89,9 @@ Lisp_Object Vcharset_ordered_list;
    charsets.  */
 Lisp_Object Vcharset_non_preferred_head;
 
-/* Incremented everytime we change Vcharset_ordered_list.  This is
-   unsigned short so that it fits in Lisp_Int and never matches
-   -1.  */
-unsigned short charset_ordered_list_tick;
+/* Incremented every time we change the priority of charsets.
+   Wraps around.  */
+EMACS_UINT charset_ordered_list_tick;
 
 /* List of iso-2022 charsets.  */
 Lisp_Object Viso_2022_charset_list;
@@ -2159,7 +2146,7 @@ DEFUN ("set-charset-priority", Fset_charset_priority, Sset_charset_priority,
 usage: (set-charset-priority &rest charsets)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object new_head, old_list, arglist[2];
+  Lisp_Object new_head, old_list;
   Lisp_Object list_2022, list_emacs_mule;
   ptrdiff_t i;
   int id;
@@ -2175,9 +2162,9 @@ usage: (set-charset-priority &rest charsets)  */)
 	  new_head = Fcons (make_number (id), new_head);
 	}
     }
-  arglist[0] = Fnreverse (new_head);
-  arglist[1] = Vcharset_non_preferred_head = old_list;
-  Vcharset_ordered_list = Fnconc (2, arglist);
+  Vcharset_non_preferred_head = old_list;
+  Vcharset_ordered_list = CALLN (Fnconc, Fnreverse (new_head), old_list);
+
   charset_ordered_list_tick++;
 
   charset_unibyte = -1;
@@ -2345,12 +2332,14 @@ syms_of_charset (void)
 {
   DEFSYM (Qcharsetp, "charsetp");
 
+  /* Special charset symbols.  */
   DEFSYM (Qascii, "ascii");
   DEFSYM (Qunicode, "unicode");
   DEFSYM (Qemacs, "emacs");
   DEFSYM (Qeight_bit, "eight-bit");
   DEFSYM (Qiso_8859_1, "iso-8859-1");
 
+  /* Value of charset attribute `charset-iso-plane'.  */
   DEFSYM (Qgl, "gl");
   DEFSYM (Qgr, "gr");
 
@@ -2363,17 +2352,8 @@ syms_of_charset (void)
   staticpro (&Vemacs_mule_charset_list);
   Vemacs_mule_charset_list = Qnil;
 
-  /* Don't staticpro them here.  It's done in syms_of_fns.  */
-  QCtest = intern_c_string (":test");
-  Qeq = intern_c_string ("eq");
-
   staticpro (&Vcharset_hash_table);
-  {
-    Lisp_Object args[2];
-    args[0] = QCtest;
-    args[1] = Qeq;
-    Vcharset_hash_table = Fmake_hash_table (2, args);
-  }
+  Vcharset_hash_table = CALLN (Fmake_hash_table, QCtest, Qeq);
 
   charset_table = charset_table_init;
   charset_table_size = ARRAYELTS (charset_table_init);

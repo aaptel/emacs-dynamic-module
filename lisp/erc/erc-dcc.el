@@ -1,6 +1,6 @@
 ;;; erc-dcc.el --- CTCP DCC module for ERC
 
-;; Copyright (C) 1993-1995, 1998, 2002-2004, 2006-2014 Free Software
+;; Copyright (C) 1993-1995, 1998, 2002-2004, 2006-2015 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Ben A. Mesander <ben@gnu.ai.mit.edu>
@@ -379,7 +379,7 @@ created subprocess, or nil."
                   (set-process-filter-multibyte process nil)))))
         (file-error
          (unless (and (string= "Cannot bind server socket" (nth 1 err))
-                      (string= "address already in use" (nth 2 err)))
+                      (string= "address already in use" (downcase (nth 2 err))))
            (signal (car err) (cdr err)))
          (setq port (1+ port))
          (unless (< port upper)
@@ -1264,4 +1264,3 @@ other client."
 ;; Local Variables:
 ;; indent-tabs-mode: nil
 ;; End:
-

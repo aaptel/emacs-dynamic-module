@@ -1,6 +1,6 @@
 ;;; cus-start.el --- define customization properties of builtins
 
-;; Copyright (C) 1997, 1999-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999-2015 Free Software Foundation, Inc.
 
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Keywords: internal
@@ -421,6 +421,12 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 						    "21.1")
              ;; term.c
              (visible-cursor cursor boolean "22.1")
+             ;; terminal.c
+             (ring-bell-function display
+              (choice
+               (const :tag "Default" nil)
+               (const :tag "Silent" ignore)
+               function))
 	     ;; undo.c
 	     (undo-limit undo integer)
 	     (undo-strong-limit undo integer)
@@ -460,6 +466,7 @@ since it could result in memory overflow and make Emacs crash."
 			      :value display-buffer)
 		       (other :tag "Always (t)" :value t))
 	      "24.3")
+	     (fast-but-imprecise-scrolling scrolling boolean "25.1")
 	     (window-resize-pixelwise windows boolean "24.4")
 	     ;; xdisp.c
 	     ;; The whitespace group is for whitespace.el.
@@ -519,7 +526,12 @@ since it could result in memory overflow and make Emacs crash."
 				      (const :tag "Hourglass" :value hourglass)))
 	     (display-hourglass cursor boolean)
 	     (hourglass-delay cursor number)
-
+	     (resize-mini-windows
+	      windows (choice
+		       (const :tag "Off (nil)" :value nil)
+		       (const :tag "Fit (t)" :value t)
+		       (const :tag "Grow only" :value grow-only))
+	      "25.1")
 	     ;; xfaces.c
 	     (scalable-fonts-allowed display boolean "22.1")
 	     ;; xfns.c

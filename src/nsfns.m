@@ -1,6 +1,6 @@
 /* Functions for the NeXT/Open/GNUstep and MacOSX window system.
 
-Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2014 Free Software
+Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2015 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -60,35 +60,6 @@ int fns_trace_num = 1;
 #ifdef HAVE_NS
 
 extern NSArray *ns_send_types, *ns_return_types, *ns_drag_types;
-
-extern Lisp_Object Qforeground_color;
-extern Lisp_Object Qbackground_color;
-extern Lisp_Object Qcursor_color;
-extern Lisp_Object Qinternal_border_width;
-extern Lisp_Object Qvisibility;
-extern Lisp_Object Qcursor_type;
-extern Lisp_Object Qicon_type;
-extern Lisp_Object Qicon_name;
-extern Lisp_Object Qicon_left;
-extern Lisp_Object Qicon_top;
-extern Lisp_Object Qtop;
-extern Lisp_Object Qdisplay;
-extern Lisp_Object Qvertical_scroll_bars;
-extern Lisp_Object Qhorizontal_scroll_bars;
-extern Lisp_Object Qauto_raise;
-extern Lisp_Object Qauto_lower;
-extern Lisp_Object Qbox;
-extern Lisp_Object Qscroll_bar_width;
-extern Lisp_Object Qscroll_bar_height;
-extern Lisp_Object Qx_resource_name;
-extern Lisp_Object Qface_set_after_frame_default;
-extern Lisp_Object Qunderline, Qundefined;
-extern Lisp_Object Qheight, Qminibuffer, Qname, Qonly, Qwidth;
-extern Lisp_Object Qunsplittable, Qmenu_bar_lines, Qbuffer_predicate, Qtitle;
-
-
-Lisp_Object Qbuffered;
-Lisp_Object Qfontsize;
 
 EmacsTooltip *ns_tooltip = nil;
 
@@ -619,18 +590,11 @@ ns_set_name_as_filename (struct frame *f)
 
           fstr = [NSString stringWithUTF8String: SSDATA (encoded_filename)];
           if (fstr == nil) fstr = @"";
-#ifdef NS_IMPL_COCOA
-          /* work around a bug observed on 10.3 and later where
-             setTitleWithRepresentedFilename does not clear out previous state
-             if given filename does not exist */
-          if (! [[NSFileManager defaultManager] fileExistsAtPath: fstr])
-            [[view window] setRepresentedFilename: @""];
-#endif
         }
       else
         fstr = @"";
 
-      [[view window] setRepresentedFilename: fstr];
+      ns_set_represented_filename (fstr, f);
       [[view window] setTitle: str];
       fset_name (f, name);
     }
@@ -1287,7 +1251,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   /* Read comment about this code in corresponding place in xfns.c.  */
   adjust_frame_size (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
-		     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 5, 1, Qnil);
+		     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 5, 1,
+		     Qx_create_frame_1);
 
   /* The resources controlling the menu-bar and tool-bar are
      processed specially at startup, and reflected in the mode
@@ -1361,7 +1326,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* Allow x_set_window_size, now.  */
   f->can_x_set_window_size = true;
 
-  adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f), 0, 1, Qnil);
+  adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f), 0, 1,
+		     Qx_create_frame_2);
 
   if (! f->output_data.ns->explicit_parent)
     {
@@ -2978,8 +2944,7 @@ handlePanelKeys (NSSavePanel *panel, NSEvent *theEvent)
 void
 syms_of_nsfns (void)
 {
-  Qfontsize = intern_c_string ("fontsize");
-  staticpro (&Qfontsize);
+  DEFSYM (Qfontsize, "fontsize");
 
   DEFVAR_LISP ("ns-icon-type-alist", Vns_icon_type_alist,
                doc: /* Alist of elements (REGEXP . IMAGE) for images of icons associated to frames.

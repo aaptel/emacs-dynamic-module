@@ -1,6 +1,6 @@
 ;;; cl-lib.el --- tests for emacs-lisp/cl-lib.el
 
-;; Copyright (C) 2013-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -244,5 +244,8 @@
 
 (ert-deftest cl-loop-destructuring-with ()
   (should (equal (cl-loop with (a b c) = '(1 2 3) return (+ a b c)) 6)))
+
+(ert-deftest cl-flet-test ()
+  (should (equal (cl-flet ((f1 (x) x)) (let ((x #'f1)) (funcall x 5))) 5)))
 
 ;;; cl-lib.el ends here

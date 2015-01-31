@@ -1,5 +1,5 @@
 /* Fringe handling (split from xdisp.c).
-   Copyright (C) 1985-1988, 1993-1995, 1997-2014 Free Software
+   Copyright (C) 1985-1988, 1993-1995, 1997-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -64,10 +64,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
    The `left-fringe' and `right-fringe' display properties
    must specify physical bitmap symbols.
 */
-
-static Lisp_Object Qtruncation, Qcontinuation, Qoverlay_arrow;
-static Lisp_Object Qempty_line, Qtop_bottom;
-static Lisp_Object Qhollow_small;
 
 enum fringe_bitmap_align
 {
@@ -591,7 +587,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
   if (face_id == DEFAULT_FACE_ID)
     {
       Lisp_Object face = fringe_faces[which];
-      face_id = NILP (face) ? lookup_named_face (f, Qfringe, 0)
+      face_id = NILP (face) ? lookup_named_face (f, Qfringe, false)
 	: lookup_derived_face (f, face, FRINGE_FACE_ID, 0);
       if (face_id < 0)
 	face_id = FRINGE_FACE_ID;
@@ -1727,15 +1723,12 @@ init_fringe_once (void)
 void
 init_fringe (void)
 {
-  int i;
-
   max_fringe_bitmaps = MAX_STANDARD_FRINGE_BITMAPS + 20;
 
   fringe_bitmaps = xzalloc (max_fringe_bitmaps * sizeof *fringe_bitmaps);
-  fringe_faces = xmalloc (max_fringe_bitmaps * sizeof *fringe_faces);
 
-  for (i = 0; i < max_fringe_bitmaps; i++)
-    fringe_faces[i] = Qnil;
+  verify (NIL_IS_ZERO);
+  fringe_faces = xzalloc (max_fringe_bitmaps * sizeof *fringe_faces);
 }
 
 #ifdef HAVE_NTGUI

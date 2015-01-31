@@ -1,6 +1,6 @@
 ;;; minibuffer.el --- Minibuffer completion functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Package: emacs
@@ -169,13 +169,15 @@ ACTION can be one of nil, t or `lambda'."
       (t 'test-completion))
      string table pred))))
 
-(defun completion-table-dynamic (fun)
+(defun completion-table-dynamic (fun &optional switch-buffer)
   "Use function FUN as a dynamic completion table.
 FUN is called with one argument, the string for which completion is required,
 and it should return an alist containing all the intended possible completions.
 This alist may be a full list of possible completions so that FUN can ignore
-the value of its argument.  If completion is performed in the minibuffer,
-FUN will be called in the buffer from which the minibuffer was entered.
+the value of its argument.
+If SWITCH-BUFFER is non-nil and completion is performed in the
+minibuffer, FUN will be called in the buffer from which the minibuffer
+was entered.
 
 The result of the `completion-table-dynamic' form is a function
 that can be used as the COLLECTION argument to `try-completion' and
@@ -187,9 +189,10 @@ See also the related function `completion-table-with-cache'."
         ;; `fun' is not supposed to return another function but a plain old
         ;; completion table, whose boundaries are always trivial.
         nil
-      (with-current-buffer (let ((win (minibuffer-selected-window)))
-                             (if (window-live-p win) (window-buffer win)
-                               (current-buffer)))
+      (with-current-buffer (if (not switch-buffer) (current-buffer)
+                             (let ((win (minibuffer-selected-window)))
+                               (if (window-live-p win) (window-buffer win)
+                                 (current-buffer))))
         (complete-with-action action (funcall fun string) string pred)))))
 
 (defun completion-table-with-cache (fun &optional ignore-case)
@@ -228,7 +231,8 @@ You should give VAR a non-nil `risky-local-variable' property."
       (lambda (,str)
         (when (functionp ,var)
           (setq ,var (funcall #',fun)))
-        ,var))))
+        ,var)
+      'do-switch-buffer)))
 
 (defun completion-table-case-fold (table &optional dont-fold)
   "Return new completion TABLE that is case insensitive.
@@ -822,16 +826,27 @@ styles for specific categories, such as files, buffers, etc."
   :type completion--styles-type
   :version "23.1")
 
-(defcustom completion-category-overrides
-  '((buffer (styles . (basic substring))))
-  "List of `completion-styles' overrides for specific categories.
+(defvar completion-category-defaults
+  '((buffer (styles . (basic substring)))
+    (unicode-name (styles . (basic substring))))
+  "Default settings for specific completion categories.
+Each entry has the shape (CATEGORY . ALIST) where ALIST is
+an association list that can specify properties such as:
+- `styles': the list of `completion-styles' to use for that category.
+- `cycle': the `completion-cycle-threshold' to use for that category.
+Categories are symbols such as `buffer' and `file', used when
+completing buffer and file names, respectively.")
+
+(defcustom completion-category-overrides nil
+  "List of category-specific user overrides for completion styles.
 Each override has the shape (CATEGORY . ALIST) where ALIST is
 an association list that can specify properties such as:
 - `styles': the list of `completion-styles' to use for that category.
 - `cycle': the `completion-cycle-threshold' to use for that category.
 Categories are symbols such as `buffer' and `file', used when
-completing buffer and file names, respectively."
-  :version "24.1"
+completing buffer and file names, respectively.
+This overrides the defaults specified in `completion-category-defaults'."
+  :version "25.1"
   :type `(alist :key-type (choice :tag "Category"
 				  (const buffer)
                                   (const file)
@@ -847,9 +862,13 @@ completing buffer and file names, respectively."
 		 (const :tag "Select one value from the menu." cycle)
                  ,completion--cycling-threshold-type))))
 
+(defun completion--category-override (category tag)
+  (or (assq tag (cdr (assq category completion-category-overrides)))
+      (assq tag (cdr (assq category completion-category-defaults)))))
+
 (defun completion--styles (metadata)
   (let* ((cat (completion-metadata-get metadata 'category))
-         (over (assq 'styles (cdr (assq cat completion-category-overrides)))))
+         (over (completion--category-override cat 'styles)))
     (if over
         (delete-dups (append (cdr over) (copy-sequence completion-styles)))
        completion-styles)))
@@ -963,7 +982,7 @@ completion candidates than this number."
 
 (defun completion--cycle-threshold (metadata)
   (let* ((cat (completion-metadata-get metadata 'category))
-         (over (assq 'cycle (cdr (assq cat completion-category-overrides)))))
+         (over (completion--category-override cat 'cycle)))
     (if over (cdr over) completion-cycle-threshold)))
 
 (defvar-local completion-all-sorted-completions nil)
@@ -1811,14 +1830,14 @@ variables.")
              ;; Use `display-buffer-below-selected' for inline completions,
              ;; but not in the minibuffer (e.g. in `eval-expression')
              ;; for which `display-buffer-at-bottom' is used.
-             ;; Compare `this-command' with `completion-at-point'
-             ;; since `completion--in-region-1' sets `this-command'
-             ;; to this value for region completion commands.
-             ,(if (and (eq this-command 'completion-at-point)
-                       (not (minibuffer-selected-window)))
-                  'display-buffer-below-selected
-                'display-buffer-at-bottom))
-            (window-height . fit-window-to-buffer))
+             ,(if (eq (selected-window) (minibuffer-window))
+                  'display-buffer-at-bottom
+                'display-buffer-below-selected))
+	    ,(if temp-buffer-resize-mode
+		 '(window-height . resize-temp-buffer-window)
+	       '(window-height . shrink-window-if-larger-than-buffer))
+	    ,(when temp-buffer-resize-mode
+	       '(preserve-size . (nil . t))))
           nil
           ;; Remove the base-size tail because `sort' requires a properly
           ;; nil-terminated list.

@@ -1,3 +1,45 @@
+2015-01-22  Paul Eggert  <eggert@cs.ucla.edu>
+
+	Don't downcase system diagnostics' first letters
+	* url-dav.el (url-dav-delete-directory, url-dav-delete-file)
+	(url-dav-directory-files): Keep diagnostics consistent with system's.
+
+2014-12-12  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* url-http.el (url-http-parse-headers): `gnutls-available-p' is
+	now always available.
+
+2014-12-11  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* url-http.el (url-http-parse-headers): Check that
+	`gnutls-available-p' is defined (bug#19346).
+
+2014-12-09  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* url-http.el (url-http-parse-headers): Pass the GnuTLS status of
+	the connection to the caller.
+	(url-http-parse-headers): When being redirected, make sure we
+	flush the previous certificate.
+
+2014-12-08  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* url-http.el (url-http-activate-callback): Make debug more verbose.
+
+2014-12-05  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* url-future.el (url-future-done-p, url-future-completed-p)
+	(url-future-errored-p, url-future-cancelled-p):
+	* url-dav.el (url-dav-http-success-p): Use define-inline.
+
+2014-11-23  Lars Magne Ingebrigtsen  <larsi@gnus.org>
+
+	* url-http.el (url-http): Respect `url-request-noninteractive'.
+
+	* url-queue.el (url-queue-start-retrieve): Fetching through
+	url-queue should always be noninteractive.
+
+	* url-vars.el (url-request-noninteractive): New variable.
+
 2014-11-14  David Reitter  <david.reitter@gmail.com>
 
 	* url-domsuf.el (url-domsuf-parse-file): Read compressed
@@ -6,8 +48,8 @@
 2014-11-05  Teodor Zlatanov  <tzz@lifelogs.com>
 
 	* url-http.el (url-user-agent): New variable, can be function or
-	string.  Suggested by Vibhav Pant <vibhavp@ubuntu.com>.  Add
-	:version.  (Bug#16498)
+	string.  Suggested by Vibhav Pant <vibhavp@ubuntu.com>.
+	Add :version.  (Bug#16498)
 
 	(url-http-user-agent-string): Use it.
 
@@ -3015,7 +3057,8 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 1999, 2001-2002, 2004-2014 Free Software Foundation, Inc.
+  Copyright (C) 1999, 2001-2002, 2004-2015 Free Software Foundation,
+  Inc.
 
   This file is part of GNU Emacs.
 

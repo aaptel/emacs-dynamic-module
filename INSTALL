@@ -1,5 +1,6 @@
 GNU Emacs Installation Guide
-Copyright (C) 1992, 1994, 1996-1997, 2000-2014 Free Software Foundation, Inc.
+Copyright (C) 1992, 1994, 1996-1997, 2000-2015 Free Software Foundation,
+Inc.
 See the end of the file for license conditions.
 
 
@@ -311,12 +312,13 @@ Use --enable-gcc-warnings to enable compile-time checks that warn
 about possibly-questionable C code.  This is intended for developers
 and is useful with GNU-compatible compilers.  On a recent GNU system
 there should be no warnings; on older and on non-GNU systems the
-generated warnings may still be useful.
+generated warnings may still be useful, though you may prefer building
+with 'make WERROR_CFLAGS=' so that the warnings are not treated as
+errors.
 
-Use --enable-silent-rules to cause 'make' to chatter less.  This is
-helpful when combined with options like --enable-gcc-warnings that
-generate long shell-command lines.  'make V=0' also suppresses the
-chatter.
+Use --disable-silent-rules to cause 'make' to give more details about
+the commands it executes.  This can be helpful when debugging a build
+that goes awry.  'make V=1' also enables the extra chatter.
 
 Use --enable-link-time-optimization to enable link-time optimizer.  If
 you're using GNU compiler, this feature is supported since version 4.5.0.
@@ -464,8 +466,7 @@ installed locations, with `make install'.  By default, Emacs's files
 are installed in the following directories:
 
 `/usr/local/bin' holds the executable programs users normally run -
-		`emacs', `etags', `ctags', `emacsclient', and
-		`grep-changelog'.
+		`emacs', `etags', `ctags', `emacsclient'.
 
 `/usr/local/share/emacs/VERSION/lisp' holds the Emacs Lisp library;
 		`VERSION' stands for the number of the Emacs version

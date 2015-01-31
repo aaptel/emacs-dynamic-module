@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2014 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2015 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Files
@@ -81,6 +81,8 @@ computer program, however, it is good to keep the distinction in mind.
 
 @node Visiting Functions
 @subsection Functions for Visiting Files
+@cindex visiting files, functions for
+@cindex how to visit files
 
   This section describes the functions normally used to visit files.
 For historical reasons, these functions have names starting with
@@ -651,8 +653,9 @@ and also calls the functions in the list
 @xref{Format Conversion}.
 
 Normally, @code{write-region} displays the message @samp{Wrote
-@var{filename}} in the echo area.  If @var{visit} is neither @code{t}
-nor @code{nil} nor a string, then this message is inhibited.  This
+@var{filename}} in the echo area.  This message is inhibited if
+@var{visit} is neither @code{t} nor @code{nil} nor a string, or if
+Emacs is operating in batch mode (@pxref{Batch Mode}).  This
 feature is useful for programs that use files for internal purposes,
 files that the user does not need to know about.
 @end deffn
@@ -948,6 +951,8 @@ Unix.  These conventions are also followed by @code{file-attributes}
 
 @node Kinds of Files
 @subsection Distinguishing Kinds of Files
+@cindex file classification
+@cindex classification of file types
 
   This section describes how to distinguish various kinds of files, such
 as directories, symbolic links, and ordinary files.
@@ -2020,6 +2025,11 @@ form.
 @end example
 @end defun
 
+@defun directory-name-p filename
+This function returns non-@code{nil} if @var{filename} ends with a
+forward slash (@samp{/}) character.
+@end defun
+
 @node Directory Names
 @subsection Directory Names
 @cindex directory name
@@ -2295,6 +2305,8 @@ through the immediately preceding @samp{/}).
 
 @node Unique File Names
 @subsection Generating Unique File Names
+@cindex unique file names
+@cindex temporary files
 
   Some programs need to write temporary files.  Here is the usual way to
 construct a name for such a file:
@@ -2603,6 +2615,14 @@ then the user will probably be happier if you do sort the names.
 
 An error is signaled if @var{directory} is not the name of a directory
 that can be read.
+@end defun
+
+@defun directory-files-recursively directory match &optional include-directories
+Return all files under @var{directory} whose file names match
+@var{match} recursively.  The file names are returned ``depth first'',
+meaning that contents of sub-directories are returned before contents
+of the directories.  If @var{include-directories} is non-@code{nil},
+also return directory names that have matching names.
 @end defun
 
 @defun directory-files-and-attributes directory &optional full-name match-regexp nosort id-format

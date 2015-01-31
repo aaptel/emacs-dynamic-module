@@ -1,5 +1,5 @@
 /* Image support for the NeXT/Open/GNUstep and MacOSX window system.
-   Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2014 Free Software
+   Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -33,8 +33,6 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "dispextern.h"
 #include "nsterm.h"
 #include "frame.h"
-
-extern Lisp_Object QCfile, QCdata;
 
 /* call tracing */
 #if 0
@@ -247,6 +245,7 @@ ns_set_alpha (void *img, int x, int y, unsigned char a)
               if (s >= bits + length)
                 {
                   [bmRep release];
+                  bmRep = nil;
                   return nil;
                 }
 #define hexchar(x) ('0' <= (x) && (x) <= '9' ? (x) - '0' : (x) - 'a' + 10)
@@ -350,15 +349,15 @@ ns_set_alpha (void *img, int x, int y, unsigned char a)
     {
       if ([rep respondsToSelector: @selector (getBitmapDataPlanes:)])
         {
-          bmRep = (NSBitmapImageRep *) rep;
+          NSBitmapImageRep *bmr = (NSBitmapImageRep *) rep;
 
-          if ([bmRep numberOfPlanes] >= 3)
-              [bmRep getBitmapDataPlanes: pixmapData];
+          if ([bmr numberOfPlanes] >= 3)
+              [bmr getBitmapDataPlanes: pixmapData];
 
           /* The next two lines cause the DPI of the image to be ignored.
              This seems to be the behavior users expect. */
           [self setScalesWhenResized: YES];
-          [self setSize: NSMakeSize([bmRep pixelsWide], [bmRep pixelsHigh])];
+          [self setSize: NSMakeSize([bmr pixelsWide], [bmr pixelsHigh])];
 
           break;
         }

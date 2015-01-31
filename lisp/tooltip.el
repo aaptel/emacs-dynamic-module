@@ -1,6 +1,6 @@
 ;;; tooltip.el --- show tooltip windows
 
-;; Copyright (C) 1997, 1999-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999-2015 Free Software Foundation, Inc.
 
 ;; Author: Gerd Moellmann <gerd@acm.org>
 ;; Keywords: help c mouse tools
@@ -284,10 +284,6 @@ is based on the current syntax table."
 	(when (> (point) start)
 	  (buffer-substring start (point)))))))
 
-(defmacro tooltip-region-active-p ()
-  "Value is non-nil if the region should override command actions."
-  `(use-region-p))
-
 (defun tooltip-expr-to-print (event)
   "Return an expression that should be printed for EVENT.
 If a region is active and the mouse is inside the region, print
@@ -295,7 +291,7 @@ the region.  Otherwise, figure out the identifier around the point
 where the mouse is."
   (with-current-buffer (tooltip-event-buffer event)
     (let ((point (posn-point (event-end event))))
-      (if (tooltip-region-active-p)
+      (if (use-region-p)
 	  (when (and (<= (region-beginning) point) (<= point (region-end)))
 	    (buffer-substring (region-beginning) (region-end)))
 	(tooltip-identifier-from-point point)))))

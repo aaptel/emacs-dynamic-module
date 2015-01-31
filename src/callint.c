@@ -1,5 +1,5 @@
 /* Call a Lisp function interactively.
-   Copyright (C) 1985-1986, 1993-1995, 1997, 2000-2014 Free Software
+   Copyright (C) 1985-1986, 1993-1995, 1997, 2000-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -28,18 +28,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "keymap.h"
 
-Lisp_Object Qminus, Qplus;
-static Lisp_Object Qfuncall_interactively;
-static Lisp_Object Qcommand_debug_status;
-static Lisp_Object Qenable_recursive_minibuffers;
-
-static Lisp_Object Qhandle_shift_selection;
-static Lisp_Object Qread_number;
-
-Lisp_Object Qmouse_leave_buffer_hook;
-
-static Lisp_Object Qlist, Qlet, Qletx, Qsave_excursion, Qif;
-Lisp_Object Qwhen, Qprogn;
 static Lisp_Object preserved_fns;
 
 /* Marker used within call-interactively to refer to point.  */
@@ -113,7 +101,8 @@ If the string begins with `^' and `shift-select-mode' is non-nil,
  Emacs first calls the function `handle-shift-selection'.
 You may use `@', `*', and `^' together.  They are processed in the
  order that they appear, before reading any arguments.
-usage: (interactive &optional ARGS)  */)
+usage: (interactive &optional ARGS)  */
+       attributes: const)
   (Lisp_Object args)
 {
   return Qnil;
@@ -240,17 +229,10 @@ read_file_name (Lisp_Object default_filename, Lisp_Object mustmatch,
 		Lisp_Object initial, Lisp_Object predicate)
 {
   struct gcpro gcpro1;
-  Lisp_Object args[7];
-
   GCPRO1 (default_filename);
-  args[0] = intern ("read-file-name");
-  args[1] = callint_message;
-  args[2] = Qnil;
-  args[3] = default_filename;
-  args[4] = mustmatch;
-  args[5] = initial;
-  args[6] = predicate;
-  RETURN_UNGCPRO (Ffuncall (7, args));
+  RETURN_UNGCPRO (CALLN (Ffuncall, intern ("read-file-name"),
+			 callint_message, Qnil, default_filename,
+			 mustmatch, initial, predicate));
 }
 
 /* BEWARE: Calling this directly from C would defeat the purpose!  */
@@ -408,15 +390,11 @@ invoke it.  If KEYS is omitted or nil, the return value of
       Vreal_this_command = save_real_this_command;
       kset_last_command (current_kboard, save_last_command);
 
-      {
-	Lisp_Object args[3];
-	args[0] = Qfuncall_interactively;
-	args[1] = function;
-	args[2] = specs;
-	Lisp_Object result = unbind_to (speccount, Fapply (3, args));
-	SAFE_FREE ();
-	return result;
-      }
+      Lisp_Object result
+	= unbind_to (speccount, CALLN (Fapply, Qfuncall_interactively,
+				       function, specs));
+      SAFE_FREE ();
+      return result;
     }
 
   /* SPECS is set to a string; use it as an interactive prompt.
@@ -477,7 +455,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 		error ("Attempt to select inactive minibuffer window");
 
 	      /* If the current buffer wants to clean up, let it.  */
-              Frun_hooks (1, &Qmouse_leave_buffer_hook);
+              run_hook (Qmouse_leave_buffer_hook);
 
 	      Fselect_window (w, Qnil);
 	    }
@@ -520,12 +498,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
   visargs = args + nargs;
   varies = (signed char *) (visargs + nargs);
 
-  for (i = 0; i < nargs; i++)
-    {
-      args[i] = Qnil;
-      visargs[i] = Qnil;
-      varies[i] = 0;
-    }
+  memclear (args, nargs * (2 * word_size + 1));
 
   GCPRO5 (prefix_arg, function, *args, *visargs, up_event);
   gcpro3.nvars = nargs;
@@ -792,7 +765,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 				   argument if no prefix.  */
 	  if (NILP (prefix_arg))
 	    {
-	      args[i] = Qnil;
+	      /* args[i] = Qnil; */
 	      varies[i] = -1;
 	    }
 	  else

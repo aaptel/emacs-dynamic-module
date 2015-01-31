@@ -1,6 +1,6 @@
 /* NeXT/Open/GNUstep / MacOSX communication module.
 
-Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2014 Free Software
+Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2015 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -225,14 +225,6 @@ static unsigned convert_ns_to_X_keysym[] =
   0x1B,				0x1B   /* escape */
 };
 
-static Lisp_Object Qmodifier_value;
-Lisp_Object Qalt, Qcontrol, Qhyper, Qmeta, Qsuper;
-extern Lisp_Object Qcursor_color, Qcursor_type, Qns;
-
-static Lisp_Object QUTF8_STRING;
-static Lisp_Object Qcocoa, Qgnustep;
-static Lisp_Object Qfile, Qurl;
-
 /* On OS X picks up the default NSGlobalDomain AppleAntiAliasingThreshold,
    the maximum font size to NOT antialias.  On GNUstep there is currently
    no way to control this behavior. */
@@ -292,6 +284,9 @@ static struct {
 } hold_event_q = {
   NULL, 0, 0
 };
+
+static NSString *represented_filename = nil;
+static struct frame *represented_frame = 0;
 
 #ifdef NS_IMPL_COCOA
 /*
@@ -378,8 +373,11 @@ static CGPoint menu_mouse_point;
       if (e) emacs_event->timestamp = EV_TIMESTAMP (e);                 \
       if (q_event_ptr)                                                  \
         {                                                               \
+          Lisp_Object tem = Vinhibit_quit;                              \
+          Vinhibit_quit = Qt;                                           \
           n_emacs_events_pending++;                                     \
           kbd_buffer_store_event_hold (emacs_event, q_event_ptr);       \
+          Vinhibit_quit = tem;                                          \
         }                                                               \
       else                                                              \
         hold_event (emacs_event);                                       \
@@ -398,6 +396,13 @@ void x_set_frame_alpha (struct frame *f);
     Utilities
 
    ========================================================================== */
+
+void
+ns_set_represented_filename (NSString* fstr, struct frame *f)
+{
+  represented_filename = [fstr retain];
+  represented_frame = f;
+}
 
 void
 ns_init_events (struct input_event* ev)
@@ -1072,7 +1077,7 @@ ns_lower_frame (struct frame *f)
 
 
 static void
-ns_frame_raise_lower (struct frame *f, int raise)
+ns_frame_raise_lower (struct frame *f, bool raise)
 /* --------------------------------------------------------------------------
      External (hook)
    -------------------------------------------------------------------------- */
@@ -1312,7 +1317,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
 
 void
 x_set_window_size (struct frame *f,
-                   int change_grav,
+                   bool change_gravity,
                    int width,
                    int height,
                    bool pixelwise)
@@ -1402,15 +1407,8 @@ x_set_window_size (struct frame *f,
     [view setBoundsOrigin: origin];
   }
 
-  change_frame_size (f, width, height, 0, 1, 0, pixelwise);
-/*  SET_FRAME_GARBAGED (f); // this short-circuits expose call in drawRect */
-
-  mark_window_cursors_off (XWINDOW (f->root_window));
-  cancel_mouse_face (f);
-
+  [view updateFrameSize: NO];
   unblock_input ();
-
-  do_pending_window_change (0);
 }
 
 
@@ -4318,7 +4316,7 @@ ns_term_init (Lisp_Object display_name)
 
   dpyinfo->name_list_element = Fcons (display_name, Qnil);
 
-  terminal->name = xstrdup (SSDATA (display_name));
+  terminal->name = xlispstrdup (display_name);
 
   unblock_input ();
 
@@ -4599,6 +4597,23 @@ ns_term_shutdown (int sig)
       return;
     }
 #endif
+
+  if (represented_filename != nil && represented_frame)
+    {
+      NSString *fstr = represented_filename;
+      NSView *view = FRAME_NS_VIEW (represented_frame);
+#ifdef NS_IMPL_COCOA
+      /* work around a bug observed on 10.3 and later where
+         setTitleWithRepresentedFilename does not clear out previous state
+         if given filename does not exist */
+      if (! [[NSFileManager defaultManager] fileExistsAtPath: fstr])
+        [[view window] setRepresentedFilename: @""];
+#endif
+      [[view window] setRepresentedFilename: fstr];
+      [represented_filename release];
+      represented_filename = nil;
+      represented_frame = NULL;
+    }
 
   if (type == NSApplicationDefined)
     {
@@ -6758,7 +6773,9 @@ if (cols > 0 && rows > 0)
     return;
 
   ns_clear_frame_area (emacsframe, x, y, width, height);
+  block_input ();
   expose_frame (emacsframe, x, y, width, height);
+  unblock_input ();
 
   /*
     drawRect: may be called (at least in OS X 10.5) for invisible
@@ -7595,8 +7612,8 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 
   /* Now make the frame display the given font.  */
   if (FRAME_NS_WINDOW (f) != 0 && ! [view isFullscreen])
-    x_set_window_size (f, 0, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
-                       FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 1);
+    x_set_window_size (f, false, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
+                       FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), true);
 
   return font_object;
 }

@@ -1,6 +1,7 @@
 ;;; grep.el --- run `grep' and display the results  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1993-1999, 2001-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1993-1999, 2001-2015 Free Software
+;; Foundation, Inc.
 
 ;; Author: Roland McGrath <roland@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -556,6 +557,18 @@ This function is called from `compilation-filter-hook'."
 			(looking-at
 			 (concat (regexp-quote hello-file)
 				 ":[0-9]+:English")))))))))
+
+    (when (eq grep-highlight-matches 'auto-detect)
+      (setq grep-highlight-matches
+	    (with-temp-buffer
+	      (and (grep-probe grep-program '(nil t nil "--help"))
+		   (progn
+		     (goto-char (point-min))
+		     (search-forward "--color" nil t))
+		   ;; Windows and DOS pipes fail `isatty' detection in Grep.
+		   (if (memq system-type '(windows-nt ms-dos))
+		       'always 'auto)))))
+
     (unless (and grep-command grep-find-command
 		 grep-template grep-find-template)
       (let ((grep-options
@@ -632,16 +645,6 @@ This function is called from `compilation-filter-hook'."
 			(t
 			 (format "%s . <X> -type f <F> -print | \"%s\" %s"
 				 find-program xargs-program gcmd))))))))
-    (when (eq grep-highlight-matches 'auto-detect)
-      (setq grep-highlight-matches
-	    (with-temp-buffer
-	      (and (grep-probe grep-program '(nil t nil "--help"))
-		   (progn
-		     (goto-char (point-min))
-		     (search-forward "--color" nil t))
-		   ;; Windows and DOS pipes fail `isatty' detection in Grep.
-		   (if (memq system-type '(windows-nt ms-dos))
-		       'always 'auto)))))
 
     ;; Save defaults for this host.
     (setq grep-host-defaults-alist

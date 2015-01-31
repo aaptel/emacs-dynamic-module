@@ -1,5 +1,5 @@
 /* NeXT/Open/GNUstep / MacOSX Cocoa selection processing for emacs.
-   Copyright (C) 1993-1994, 2005-2006, 2008-2014 Free Software
+   Copyright (C) 1993-1994, 2005-2006, 2008-2015 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -33,8 +33,6 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "nsterm.h"
 #include "termhooks.h"
 #include "keyboard.h"
-
-static Lisp_Object QCLIPBOARD, QSECONDARY, QTEXT, QFILE_NAME;
 
 static Lisp_Object Vselection_alist;
 
@@ -438,7 +436,8 @@ On Nextstep, TERMINAL is unused.  */)
   if (EQ (selection, Qnil)) selection = QPRIMARY;
   if (EQ (selection, Qt)) selection = QSECONDARY;
   return ns_get_pb_change_count (selection)
-    == ns_get_our_change_count_for (selection);
+    == ns_get_our_change_count_for (selection)
+    ? Qt : Qnil;
 }
 
 
@@ -504,10 +503,10 @@ nxatoms_of_nsselect (void)
 void
 syms_of_nsselect (void)
 {
-  QCLIPBOARD = intern_c_string ("CLIPBOARD");	staticpro (&QCLIPBOARD);
-  QSECONDARY = intern_c_string ("SECONDARY");	staticpro (&QSECONDARY);
-  QTEXT      = intern_c_string ("TEXT"); 	staticpro (&QTEXT);
-  QFILE_NAME = intern_c_string ("FILE_NAME"); 	staticpro (&QFILE_NAME);
+  DEFSYM (QCLIPBOARD, "CLIPBOARD");
+  DEFSYM (QSECONDARY, "SECONDARY");
+  DEFSYM (QTEXT, "TEXT");
+  DEFSYM (QFILE_NAME, "FILE_NAME");
 
   defsubr (&Sns_disown_selection_internal);
   defsubr (&Sns_get_selection);

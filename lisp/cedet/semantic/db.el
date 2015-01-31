@@ -1,6 +1,6 @@
 ;;; semantic/db.el --- Semantic tag database manager
 
-;; Copyright (C) 2000-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2015 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: tags
@@ -330,6 +330,10 @@ Adds the number of tags in this file to the object print name."
 
 ;;; DATABASE BASE CLASS
 ;;
+(unless (fboundp 'semanticdb-abstract-table-list-p)
+  (cl-deftype semanticdb-abstract-table-list ()
+    '(list-of semanticdb-abstract-table)))
+
 (defclass semanticdb-project-database (eieio-instance-tracker)
   ((tracking-symbol :initform semanticdb-database-list)
    (reference-directory :type string
@@ -481,7 +485,7 @@ other than :table."
   (let ((cache (oref table cache))
 	(obj nil))
     (while (and (not obj) cache)
-      (if (eq (eieio--object-class (car cache)) desired-class)
+      (if (eq (eieio-object-class (car cache)) desired-class)
 	  (setq obj (car cache)))
       (setq cache (cdr cache)))
     (if obj
@@ -532,7 +536,7 @@ other than :table."
   (let ((cache (oref db cache))
 	(obj nil))
     (while (and (not obj) cache)
-      (if (eq (eieio--object-class (car cache)) desired-class)
+      (if (eq (eieio-object-class (car cache)) desired-class)
 	  (setq obj (car cache)))
       (setq cache (cdr cache)))
     (if obj

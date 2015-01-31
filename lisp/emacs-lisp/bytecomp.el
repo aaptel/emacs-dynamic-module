@@ -1,6 +1,6 @@
 ;;; bytecomp.el --- compilation of Lisp code into byte code -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1992, 1994, 1998, 2000-2014 Free Software
+;; Copyright (C) 1985-1987, 1992, 1994, 1998, 2000-2015 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Jamie Zawinski <jwz@lucid.com>
@@ -417,7 +417,7 @@ specify different fields to sort on."
 This list lives partly on the stack.")
 (defvar byte-compile-lexical-variables nil
   "List of variables that have been treated as lexical.
-Filled in `cconv-analyse-form' but initialized and consulted here.")
+Filled in `cconv-analyze-form' but initialized and consulted here.")
 (defvar byte-compile-const-variables nil
   "List of variables declared as constants during compilation of this file.")
 (defvar byte-compile-free-references)
@@ -433,7 +433,7 @@ Return the compile-time value of FORM."
   ;; 3.2.3.1, "Processing of Top Level Forms".  The semantics are very
   ;; subtle: see test/automated/bytecomp-tests.el for interesting
   ;; cases.
-  (setf form (macroexpand form byte-compile-macro-environment))
+  (setf form (macroexp-macroexpand form byte-compile-macro-environment))
   (if (eq (car-safe form) 'progn)
       (cons 'progn
             (mapcar (lambda (subform)
@@ -1858,13 +1858,13 @@ The value is non-nil if there were no errors, nil if errors."
 		;; recompiled).  Previously this was accomplished by
 		;; deleting target-file before writing it.
 		(rename-file tempfile target-file t)
-		(message "Wrote %s" target-file))
+		(or noninteractive (message "Wrote %s" target-file)))
 	    ;; This is just to give a better error message than write-region
 	    (signal 'file-error
 		    (list "Opening output file"
 			  (if (file-exists-p target-file)
-			      "cannot overwrite file"
-			    "directory not writable or nonexistent")
+			      "Cannot overwrite file"
+			    "Directory not writable or nonexistent")
 			  target-file)))
 	  (kill-buffer (current-buffer)))
 	(if (and byte-compile-generate-call-tree
@@ -3820,6 +3820,10 @@ that suppresses all warnings during execution of BODY."
 	 ;; If things not being bound at all is ok, so must them being
 	 ;; obsolete.  Note that we add to the existing lists since Tramp
 	 ;; (ab)uses this feature.
+         ;; FIXME: If `foo' is obsoleted by `bar', the code below
+         ;; correctly arranges to silence the warnings after testing
+         ;; existence of `foo', but the warning should also be
+         ;; silenced after testing the existence of `bar'.
 	 (let ((byte-compile-not-obsolete-vars
 		(append byte-compile-not-obsolete-vars bound-list))
 	       (byte-compile-not-obsolete-funcs
