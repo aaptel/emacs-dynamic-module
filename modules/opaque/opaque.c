@@ -9,7 +9,7 @@ struct opaque
   int a, b, c;
 };
 
-static Lisp_Object Qa, Qb, Qc;
+static Lisp_Object Qopaque, Qa, Qb, Qc_;
 
 EXFUN (Fopaque_make, 3);
 DEFUN ("opaque-make", Fopaque_make, Sopaque_make, 3, 3, 0,
@@ -44,7 +44,7 @@ DEFUN ("opaque-get", Fopaque_get, Sopaque_get, 2, 2, 0,
   (Lisp_Object obj, Lisp_Object f)
 {
   struct opaque *p = XSAVE_POINTER (obj, 0);
-  int val = EQ (f, Qa) ? p->a : EQ (f, Qb) ? p->b : EQ (f, Qc) ? p->c : -1;
+  int val = EQ (f, Qa) ? p->a : EQ (f, Qb) ? p->b : EQ (f, Qc_) ? p->c : -1;
   return make_number (val);
 }
 
@@ -54,7 +54,7 @@ void init ()
 
   DEFSYM (Qa, "a");
   DEFSYM (Qb, "b");
-  DEFSYM (Qc, "c");
+  DEFSYM (Qc_, "c");
 
   defsubr (&Sopaque_make);
   defsubr (&Sopaque_free);
