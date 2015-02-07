@@ -597,6 +597,9 @@ the same file name is found in the `doc-directory'.  */)
          the "global" DOC file */
       Vdoc_file_name = filename;
 
+      /* and in that case, the filename has to be prefixed with the
+         right directory path */
+
       if
 #ifndef CANNOT_DUMP
         (!NILP (Vpurify_flag))
@@ -616,9 +619,10 @@ the same file name is found in the `doc-directory'.  */)
     }
   else
     {
-      CHECK_STRING (Vdoc_directory);
-      dirname = SSDATA (Vdoc_directory);
-      dirlen = SBYTES (Vdoc_directory);
+      /* If we're processing a module doc file, don't prefix anything
+         because the filename is already a proper path */
+      dirname = "";
+      dirlen = 0;
     }
 
   count = SPECPDL_INDEX ();
