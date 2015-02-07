@@ -16,12 +16,6 @@ MODULES_DIR = []
 MAKE_EXTRA_FLAGS = []
 OK = True
 
-for path in glob.glob(os.path.join(ROOT_DIR, "modules", "*")):
-    if os.path.isdir(path):
-        MODULES_DIR.append(path)
-
-assert len(MODULES_DIR) > 0, "No modules found"
-
 parser = argparse.ArgumentParser(description='Emacs dynamic-module tester')
 parser.add_argument('-e', '--emacs-bin', help='altenative path to the emacs binary')
 parser.add_argument('-B', '--rebuild', action='store_true', help='force make to build (-B flag)')
@@ -35,6 +29,18 @@ if ARGS.emacs_bin:
     EMACS_BIN = ARGS.emacs_bin
 
 assert os.path.isfile(EMACS_BIN), "No emacs binary found at path %s" % EMACS_BIN
+
+if ARGS.module:
+    for mod in ARGS.module:
+        path = os.path.join(ROOT_DIR, "modules", mod)
+        if os.path.isdir(path):
+            MODULES_DIR.append(path)
+else:
+    for path in glob.glob(os.path.join(ROOT_DIR, "modules", "*")):
+        if os.path.isdir(path):
+            MODULES_DIR.append(path)
+
+assert len(MODULES_DIR) > 0, "No modules found"
 
 for module_dir in MODULES_DIR:
     base, name = os.path.split(module_dir)
