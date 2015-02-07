@@ -986,7 +986,7 @@ This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
 }
 
 DEFUN ("load-module", Fload_module, Sload_module, 1, 1, 0,
-       doc: /* Dymamically load a compiled module. */)
+       doc: /* Dymamically load the compiled module FILE. */)
   (Lisp_Object file)
 {
 #ifdef HAVE_LTDL
