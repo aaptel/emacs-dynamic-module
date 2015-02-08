@@ -3,7 +3,7 @@
 
 (ert-deftest yaml-scalar ()
   "Tests scalar parsing"
-  (should (equal '(("abc"))
+  (should (equal '("abc")
                  (yaml-parse-string
                   "---
 abc
@@ -22,11 +22,10 @@ abc
 
 ;; TODO: need deep equal for hash-tables for the rest
 
-;; TODO
 (ert-deftest yaml-map ()
   "Tests map parsing"
-  (skip-unless nil)
-  (should (equal 'TODO
+  (skip-unless nil) ;; TODO
+  (should (equal 'xxx
                  (yaml-parse-string
                   "---
 a: 1
@@ -34,10 +33,10 @@ b: 2
 c: 3
 "))))
 
-;; TODO
-(ert-deftest yaml-multi-doc
-    "Tests documents parsing"
-  (should (equal 'TODO
+(ert-deftest yaml-multi-doc ()
+  "Tests documents parsing"
+  (skip-unless nil) ;; TODO
+  (should (equal 'xxx
                  (yaml-parse-string
                   "---
 a: 1
@@ -59,7 +58,8 @@ abc
 
 (ert-deftest yaml-alias ()
   "Tests alias parsing"
-  (should (equal 'TODO
+  (skip-unless nil) ;; TODO
+  (should (equal 'xxx
                  (yaml-parse-string
                   "---
 invoice: 34843
