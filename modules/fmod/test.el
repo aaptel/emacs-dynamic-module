@@ -11,18 +11,14 @@
 (ert-deftest fmod-doc ()
   "Tests docstring"
   ;; core functions docstrings should work
-  (should (string= (documentation 'base64-decode-string 'raw) "Base64-decode STRING and return the result."))
+  (should (string= (documentation 'base64-decode-string 'raw) "Base64-decode STRING and return the result.\n\n(fn STRING)"))
 
   (require 'fmod)
 
   ;; even after a module was added
-  (should (string= (documentation 'base64-decode-string 'raw) "Base64-decode STRING and return the result.
-
-(fn STRING)"))
+  (should (string= (documentation 'base64-decode-string 'raw) "Base64-decode STRING and return the result.\n\n(fn STRING)"))
   ;; check new function doc
-  (should (string= (documentation 'fmod 'raw) "Returns the floating-point remainder of NUMER/DENOM
-
-(fn NUMER DENOM)")))
+  (should (string= (documentation 'fmod 'raw) "Returns the floating-point remainder of NUMER/DENOM\n\n(fn NUMER DENOM)")))
 
 (ert-deftest fmod-value ()
   "Tests fmod calls"
