@@ -2,14 +2,14 @@
 #include <lisp.h>
 
 int plugin_is_GPL_compatible;
-static Lisp_Object Qopaque;
+static Lisp_Object MQopaque;
 
 struct opaque
 {
   int a, b, c;
 };
 
-static Lisp_Object Qopaque, Qa, Qb, Qc_;
+static Lisp_Object MQopaque, MQa, MQb, MQc;
 
 EXFUN (Fopaque_make, 3);
 DEFUN ("opaque-make", Fopaque_make, Sopaque_make, 3, 3, 0,
@@ -44,21 +44,21 @@ DEFUN ("opaque-get", Fopaque_get, Sopaque_get, 2, 2, 0,
   (Lisp_Object obj, Lisp_Object f)
 {
   struct opaque *p = XSAVE_POINTER (obj, 0);
-  int val = EQ (f, Qa) ? p->a : EQ (f, Qb) ? p->b : EQ (f, Qc_) ? p->c : -1;
+  int val = EQ (f, MQa) ? p->a : EQ (f, MQb) ? p->b : EQ (f, MQc) ? p->c : -1;
   return make_number (val);
 }
 
 void init ()
 {
-  DEFSYM (Qopaque, "opaque");
+  MQopaque = intern ("opaque");
 
-  DEFSYM (Qa, "a");
-  DEFSYM (Qb, "b");
-  DEFSYM (Qc_, "c");
+  MQa = intern ("a");
+  MQb = intern ("b");
+  MQc = intern ("c");
 
   defsubr (&Sopaque_make);
   defsubr (&Sopaque_free);
   defsubr (&Sopaque_get);
 
-  Fprovide (Qopaque, Qnil);
+  Fprovide (MQopaque, Qnil);
 }

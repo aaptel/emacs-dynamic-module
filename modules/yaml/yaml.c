@@ -11,7 +11,7 @@
 #include <buffer.h>
 
 int plugin_is_GPL_compatible;
-static Lisp_Object Qyaml;
+static Lisp_Object MQyaml;
 
 typedef unsigned char uchar;
 
@@ -222,11 +222,11 @@ DEFUN ("yaml-parse-file", Fyaml_parse_file, Syaml_parse_file, 1, 1, 0,
 
 void init ()
 {
-  DEFSYM (Qyaml, "yaml");
+  MQyaml = intern ("yaml");
 
   defsubr (&Syaml_parse_file);
   defsubr (&Syaml_parse_string);
   defsubr (&Syaml_parse_buffer);
 
-  Fprovide (Qyaml, Qnil);
+  Fprovide (MQyaml, Qnil);
 }

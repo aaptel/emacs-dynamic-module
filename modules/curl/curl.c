@@ -7,7 +7,7 @@
 #include <lisp.h>
 
 int plugin_is_GPL_compatible;
-static Lisp_Object Qcurl;
+static Lisp_Object MQcurl;
 
 struct buffer
 {
@@ -107,12 +107,12 @@ void init ()
   curl_global_init (CURL_GLOBAL_ALL);
   /* when unloading: curl_global_cleanup(); */
 
-  DEFSYM (Qcurl, "curl");
+  MQcurl = intern ("curl");
 
   defsubr (&Scurl_make);
   defsubr (&Scurl_fetch_url);
   defsubr (&Scurl_content);
   defsubr (&Scurl_free);
 
-  Fprovide (Qcurl, Qnil);
+  Fprovide (MQcurl, Qnil);
 }
