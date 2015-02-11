@@ -224,6 +224,10 @@ for example, (type-of 1) returns `integer'.  */)
 	  return Qoverlay;
 	case Lisp_Misc_Float:
 	  return Qfloat;
+#ifdef HAVE_LTDL
+	case Lisp_Misc_Module:
+	  return Qmodule;
+#endif
 	}
       emacs_abort ();
 
@@ -423,6 +427,17 @@ DEFUN ("markerp", Fmarkerp, Smarkerp, 1, 1, 0,
     return Qt;
   return Qnil;
 }
+
+#ifdef HAVE_LTDL
+DEFUN ("modulep", Fmodulep, Smodulep, 1, 1, 0,
+       doc: /* Return t if OBJECT is a module object.  */)
+  (Lisp_Object object)
+{
+  if (MODULEP (object))
+    return Qt;
+  return Qnil;
+}
+#endif
 
 DEFUN ("subrp", Fsubrp, Ssubrp, 1, 1, 0,
        doc: /* Return t if OBJECT is a built-in function.  */)
@@ -3457,6 +3472,9 @@ syms_of_data (void)
   DEFSYM (Qbool_vector_p, "bool-vector-p");
   DEFSYM (Qchar_or_string_p, "char-or-string-p");
   DEFSYM (Qmarkerp, "markerp");
+#ifdef HAVE_LTDL
+  DEFSYM (Qmodulep, "modulep");
+#endif
   DEFSYM (Qbuffer_or_string_p, "buffer-or-string-p");
   DEFSYM (Qinteger_or_marker_p, "integer-or-marker-p");
   DEFSYM (Qboundp, "boundp");
@@ -3552,6 +3570,9 @@ syms_of_data (void)
   DEFSYM (Qcons, "cons");
   DEFSYM (Qmarker, "marker");
   DEFSYM (Qoverlay, "overlay");
+#ifdef HAVE_LTDL
+  DEFSYM (Qmodule, "module");
+#endif
   DEFSYM (Qfloat, "float");
   DEFSYM (Qwindow_configuration, "window-configuration");
   DEFSYM (Qprocess, "process");
@@ -3601,6 +3622,9 @@ syms_of_data (void)
   defsubr (&Ssequencep);
   defsubr (&Sbufferp);
   defsubr (&Smarkerp);
+#ifdef HAVE_LTDL
+  defsubr (&Smodulep);
+#endif
   defsubr (&Ssubrp);
   defsubr (&Sbyte_code_function_p);
   defsubr (&Schar_or_string_p);

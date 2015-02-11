@@ -2,6 +2,10 @@
 
 ;; basic module test should go here
 
+(ert-deftest fmod-module-available ()
+  "Tests if `module-available-p' is t"
+  (should (module-available-p)))
+
 (ert-deftest fmod-require ()
   "Tests bindings after require"
   (skip-unless (not (fboundp 'fmod)))

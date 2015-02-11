@@ -1403,6 +1403,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       /* syms_of_keymap (); */
       syms_of_macros ();
       syms_of_marker ();
+      syms_of_module ();
       syms_of_minibuf ();
       syms_of_process ();
       syms_of_search ();

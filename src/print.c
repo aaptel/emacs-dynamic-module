@@ -2045,6 +2045,23 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  PRINTCHAR ('>');
 	  break;
 
+#ifdef HAVE_LTDL
+        case Lisp_Misc_Module:
+          strout ("#<module id = ", -1, -1, printcharfun);
+          {
+            int len = sprintf (buf, "%u", XMODULE (obj)->id);
+            strout (buf, len, len, printcharfun);
+            strout (", dtor = ", -1, -1, printcharfun);
+            len = sprintf (buf, "%p", XMODULE (obj)->dtor);
+            strout (buf, len, len, printcharfun);
+            strout (", p = ", -1, -1, printcharfun);
+            len = sprintf (buf, "%p", XMODULE (obj)->p);
+            strout (buf, len, len, printcharfun);
+            strout (">", -1, -1, printcharfun);
+          }
+          break;
+#endif
+
 	  /* Remaining cases shouldn't happen in normal usage, but let's
 	     print them anyway for the benefit of the debugger.  */
 

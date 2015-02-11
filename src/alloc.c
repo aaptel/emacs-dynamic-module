@@ -3657,6 +3657,38 @@ free_marker (Lisp_Object marker)
   free_misc (marker);
 }
 
+#ifdef HAVE_LTDL
+/* Create a new module object. */
+Lisp_Object
+module_make_object (module_id_t id, void (*dtor) (void*), void *userptr)
+{
+  Lisp_Object obj;
+  struct Lisp_Module *m;
+
+  eassert (id < MODULE_ID_MAX);
+
+  obj = allocate_misc (Lisp_Misc_Module);
+  m = XMODULE (obj);
+  m->id = id;
+  m->dtor = dtor;
+  m->p = userptr;
+  return obj;
+}
+
+/* Free a module using its own destructor.  */
+void
+module_free_object (Lisp_Object obj)
+{
+  /* every change made here probably needs to be done in
+     sweep_marker() */
+
+  struct Lisp_Module *m = XMODULE (obj);
+  m->dtor (m->p);
+
+  free_misc (obj);
+}
+#endif
+
 
 /* Return a newly created vector or string with specified arguments as
    elements.  If all the arguments are characters that can fit
@@ -6367,6 +6399,12 @@ mark_object (Lisp_Object arg)
 	  mark_overlay (XOVERLAY (obj));
 	  break;
 
+#ifdef HAVE_LTDL
+	case Lisp_Misc_Module:
+	  XMISCANY (obj)->gcmarkbit = 1;
+	  break;
+#endif
+
 	default:
 	  emacs_abort ();
 	}
@@ -6744,9 +6782,23 @@ sweep_misc (void)
       for (i = 0; i < lim; i++)
         {
           if (!mblk->markers[i].m.u_any.gcmarkbit)
-            {
-              if (mblk->markers[i].m.u_any.type == Lisp_Misc_Marker)
-                unchain_marker (&mblk->markers[i].m.u_marker);
+              {
+                switch (mblk->markers[i].m.u_any.type)
+                  {
+                  case Lisp_Misc_Marker:
+                    unchain_marker (&mblk->markers[i].m.u_marker);
+                    break;
+#ifdef HAVE_LTDL
+                  case Lisp_Misc_Module:
+                    /* Module dtor need to be called */
+                    {
+                      /* see module_free_object() */
+                      struct Lisp_Module *m = &mblk->markers[i].m.u_module;
+                      m->dtor (m->p);
+                    }
+                    break;
+#endif
+                  }
               /* Set the type of the freed object to Lisp_Misc_Free.
                  We could leave the type alone, since nobody checks it,
                  but this might catch bugs faster.  */

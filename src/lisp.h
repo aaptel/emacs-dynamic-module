@@ -491,6 +491,9 @@ enum Lisp_Misc_Type
     /* Currently floats are not a misc type,
        but let's define this in case we want to change that.  */
     Lisp_Misc_Float,
+#ifdef HAVE_LTDL
+    Lisp_Misc_Module,
+#endif
     /* This is not a type code.  It is for range checking.  */
     Lisp_Misc_Limit
   };
@@ -600,6 +603,9 @@ INLINE bool OVERLAYP (Lisp_Object);
 INLINE bool PROCESSP (Lisp_Object);
 INLINE bool PSEUDOVECTORP (Lisp_Object, int);
 INLINE bool SAVE_VALUEP (Lisp_Object);
+#ifdef HAVE_LTDL
+INLINE bool MODULEP (Lisp_Object);
+#endif
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 					      Lisp_Object);
 INLINE bool STRINGP (Lisp_Object);
@@ -2176,6 +2182,24 @@ XSAVE_OBJECT (Lisp_Object obj, int n)
   return XSAVE_VALUE (obj)->data[n].object;
 }
 
+#ifdef HAVE_LTDL
+
+#define MODULE_ID_BITS 5
+#define MODULE_ID_MAX ((1 << MODULE_ID_BITS) - 1)
+typedef unsigned module_id_t;
+struct Lisp_Module
+  {
+    ENUM_BF (Lisp_Misc_Type) type : 16;	/* = Lisp_Misc_Module */
+    bool_bf gcmarkbit : 1;
+    unsigned spacer : 15 - MODULE_ID_BITS;
+    unsigned id : MODULE_ID_BITS;
+
+    void (*dtor) (void*);
+    void *p;
+  };
+
+#endif
+
 /* A miscellaneous object, when it's on the free list.  */
 struct Lisp_Free
   {
@@ -2195,6 +2219,9 @@ union Lisp_Misc
     struct Lisp_Marker u_marker;
     struct Lisp_Overlay u_overlay;
     struct Lisp_Save_Value u_save_value;
+#ifdef HAVE_LTDL
+    struct Lisp_Module u_module;
+#endif
   };
 
 INLINE union Lisp_Misc *
@@ -2236,6 +2263,17 @@ XSAVE_VALUE (Lisp_Object a)
   eassert (SAVE_VALUEP (a));
   return & XMISC (a)->u_save_value;
 }
+
+#ifdef HAVE_LTDL
+
+INLINE struct Lisp_Module *
+XMODULE (Lisp_Object a)
+{
+  eassert (MODULEP (a));
+  return & XMISC (a)->u_module;
+}
+
+#endif
 
 /* Forwarding pointer to an int variable.
    This is allowed only in the value cell of a symbol,
@@ -2481,6 +2519,14 @@ SAVE_VALUEP (Lisp_Object x)
 {
   return MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Save_Value;
 }
+
+#ifdef HAVE_LTDL
+INLINE bool
+MODULEP (Lisp_Object x)
+{
+  return MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Module;
+}
+#endif
 
 INLINE bool
 AUTOLOADP (Lisp_Object x)
@@ -3839,6 +3885,10 @@ extern Lisp_Object make_save_funcptr_ptr_obj (void (*) (void), void *,
 					      Lisp_Object);
 extern Lisp_Object make_save_memory (Lisp_Object *, ptrdiff_t);
 extern void free_save_value (Lisp_Object);
+#ifdef HAVE_LTDL
+extern Lisp_Object module_make_object (module_id_t id, void (*dtor) (void*), void *userptr);
+extern void module_free_object (Lisp_Object);
+#endif
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void free_marker (Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
@@ -4059,6 +4109,13 @@ extern Lisp_Object set_marker_restricted_both (Lisp_Object, Lisp_Object,
                                                ptrdiff_t, ptrdiff_t);
 extern Lisp_Object build_marker (struct buffer *, ptrdiff_t, ptrdiff_t);
 extern void syms_of_marker (void);
+
+/* Defined in module.c.  */
+
+#ifdef HAVE_LTDL
+extern module_id_t module_make_id (void);
+#endif
+extern void syms_of_module (void);
 
 /* Defined in fileio.c.  */
 
