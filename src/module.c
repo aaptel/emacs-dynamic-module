@@ -21,7 +21,9 @@
 #include <config.h>
 #include "lisp.h"
 #include "emacs_module.h"
-#include <ltdl.h>
+#include <dynlib.h>
+
+#define MODULE_CALL_FUN_NAME "module-call"
 
 void                         syms_of_module         (void);
 static struct emacs_runtime* module_get_runtime     (void);
@@ -93,7 +95,7 @@ static emacs_value module_make_function (emacs_env *env,
   */
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
-  Lisp_Object Qmodule_call = intern ("module-call");
+  Lisp_Object Qmodule_call = intern (MODULE_CALL_FUN_NAME);
   Lisp_Object envptr = make_save_ptr ((void*) env);
   Lisp_Object subrptr = make_save_ptr ((void*) subr);
 
@@ -129,16 +131,13 @@ static emacs_value module_funcall (emacs_env *env,
   for (i = 0; i < nargs; i++)
     newargs[1 + i] = (Lisp_Object) args[i];
 
-  struct gcpro gcpro1;
-  GCPRO1 (newargs[0]);
   Lisp_Object ret = Ffuncall (nargs+1, newargs);
-  UNGCPRO;
 
   xfree (newargs);
   return (emacs_value) ret;
 }
 
-DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
+DEFUN (MODULE_CALL_FUN_NAME, Fmodule_call, Smodule_call, 3, 3, 0,
        doc: "Call a module function")
   (Lisp_Object envptr, Lisp_Object subrptr, Lisp_Object arglist)
 {
@@ -163,37 +162,23 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
        doc: "Load module FILE")
   (Lisp_Object file)
 {
-  static int lt_init_done = 0;
-  lt_dlhandle handle;
+  dynlib_handle_ptr handle;
   emacs_init_function module_init;
   void *gpl_sym;
   Lisp_Object doc_name, args[2];
 
-  /* init libtool once per emacs process */
-  if (!lt_init_done)
-    {
-      int ret = lt_dlinit ();
-      if (ret)
-        {
-          const char* s = lt_dlerror ();
-          error ("ltdl init fail: %s", s);
-        }
-      lt_init_done = 1;
-    }
-
   CHECK_STRING (file);
-  handle = lt_dlopen (SDATA (file));
+  handle = dynlib_open (SDATA (file));
   if (!handle)
     error ("Cannot load file %s", SDATA (file));
 
-  gpl_sym = lt_dlsym (handle, "plugin_is_GPL_compatible");
+  gpl_sym = dynlib_sym (handle, "plugin_is_GPL_compatible");
   if (!gpl_sym)
     error ("Module %s is not GPL compatible", SDATA (file));
 
-  module_init = (emacs_init_function) lt_dlsym (handle, "emacs_module_init");
+  module_init = (emacs_init_function) dynlib_sym (handle, "emacs_module_init");
   if (!module_init)
     error ("Module %s does not have an init function.", SDATA (file));
-
 
   int r = module_init (module_get_runtime ());
 
