@@ -311,7 +311,7 @@ user-defined operators, use `calculator-user-operators' instead.")
    9 (highest) (optional, defaults to 1);
 
 It it possible have a unary prefix version of a binary operator if it
-comes later in this list.  If the list begins with the symbol 'nobind,
+comes later in this list.  If the list begins with the symbol `nobind',
 then no key binding will take place -- this is only useful for
 predefined keys.
 
@@ -1203,10 +1203,10 @@ arguments."
     ;; f is an expression
     (let ((TX (and X (calculator-truncate X)))
           (TY (and Y (calculator-truncate Y)))
-          (DX (if (and X calculator-deg) (/ (* X pi) 180) X))
+          (DX (if (and X calculator-deg) (degrees-to-radians X) X))
           (L  calculator-saved-list)
           (fF `(calculator-funcall ',f x y))
-          (fD `(if calculator-deg (/ (* x 180) float-pi) x)))
+          (fD `(if calculator-deg (* radians-to-degrees x) x)))
       (eval `(cl-flet ((F (&optional x y) ,fF) (D (x) ,fD))
                (let ((X ,X) (Y ,Y) (DX ,DX) (TX ,TX) (TY ,TY) (L ',L))
                  ,f))

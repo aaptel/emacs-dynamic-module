@@ -46,8 +46,6 @@
 
 ;;; Code:
 
-(require 'help-fns)
-
 (defgroup elint nil
   "Linting for Emacs Lisp."
   :prefix "elint-"
@@ -251,9 +249,9 @@ This environment can be passed to `macroexpand'."
     (elint-set-mode-line t)
     (with-current-buffer elint-log-buffer
       (unless (string-equal default-directory dir)
-	(elint-log-message (format "\nLeaving directory `%s'"
-				   default-directory) t)
-	(elint-log-message (format "Entering directory `%s'" dir) t)
+	(elint-log-message (format-message "\nLeaving directory ‘%s’"
+                                           default-directory) t)
+	(elint-log-message (format-message "Entering directory ‘%s’" dir) t)
 	(setq default-directory dir))))
   (let ((str (format "Linting file %s" file)))
     (message "%s..." str)
@@ -374,9 +372,9 @@ Returns the forms."
 	(let ((elint-current-pos (point)))
 	  ;; non-list check could be here too. errors may be out of seq.
 	  ;; quoted check cannot be elsewhere, since quotes skipped.
-	  (if (looking-back "'")
+	  (if (looking-back "'" (1- (point)))
 	      ;; Eg cust-print.el uses ' as a comment syntax.
-	      (elint-warning "Skipping quoted form `'%.20s...'"
+	      (elint-warning "Skipping quoted form ‘'%.20s...’"
 			   (read (current-buffer)))
 	    (condition-case nil
 		(setq tops (cons
@@ -385,7 +383,7 @@ Returns the forms."
 			    tops))
 	      (end-of-file
 	       (goto-char elint-current-pos)
-	       (error "Missing ')' in top form: %s"
+	       (error "Missing ‘)’ in top form: %s"
 		      (buffer-substring elint-current-pos
 					(line-end-position))))))))
       (nreverse tops))))
@@ -403,7 +401,7 @@ Return nil if there are no more forms, t otherwise."
   (cond
    ;; Eg nnmaildir seems to use [] as a form of comment syntax.
    ((not (listp form))
-    (elint-warning "Skipping non-list form `%s'" form))
+    (elint-warning "Skipping non-list form ‘%s’" form))
    ;; Add defined variable
    ((memq (car form) '(defvar defconst defcustom))
     (setq elint-env (elint-env-add-var elint-env (cadr form))))
@@ -434,7 +432,7 @@ Return nil if there are no more forms, t otherwise."
 	       (if (or (< (length form) 4)
 		       (eq (nth 3 form) t)
 		       (unless (stringp (nth 2 form))
-			 (elint-error "Malformed declaration for `%s'"
+			 (elint-error "Malformed declaration for ‘%s’"
 				      (cadr form))
 			 t))
 		   'unknown
@@ -760,7 +758,7 @@ CODE can be a lambda expression, a macro, or byte-compiled code."
     (and (eq (car-safe alias) 'quote)
 	 (eq (car-safe target) 'quote)
 	 (eq (elint-get-args (cadr target) env) 'undefined)
-	 (elint-warning "Alias `%s' has unknown target `%s'"
+	 (elint-warning "Alias ‘%s’ has unknown target ‘%s’"
 			(cadr alias) (cadr target))))
   (elint-form form env t))
 
@@ -798,7 +796,7 @@ CODE can be a lambda expression, a macro, or byte-compiled code."
 		  (setq newenv
 			(elint-env-add-var newenv (car s))))
 		 (t (elint-error
-		     "Malformed `let' declaration: %s" s))))
+		     "Malformed ‘let’ declaration: %s" s))))
 	      varlist)
 
 	;; Lint the body forms
@@ -984,7 +982,7 @@ Does basic handling of `featurep' tests."
 						    (line-beginning-position))))
 			       0)	; unknown position
 			     type
-			     (apply 'format string args))))
+			     (apply #'format-message string args))))
 
 (defun elint-error (string &rest args)
   "Report a linting error.

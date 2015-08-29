@@ -229,7 +229,7 @@ to set this option to nil."
 
 (defcustom idlwave-shell-file-name-chars "~/A-Za-z0-9+:_.$#%={}\\- "
   "The characters allowed in file names, as a string.
-Used for file name completion.  Must not contain `'', `,' and `\"'
+Used for file name completion.  Must not contain ‘'’, ‘,’ and ‘\"’
 because these are used as separators by IDL."
   :group 'idlwave-shell-general-setup
   :type 'string)
@@ -379,15 +379,15 @@ This mechanism is useful for correct interaction with the IDL function
 GET_KBRD, because in normal operation IDLWAVE only sends \\n terminated
 strings.  Here is some example code which makes use of the default spells.
 
-  print,'<chars>'               ; Make IDLWAVE switch to character mode
+  print,\\='<chars>\\='               ; Make IDLWAVE switch to character mode
   REPEAT BEGIN
       A = GET_KBRD(1)
       PRINT, BYTE(A)
-  ENDREP UNTIL A EQ 'q'
-  print,'</chars>'              ; Make IDLWAVE switch back to line mode
+  ENDREP UNTIL A EQ \\='q\\='
+  print,\\='</chars>\\='              ; Make IDLWAVE switch back to line mode
 
-  print,'Quit the program, y or n?'
-  print,'<onechar>'             ; Ask IDLWAVE to send one character
+  print,\\='Quit the program, y or n?\\='
+  print,\\='<onechar>\\='             ; Ask IDLWAVE to send one character
   answer = GET_KBRD(1)
 
 Since the IDLWAVE shell defines the system variable `!IDLWAVE_VERSION',
@@ -403,11 +403,11 @@ idlwave_char_input,/off          ; End the loop to send characters
 
 pro idlwave_char_input,on=on,off=off
   ;; Test if we are running under Emacs
-  defsysv,'!idlwave_version',exists=running_emacs
+  defsysv,\\='!idlwave_version\\=',exists=running_emacs
   if running_emacs then begin
-      if keyword_set(on) then         print,'<chars>' $
-        else if keyword_set(off) then print,'</chars>' $
-        else                          print,'<onechar>'
+      if keyword_set(on) then         print,\\='<chars>\\=' $
+        else if keyword_set(off) then print,\\='</chars>\\=' $
+        else                          print,\\='<onechar>\\='
   endif
 end"
   :group 'idlwave-shell-command-setup
@@ -1445,12 +1445,8 @@ Otherwise just move the line.  Move down unless UP is non-nil."
   (interactive "p")
   (idlwave-shell-move-or-history nil arg))
 
-;; Newer versions of comint.el changed the name of comint-filter to
-;; comint-output-filter.
-(defalias 'idlwave-shell-comint-filter
-  (if (fboundp 'comint-output-filter)
-      #'comint-output-filter
-    #'comint-filter))
+(define-obsolete-function-alias 'idlwave-shell-comint-filter
+  'comint-output-filter "25.1")
 
 (defun idlwave-shell-is-running ()
   "Return t if the shell process is running."
@@ -1496,7 +1492,7 @@ and then calls `idlwave-shell-send-command' for any pending commands."
 		     (get-buffer-create idlwave-shell-hidden-output-buffer))
 		    (goto-char (point-max))
 		    (insert string))
-		(idlwave-shell-comint-filter proc string))
+		(comint-output-filter proc string))
 	      ;; Watch for magic - need to accumulate the current line
 	      ;; since it may not be sent all at once.
 	      (if (string-match "\n" string)
@@ -1552,7 +1548,7 @@ and then calls `idlwave-shell-send-command' for any pending commands."
 		  (if idlwave-shell-hide-output
 		      (if (and idlwave-shell-show-if-error
 			       (eq idlwave-shell-current-state 'error))
-			  (idlwave-shell-comint-filter proc full-output)
+			  (comint-output-filter proc full-output)
 			;; If it's only *mostly* hidden, filter % lines,
 			;; and show anything that remains
 			(if (eq idlwave-shell-hide-output 'mostly)
@@ -1560,7 +1556,7 @@ and then calls `idlwave-shell-send-command' for any pending commands."
 				   (idlwave-shell-filter-hidden-output
 				    full-output)))
 			      (if filtered
-				  (idlwave-shell-comint-filter
+				  (comint-output-filter
 				   proc filtered))))))
 
 		  ;; Call the post-command hook
@@ -2642,7 +2638,7 @@ If ENABLE is non-nil, enable them instead."
 (defun idlwave-shell-break-in ()
   "Look for a module name near point and set a break point for it.
 The command looks for an identifier near point and sets a breakpoint
-for the first line of the corresponding module.  If MODULE is `t', set
+for the first line of the corresponding module.  If MODULE is t, set
 in the current routine."
   (interactive)
   (let* ((module (idlwave-fix-module-if-obj_new (idlwave-what-module)))

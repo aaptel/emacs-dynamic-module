@@ -809,7 +809,7 @@ Please send all bug fixes and enhancements to
 ;; on next page.  Visually, valid values are (the character `+' at right of
 ;; each column indicates that a line is printed):
 ;;
-;;		   `nil'        `follow'        `full'        `full-follow'
+;;		    nil         `follow'        `full'        `full-follow'
 ;; Current Page --------     -----------     ---------     ----------------
 ;;		1  XXXXX +   1  XXXXXXXX +   1  XXXXXX +   1  XXXXXXXXXXXXX +
 ;;		2  XXXXX +   2  XXXXXXXX +   2  XXXXXX +   2  XXXXXXXXXXXXX +
@@ -2117,7 +2117,7 @@ See also documentation for `ps-zebra-stripes' and `ps-zebra-stripe-height'."
 Visually, valid values are (the character `+' at right of each column indicates
 that a line is printed):
 
-		   `nil'        `follow'        `full'        `full-follow'
+		    nil         `follow'        `full'        `full-follow'
    Current Page --------     -----------     ---------     ----------------
 		1  XXXXX +   1  XXXXXXXX +   1  XXXXXX +   1  XXXXXXXXXXXXX +
 		2  XXXXX +   2  XXXXXXXX +   2  XXXXXX +   2  XXXXXXXXXXXXX +
@@ -4604,8 +4604,8 @@ page-height == ((floor print-height ((th + ls) * zh)) * ((th + ls) * zh)) - th
 		       (setq prompt "File is unwritable"))
 		      ((file-exists-p res)
 		       (setq prompt "File exists")
-		       (not (y-or-n-p (format "File `%s' exists; overwrite? "
-					      res))))
+		       (not (y-or-n-p (format-message
+				       "File `%s' exists; overwrite? " res))))
 		      (t nil))
 	   (setq res (read-file-name
 		      (format "%s; save PostScript to file: " prompt)
@@ -5711,7 +5711,7 @@ XSTART YSTART are the relative position for the first page in a sheet.")
 	 (error "Invalid %s `%S'%s"
 		mess size
 		(if arg
-		    (format " for `%S'" arg)
+		    (format-message " for `%S'" arg)
 		  "")))
     siz))
 
@@ -6043,10 +6043,7 @@ XSTART YSTART are the relative position for the first page in a sheet.")
 	    (progn
 	      (setq ps-razchunk q-done)
 	      (message "Formatting...%3d%%"
-		       (if (< q-todo 100)
-			   (/ (* 100 q-done) q-todo)
-			 (/ q-done (/ q-todo 100)))
-		       ))))))
+		       (floor (* 100.0 q-done) q-todo)))))))
 
 (defvar ps-last-font nil)
 

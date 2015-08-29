@@ -509,6 +509,48 @@ getting timeout messages."
   :type 'integer
   :group 'js)
 
+(defcustom js-indent-first-init nil
+  "Non-nil means specially indent the first variable declaration's initializer.
+Normally, the first declaration's initializer is unindented, and
+subsequent declarations have their identifiers aligned with it:
+
+  var o = {
+      foo: 3
+  };
+
+  var o = {
+      foo: 3
+  },
+      bar = 2;
+
+If this option has the value t, indent the first declaration's
+initializer by an additional level:
+
+  var o = {
+          foo: 3
+      };
+
+  var o = {
+          foo: 3
+      },
+      bar = 2;
+
+If this option has the value `dynamic', if there is only one declaration,
+don't indent the first one's initializer; otherwise, indent it.
+
+  var o = {
+      foo: 3
+  };
+
+  var o = {
+          foo: 3
+      },
+      bar = 2;"
+  :version "25.1"
+  :type '(choice (const nil) (const t) (const dynamic))
+  :safe 'symbolp
+  :group 'js)
+
 ;;; KeyMap
 
 (defvar js-mode-map
@@ -534,6 +576,7 @@ getting timeout messages."
   (let ((table (make-syntax-table)))
     (c-populate-syntax-table table)
     (modify-syntax-entry ?$ "_" table)
+    (modify-syntax-entry ?` "\"" table)
     table)
   "Syntax table for `js-mode'.")
 
@@ -1857,6 +1900,36 @@ In particular, return the buffer position of the first `for' kwd."
       (goto-char for-kwd)
       (current-column))))
 
+(defun js--maybe-goto-declaration-keyword-end (parse-status)
+  "Helper function for `js--proper-indentation'.
+Depending on the value of `js-indent-first-init', move
+point to the end of a variable declaration keyword so that
+indentation is aligned to that column."
+  (cond
+   ((eq js-indent-first-init t)
+    (when (looking-at js--declaration-keyword-re)
+      (goto-char (1+ (match-end 0)))))
+   ((eq js-indent-first-init 'dynamic)
+    (let ((bracket (nth 1 parse-status))
+          declaration-keyword-end
+          at-closing-bracket-p
+          comma-p)
+      (when (looking-at js--declaration-keyword-re)
+        (setq declaration-keyword-end (match-end 0))
+        (save-excursion
+          (goto-char bracket)
+          (setq at-closing-bracket-p
+                (condition-case nil
+                    (progn
+                      (forward-sexp)
+                      t)
+                  (error nil)))
+          (when at-closing-bracket-p
+            (while (forward-comment 1))
+            (setq comma-p (looking-at-p ","))))
+        (when comma-p
+          (goto-char (1+ declaration-keyword-end))))))))
+
 (defun js--proper-indentation (parse-status)
   "Return the proper indentation for the current line."
   (save-excursion
@@ -1890,6 +1963,7 @@ In particular, return the buffer position of the first `for' kwd."
                    (skip-syntax-backward " ")
                    (when (eq (char-before) ?\)) (backward-list))
                    (back-to-indentation)
+                   (js--maybe-goto-declaration-keyword-end parse-status)
                    (let* ((in-switch-p (unless same-indent-p
                                          (looking-at "\\_<switch\\_>")))
                           (same-indent-p (or same-indent-p
@@ -1928,8 +2002,9 @@ In particular, return the buffer position of the first `for' kwd."
   (let* ((parse-status
           (save-excursion (syntax-ppss (point-at-bol))))
          (offset (- (point) (save-excursion (back-to-indentation) (point)))))
-    (indent-line-to (js--proper-indentation parse-status))
-    (when (> offset 0) (forward-char offset))))
+    (unless (nth 3 parse-status)
+      (indent-line-to (js--proper-indentation parse-status))
+      (when (> offset 0) (forward-char offset)))))
 
 ;;; Filling
 
@@ -2777,10 +2852,6 @@ with `js--js-encode-value'."
 (defsubst js--js-true (value)
   (not (js--js-not value)))
 
-;; The somewhat complex code layout confuses the byte-compiler into
-;; thinking this function "might not be defined at runtime".
-(declare-function js--optimize-arglist "js" (arglist))
-
 (eval-and-compile
   (defun js--optimize-arglist (arglist)
     "Convert immediate js< and js! references to deferred ones."
@@ -3426,7 +3497,7 @@ If one hasn't been set, or if it's stale, prompt for a new one."
 ;;; Main Function
 
 ;;;###autoload
-(define-derived-mode js-mode prog-mode "Javascript"
+(define-derived-mode js-mode prog-mode "JavaScript"
   "Major mode for editing JavaScript."
   :group 'js
   (setq-local indent-line-function 'js-indent-line)
@@ -3457,7 +3528,7 @@ If one hasn't been set, or if it's stale, prompt for a new one."
 
   ;; for filling, pretend we're cc-mode
   (setq c-comment-prefix-regexp "//+\\|\\**"
-        c-paragraph-start "$"
+        c-paragraph-start "\\(@[[:alpha:]]+\\>\\|$\\)"
         c-paragraph-separate "$"
         c-block-comment-prefix "* "
         c-line-comment-starter "//"
@@ -3489,9 +3560,10 @@ If one hasn't been set, or if it's stale, prompt for a new one."
   ;; the buffer containing the problem, JIT-lock will apply the
   ;; correct syntax to the regular expression literal and the problem
   ;; will mysteriously disappear.
-  ;; FIXME: We should actually do this fontification lazily by adding
+  ;; FIXME: We should instead do this fontification lazily by adding
   ;; calls to syntax-propertize wherever it's really needed.
-  (syntax-propertize (point-max)))
+  ;;(syntax-propertize (point-max))
+  )
 
 ;;;###autoload (defalias 'javascript-mode 'js-mode)
 

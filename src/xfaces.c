@@ -797,7 +797,7 @@ load_pixmap (struct frame *f, Lisp_Object name)
 
   if (bitmap_id < 0)
     {
-      add_to_log ("Invalid or undefined bitmap `%s'", name, Qnil);
+      add_to_log ("Invalid or undefined bitmap `%s'", name);
       bitmap_id = 0;
     }
   else
@@ -1099,7 +1099,7 @@ load_color2 (struct frame *f, struct face *face, Lisp_Object name,
      to the values in an existing cell. */
   if (!defined_color (f, SSDATA (name), color, true))
     {
-      add_to_log ("Unable to load color \"%s\"", name, Qnil);
+      add_to_log ("Unable to load color \"%s\"", name);
 
       switch (target_index)
 	{
@@ -1822,7 +1822,7 @@ resolve_face_name (Lisp_Object face_name, bool signal_p)
   Lisp_Object tortoise, hare;
 
   if (STRINGP (face_name))
-    face_name = intern (SSDATA (face_name));
+    face_name = Fintern (face_name, Qnil);
 
   if (NILP (face_name) || !SYMBOLP (face_name))
     return face_name;
@@ -2177,17 +2177,12 @@ merge_named_face (struct frame *f, Lisp_Object face_name, Lisp_Object *to,
 			      face_name, NAMED_MERGE_POINT_NORMAL,
 			      &named_merge_points))
     {
-      struct gcpro gcpro1;
       Lisp_Object from[LFACE_VECTOR_SIZE];
       bool ok = get_lface_attributes (f, face_name, from, false,
 				      named_merge_points);
 
       if (ok)
-	{
-	  GCPRO1 (named_merge_point.face_name);
-	  merge_face_vectors (f, from, to, named_merge_points);
-	  UNGCPRO;
-	}
+	merge_face_vectors (f, from, to, named_merge_points);
 
       return ok;
     }
@@ -2247,7 +2242,7 @@ merge_face_ref (struct frame *f, Lisp_Object face_ref, Lisp_Object *to,
 	  else
 	    {
 	      if (err_msgs)
-		add_to_log ("Invalid face color", color_name, Qnil);
+		add_to_log ("Invalid face color %S", color_name);
 	      ok = false;
 	    }
 	}
@@ -2452,7 +2447,7 @@ merge_face_ref (struct frame *f, Lisp_Object face_ref, Lisp_Object *to,
       /* FACE_REF ought to be a face name.  */
       ok = merge_named_face (f, face_ref, to, named_merge_points);
       if (!ok && err_msgs)
-	add_to_log ("Invalid face reference: %s", face_ref, Qnil);
+	add_to_log ("Invalid face reference: %s", face_ref);
     }
 
   return ok;
@@ -5700,7 +5695,7 @@ map_tty_color (struct frame *f, struct face *face,
   if (STRINGP (color)
       && SCHARS (color)
       && CONSP (Vtty_defined_color_alist)
-      && (def = assq_no_quit (color, call1 (Qtty_color_alist, frame)),
+      && (def = assoc_no_quit (color, call1 (Qtty_color_alist, frame)),
 	  CONSP (def)))
     {
       /* Associations in tty-defined-color-alist are of the form
@@ -6378,7 +6373,6 @@ syms_of_xfaces (void)
   /* Names of basic faces.  */
   DEFSYM (Qdefault, "default");
   DEFSYM (Qtool_bar, "tool-bar");
-  DEFSYM (Qregion, "region");
   DEFSYM (Qfringe, "fringe");
   DEFSYM (Qheader_line, "header-line");
   DEFSYM (Qscroll_bar, "scroll-bar");
@@ -6399,13 +6393,6 @@ syms_of_xfaces (void)
 
   /* The name of the function used to compute colors on TTYs.  */
   DEFSYM (Qtty_color_alist, "tty-color-alist");
-
-  /* Allowed scalable fonts.  A value of nil means don't allow any
-     scalable fonts.  A value of t means allow the use of any scalable
-     font.  Otherwise, value must be a list of regular expressions.  A
-     font may be scaled if its name matches a regular expression in the
-     list.  */
-  DEFSYM (Qscalable_fonts_allowed, "scalable-fonts-allowed");
 
   Vparam_value_alist = list1 (Fcons (Qnil, Qnil));
   staticpro (&Vparam_value_alist);

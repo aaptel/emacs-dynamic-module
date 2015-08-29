@@ -156,6 +156,7 @@ DESCRIPTION is the text of the news item."
 			       archive-url))
 
 (declare-function lm-commentary "lisp-mnt" (&optional file))
+(defvar tar-data-buffer)
 
 (defun package-upload-buffer-internal (pkg-desc extension &optional archive-url)
   "Upload a package whose contents are in the current buffer.
@@ -295,7 +296,7 @@ destination, prompt for one."
             ((string-match "\\.tar\\'" file)
              (tar-mode) (package-tar-file-info))
             ((string-match "\\.el\\'" file) (package-buffer-info))
-            (t (error "Unrecognized extension `%s'"
+            (t (error "Unrecognized extension ‘%s’"
                       (file-name-extension file))))))
       (package-upload-buffer-internal pkg-desc (file-name-extension file)))))
 

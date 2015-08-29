@@ -187,7 +187,9 @@ xg_display_open (char *display_name, Display **dpy)
 {
   GdkDisplay *gdpy;
 
+  unrequest_sigio ();  // See comment in x_display_ok, xterm.c.
   gdpy = gdk_display_open (display_name);
+  request_sigio ();
   if (!gdpy_def && gdpy)
     {
       gdpy_def = gdpy;
@@ -380,10 +382,11 @@ xg_get_image_for_pixmap (struct frame *f,
   if (STRINGP (specified_file)
       && STRINGP (file = x_find_image_file (specified_file)))
     {
+      char *encoded_file = SSDATA (ENCODE_FILE (file));
       if (! old_widget)
-        old_widget = GTK_IMAGE (gtk_image_new_from_file (SSDATA (file)));
+        old_widget = GTK_IMAGE (gtk_image_new_from_file (encoded_file));
       else
-        gtk_image_set_from_file (old_widget, SSDATA (file));
+        gtk_image_set_from_file (old_widget, encoded_file);
 
       return GTK_WIDGET (old_widget);
     }
@@ -577,9 +580,9 @@ xg_check_special_colors (struct frame *f,
       gtk_style_context_get_background_color (gsty, state, &col);
 
     sprintf (buf, "rgb:%04x/%04x/%04x",
-             (int)(col.red * 65535),
-             (int)(col.green * 65535),
-             (int)(col.blue * 65535));
+             (unsigned) (col.red * 65535),
+             (unsigned) (col.green * 65535),
+             (unsigned) (col.blue * 65535));
     success_p = (XParseColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f),
 			      buf, color)
 		 != 0);
@@ -845,25 +848,41 @@ xg_clear_under_internal_border (struct frame *f)
 {
   if (FRAME_INTERNAL_BORDER_WIDTH (f) > 0)
     {
+#ifndef USE_CAIRO
       GtkWidget *wfixed = f->output_data.x->edit_widget;
 
       gtk_widget_queue_draw (wfixed);
       gdk_window_process_all_updates ();
-
-      x_clear_area (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), 0, 0,
+#endif
+      x_clear_area (f, 0, 0,
 		    FRAME_PIXEL_WIDTH (f), FRAME_INTERNAL_BORDER_WIDTH (f));
 
-      x_clear_area (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), 0, 0,
+      x_clear_area (f, 0, 0,
 		    FRAME_INTERNAL_BORDER_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
 
-      x_clear_area (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), 0,
+      x_clear_area (f, 0,
 		    FRAME_PIXEL_HEIGHT (f) - FRAME_INTERNAL_BORDER_WIDTH (f),
 		    FRAME_PIXEL_WIDTH (f), FRAME_INTERNAL_BORDER_WIDTH (f));
 
-      x_clear_area (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+      x_clear_area (f,
 		    FRAME_PIXEL_WIDTH (f) - FRAME_INTERNAL_BORDER_WIDTH (f),
 		    0, FRAME_INTERNAL_BORDER_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
     }
+}
+
+static int
+xg_get_gdk_scale (void)
+{
+  const char *sscale = getenv ("GDK_SCALE");
+
+  if (sscale)
+    {
+      long scale = atol (sscale);
+      if (0 < scale)
+	return min (scale, INT_MAX);
+    }
+
+  return 1;
 }
 
 /* Function to handle resize of our frame.  As we have a Gtk+ tool bar
@@ -916,6 +935,9 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
   int pixelheight = FRAME_TEXT_TO_PIXEL_HEIGHT (f, height);
   Lisp_Object fullscreen = get_frame_param (f, Qfullscreen);
   gint gwidth, gheight;
+  int totalheight
+    = pixelheight + FRAME_TOOLBAR_HEIGHT (f) + FRAME_MENUBAR_HEIGHT (f);
+  int totalwidth = pixelwidth + FRAME_TOOLBAR_WIDTH (f);
 
   if (FRAME_PIXEL_HEIGHT (f) == 0)
     return;
@@ -925,6 +947,13 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
 
   /* Do this before resize, as we don't know yet if we will be resized.  */
   xg_clear_under_internal_border (f);
+
+  if (FRAME_VISIBLE_P (f))
+    {
+      int scale = xg_get_gdk_scale ();
+      totalheight /= scale;
+      totalwidth /= scale;
+    }
 
   /* Resize the top level widget so rows and columns remain constant.
 
@@ -940,38 +969,33 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
       frame_size_history_add
 	(f, Qxg_frame_set_char_size_1, width, height,
 	 list2 (make_number (gheight),
-		make_number (pixelheight + FRAME_TOOLBAR_HEIGHT (f)
-			     + FRAME_MENUBAR_HEIGHT (f))));
+		make_number (totalheight)));
 
       gtk_window_resize (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
 			 gwidth,
-			 pixelheight + FRAME_TOOLBAR_HEIGHT (f)
-			 + FRAME_MENUBAR_HEIGHT (f));
+			 totalheight);
     }
   else if (EQ (fullscreen, Qfullheight) && height == FRAME_TEXT_HEIGHT (f))
     {
       frame_size_history_add
 	(f, Qxg_frame_set_char_size_2, width, height,
 	 list2 (make_number (gwidth),
-		make_number (pixelwidth + FRAME_TOOLBAR_WIDTH (f))));
+		make_number (totalwidth)));
 
       gtk_window_resize (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
-			 pixelwidth + FRAME_TOOLBAR_WIDTH (f),
+			 totalwidth,
 			 gheight);
     }
-
   else
     {
       frame_size_history_add
 	(f, Qxg_frame_set_char_size_3, width, height,
-	 list2 (make_number (pixelwidth + FRAME_TOOLBAR_WIDTH (f)),
-		make_number (pixelheight + FRAME_TOOLBAR_HEIGHT (f)
-			     + FRAME_MENUBAR_HEIGHT (f))));
+	 list2 (make_number (totalwidth),
+		make_number (totalheight)));
 
       gtk_window_resize (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
-			 pixelwidth + FRAME_TOOLBAR_WIDTH (f),
-			 pixelheight + FRAME_TOOLBAR_HEIGHT (f)
-			 + FRAME_MENUBAR_HEIGHT (f));
+			 totalwidth,
+			 totalheight);
       fullscreen = Qnil;
     }
 
@@ -1123,18 +1147,6 @@ delete_cb (GtkWidget *widget,
            GdkEvent  *event,
            gpointer user_data)
 {
-#ifdef HAVE_GTK3
-  /* The event doesn't arrive in the normal event loop.  Send event
-     here.  */
-  struct frame *f = user_data;
-  struct input_event ie;
-
-  EVENT_INIT (ie);
-  ie.kind = DELETE_WINDOW_EVENT;
-  XSETFRAME (ie.frame_or_window, f);
-  kbd_buffer_store_event (&ie);
-#endif
-
   return TRUE;
 }
 
@@ -1353,6 +1365,7 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
   int min_rows = 0, min_cols = 0;
   int win_gravity = f->win_gravity;
   Lisp_Object fs_state, frame;
+  int scale = xg_get_gdk_scale ();
 
   /* Don't set size hints during initialization; that apparently leads
      to a race condition.  See the thread at
@@ -1362,7 +1375,9 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
 
   XSETFRAME (frame, f);
   fs_state = Fframe_parameter (frame, Qfullscreen);
-  if (EQ (fs_state, Qmaximized) || EQ (fs_state, Qfullboth))
+  if ((EQ (fs_state, Qmaximized) || EQ (fs_state, Qfullboth)) &&
+      (x_wm_supports (f, FRAME_DISPLAY_INFO (f)->Xatom_net_wm_state) ||
+       x_wm_supports (f, FRAME_DISPLAY_INFO (f)->Xatom_net_wm_state_fullscreen)))
     {
       /* Don't set hints when maximized or fullscreen.  Apparently KWin and
          Gtk3 don't get along and the frame shrinks (!).
@@ -1431,6 +1446,11 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
       hint_flags &= ~GDK_HINT_POS;
       hint_flags |= GDK_HINT_USER_POS;
     }
+
+  size_hints.base_width /= scale;
+  size_hints.base_height /= scale;
+  size_hints.width_inc /= scale;
+  size_hints.height_inc /= scale;
 
   if (hint_flags != f->output_data.x->hint_flags
       || memcmp (&size_hints,
@@ -1908,9 +1928,7 @@ xg_get_file_with_chooser (struct frame *f,
   if (default_filename)
     {
       Lisp_Object file;
-      struct gcpro gcpro1;
       char *utf8_filename;
-      GCPRO1 (file);
 
       file = build_string (default_filename);
 
@@ -1935,8 +1953,6 @@ xg_get_file_with_chooser (struct frame *f,
               gtk_file_chooser_set_current_name (GTK_FILE_CHOOSER (filewin), cp);
             }
         }
-
-      UNGCPRO;
     }
 
   *func = xg_get_file_name_from_chooser;
@@ -2125,12 +2141,18 @@ xg_get_font (struct frame *f, const char *default_name)
 	  PangoWeight weight = pango_font_description_get_weight (desc);
 	  PangoStyle  style  = pango_font_description_get_style (desc);
 
+#ifdef USE_CAIRO
+#define FONT_TYPE_WANTED (Qftcr)
+#else
+#define FONT_TYPE_WANTED (Qxft)
+#endif
 	  font = CALLN (Ffont_spec,
 			QCname, build_string (name),
 			QCsize, make_float (pango_units_to_double (size)),
 			QCweight, XG_WEIGHT_TO_SYMBOL (weight),
 			QCslant, XG_STYLE_TO_SYMBOL (style),
-			QCtype, Qxft);
+			QCtype,
+                        FONT_TYPE_WANTED);
 
 	  pango_font_description_free (desc);
 	  dupstring (&x_last_font_name, name);
@@ -3516,7 +3538,9 @@ update_theme_scrollbar_width (void)
   gtk_widget_destroy (wscroll);
   g_object_unref (G_OBJECT (wscroll));
   w += 2*b;
+#ifndef HAVE_GTK3
   if (w < 16) w = 16;
+#endif
   scroll_bar_width_for_theme = w;
 }
 
@@ -3545,14 +3569,14 @@ update_theme_scrollbar_height (void)
 int
 xg_get_default_scrollbar_width (void)
 {
-  return scroll_bar_width_for_theme;
+  return scroll_bar_width_for_theme * xg_get_gdk_scale ();
 }
 
 int
 xg_get_default_scrollbar_height (void)
 {
   /* Apparently there's no default height for themes.  */
-  return scroll_bar_width_for_theme;
+  return scroll_bar_width_for_theme * xg_get_gdk_scale ();
 }
 
 /* Return the scrollbar id for X Window WID on display DPY.
@@ -3751,14 +3775,18 @@ xg_update_scrollbar_pos (struct frame *f,
                          int width,
                          int height)
 {
-
   GtkWidget *wscroll = xg_get_widget_from_map (scrollbar_id);
-
   if (wscroll)
     {
       GtkWidget *wfixed = f->output_data.x->edit_widget;
       GtkWidget *wparent = gtk_widget_get_parent (wscroll);
       gint msl;
+      int scale = xg_get_gdk_scale ();
+
+      top /= scale;
+      left /= scale;
+      height /= scale;
+      left -= (scale - 1) * ((width / scale) >> 1);
 
       /* Clear out old position.  */
       int oldx = -1, oldy = -1, oldw, oldh;
@@ -3784,14 +3812,19 @@ xg_update_scrollbar_pos (struct frame *f,
           gtk_widget_show_all (wparent);
           gtk_widget_set_size_request (wscroll, width, height);
         }
+#ifndef USE_CAIRO
       gtk_widget_queue_draw (wfixed);
       gdk_window_process_all_updates ();
+#endif
       if (oldx != -1 && oldw > 0 && oldh > 0)
-	/* Clear under old scroll bar position.  This must be done after
-	   the gtk_widget_queue_draw and gdk_window_process_all_updates
-	   above.  */
-	x_clear_area (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		      oldx, oldy, oldw, oldh);
+        {
+          /* Clear under old scroll bar position.  This must be done after
+             the gtk_widget_queue_draw and gdk_window_process_all_updates
+             above.  */
+	  oldw += (scale - 1) * oldw;
+	  oldx -= (scale - 1) * oldw;
+          x_clear_area (f, oldx, oldy, oldw, oldh);
+        }
 
       /* GTK does not redraw until the main loop is entered again, but
          if there are no X events pending we will not enter it.  So we sync
@@ -3856,7 +3889,7 @@ xg_update_horizontal_scrollbar_pos (struct frame *f,
 	/* Clear under old scroll bar position.  This must be done after
 	   the gtk_widget_queue_draw and gdk_window_process_all_updates
 	   above.  */
-	x_clear_area (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+	x_clear_area (f,
 		      oldx, oldy, oldw, oldh);
 
       /* GTK does not redraw until the main loop is entered again, but
@@ -4032,6 +4065,108 @@ xg_event_is_for_scrollbar (struct frame *f, const XEvent *event)
 
   return retval;
 }
+
+
+/***********************************************************************
+			       Printing
+ ***********************************************************************/
+#ifdef USE_CAIRO
+static GtkPrintSettings *print_settings = NULL;
+static GtkPageSetup *page_setup = NULL;
+
+void
+xg_page_setup_dialog (void)
+{
+  GtkPageSetup *new_page_setup = NULL;
+
+  if (print_settings == NULL)
+    print_settings = gtk_print_settings_new ();
+  new_page_setup = gtk_print_run_page_setup_dialog (NULL, page_setup,
+						    print_settings);
+  if (page_setup)
+    g_object_unref (page_setup);
+  page_setup = new_page_setup;
+}
+
+Lisp_Object
+xg_get_page_setup (void)
+{
+  Lisp_Object result, orientation_symbol;
+  GtkPageOrientation orientation;
+
+  if (page_setup == NULL)
+    page_setup = gtk_page_setup_new ();
+  result = list4 (Fcons (Qleft_margin,
+			 make_float (gtk_page_setup_get_left_margin (page_setup,
+								     GTK_UNIT_POINTS))),
+		  Fcons (Qright_margin,
+			 make_float (gtk_page_setup_get_right_margin (page_setup,
+								      GTK_UNIT_POINTS))),
+		  Fcons (Qtop_margin,
+			 make_float (gtk_page_setup_get_top_margin (page_setup,
+								    GTK_UNIT_POINTS))),
+		  Fcons (Qbottom_margin,
+			 make_float (gtk_page_setup_get_bottom_margin (page_setup,
+								       GTK_UNIT_POINTS))));
+  result = Fcons (Fcons (Qheight,
+			 make_float (gtk_page_setup_get_page_height (page_setup,
+								     GTK_UNIT_POINTS))),
+		  result);
+  result = Fcons (Fcons (Qwidth,
+			 make_float (gtk_page_setup_get_page_width (page_setup,
+								    GTK_UNIT_POINTS))),
+		  result);
+  orientation = gtk_page_setup_get_orientation (page_setup);
+  if (orientation == GTK_PAGE_ORIENTATION_PORTRAIT)
+    orientation_symbol = Qportrait;
+  else if (orientation == GTK_PAGE_ORIENTATION_LANDSCAPE)
+    orientation_symbol = Qlandscape;
+  else if (orientation == GTK_PAGE_ORIENTATION_REVERSE_PORTRAIT)
+    orientation_symbol = Qreverse_portrait;
+  else if (orientation == GTK_PAGE_ORIENTATION_REVERSE_LANDSCAPE)
+    orientation_symbol = Qreverse_landscape;
+  result = Fcons (Fcons (Qorientation, orientation_symbol), result);
+
+  return result;
+}
+
+static void
+draw_page (GtkPrintOperation *operation, GtkPrintContext *context,
+	   gint page_nr, gpointer user_data)
+{
+  Lisp_Object frames = *((Lisp_Object *) user_data);
+  struct frame *f = XFRAME (Fnth (make_number (page_nr), frames));
+  cairo_t *cr = gtk_print_context_get_cairo_context (context);
+
+  x_cr_draw_frame (cr, f);
+}
+
+void
+xg_print_frames_dialog (Lisp_Object frames)
+{
+  GtkPrintOperation *print;
+  GtkPrintOperationResult res;
+
+  print = gtk_print_operation_new ();
+  if (print_settings != NULL)
+    gtk_print_operation_set_print_settings (print, print_settings);
+  if (page_setup != NULL)
+    gtk_print_operation_set_default_page_setup (print, page_setup);
+  gtk_print_operation_set_n_pages (print, XINT (Flength (frames)));
+  g_signal_connect (print, "draw-page", G_CALLBACK (draw_page), &frames);
+  res = gtk_print_operation_run (print, GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG,
+                                 NULL, NULL);
+  if (res == GTK_PRINT_OPERATION_RESULT_APPLY)
+    {
+      if (print_settings != NULL)
+        g_object_unref (print_settings);
+      print_settings =
+	g_object_ref (gtk_print_operation_get_print_settings (print));
+    }
+  g_object_unref (print);
+}
+
+#endif	/* USE_CAIRO */
 
 
 
@@ -4320,8 +4455,6 @@ find_rtl_image (struct frame *f, Lisp_Object image, Lisp_Object rtl)
 {
   int i;
   Lisp_Object file, rtl_name;
-  struct gcpro gcpro1, gcpro2;
-  GCPRO2 (file, rtl_name);
 
   rtl_name = Ffile_name_nondirectory (rtl);
 

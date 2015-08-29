@@ -186,7 +186,7 @@ DEFUN ("eq", Feq, Seq, 2, 2, 0,
 }
 
 DEFUN ("null", Fnull, Snull, 1, 1, 0,
-       doc: /* Return t if OBJECT is nil.  */
+       doc: /* Return t if OBJECT is nil, and return nil otherwise.  */
        attributes: const)
   (Lisp_Object object)
 {
@@ -223,7 +223,9 @@ for example, (type-of 1) returns `integer'.  */)
 	case Lisp_Misc_Overlay:
 	  return Qoverlay;
 	case Lisp_Misc_Float:
-	  return Qfloat;
+          return Qfloat;
+        case Lisp_Misc_Finalizer:
+          return Qfinalizer;
 	}
       emacs_abort ();
 
@@ -1527,10 +1529,8 @@ usage: (setq-default [VAR VALUE]...)  */)
   (Lisp_Object args)
 {
   Lisp_Object args_left, symbol, val;
-  struct gcpro gcpro1;
 
   args_left = val = args;
-  GCPRO1 (args);
 
   while (CONSP (args_left))
     {
@@ -1540,7 +1540,6 @@ usage: (setq-default [VAR VALUE]...)  */)
       args_left = Fcdr (XCDR (args_left));
     }
 
-  UNGCPRO;
   return val;
 }
 
@@ -1645,8 +1644,10 @@ The function `default-value' gets the default value and `set-default' sets it.  
 	Lisp_Object symbol;
 	XSETSYMBOL (symbol, sym); /* In case `variable' is aliased.  */
 	if (let_shadows_global_binding_p (symbol))
-	  message ("Making %s buffer-local while let-bound!",
-		   SDATA (SYMBOL_NAME (variable)));
+	  {
+	    AUTO_STRING (format, "Making %s buffer-local while let-bound!");
+	    CALLN (Fmessage, format, SYMBOL_NAME (variable));
+	  }
       }
     }
 
@@ -1728,9 +1729,11 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
 	Lisp_Object symbol;
 	XSETSYMBOL (symbol, sym); /* In case `variable' is aliased.  */
 	if (let_shadows_global_binding_p (symbol))
-	  message ("Making %s local to %s while let-bound!",
-		   SDATA (SYMBOL_NAME (variable)),
-		   SDATA (BVAR (current_buffer, name)));
+	  {
+	    AUTO_STRING (format, "Making %s local to %s while let-bound!");
+	    CALLN (Fmessage, format, SYMBOL_NAME (variable),
+		   BVAR (current_buffer, name));
+	  }
       }
     }
 
@@ -1740,8 +1743,11 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   if (NILP (tem))
     {
       if (let_shadows_buffer_binding_p (sym))
-	message ("Making %s buffer-local while locally let-bound!",
-		 SDATA (SYMBOL_NAME (variable)));
+	{
+	  AUTO_STRING (format,
+		       "Making %s buffer-local while locally let-bound!");
+	  CALLN (Fmessage, format, SYMBOL_NAME (variable));
+	}
 
       /* Swap out any local binding for some other buffer, and make
 	 sure the current value is permanently recorded, if it's the
@@ -1906,8 +1912,10 @@ frame-local bindings).  */)
     Lisp_Object symbol;
     XSETSYMBOL (symbol, sym); /* In case `variable' is aliased.  */
     if (let_shadows_global_binding_p (symbol))
-      message ("Making %s frame-local while let-bound!",
-	       SDATA (SYMBOL_NAME (variable)));
+      {
+	AUTO_STRING (format, "Making %s frame-local while let-bound!");
+	CALLN (Fmessage, format, SYMBOL_NAME (variable));
+      }
   }
   return variable;
 }
@@ -3440,7 +3448,6 @@ syms_of_data (void)
   DEFSYM (Qlistp, "listp");
   DEFSYM (Qconsp, "consp");
   DEFSYM (Qsymbolp, "symbolp");
-  DEFSYM (Qkeywordp, "keywordp");
   DEFSYM (Qintegerp, "integerp");
   DEFSYM (Qnatnump, "natnump");
   DEFSYM (Qwholenump, "wholenump");
@@ -3454,7 +3461,6 @@ syms_of_data (void)
   DEFSYM (Qmarkerp, "markerp");
   DEFSYM (Qbuffer_or_string_p, "buffer-or-string-p");
   DEFSYM (Qinteger_or_marker_p, "integer-or-marker-p");
-  DEFSYM (Qboundp, "boundp");
   DEFSYM (Qfboundp, "fboundp");
 
   DEFSYM (Qfloatp, "floatp");
@@ -3469,10 +3475,6 @@ syms_of_data (void)
   DEFSYM (Qmany, "many");
 
   DEFSYM (Qcdr, "cdr");
-
-  /* Handle automatic advice activation.  */
-  DEFSYM (Qad_advice_info, "ad-advice-info");
-  DEFSYM (Qad_activate_internal, "ad-activate-internal");
 
   error_tail = pure_cons (Qerror, Qnil);
 
@@ -3547,6 +3549,7 @@ syms_of_data (void)
   DEFSYM (Qcons, "cons");
   DEFSYM (Qmarker, "marker");
   DEFSYM (Qoverlay, "overlay");
+  DEFSYM (Qfinalizer, "finalizer");
   DEFSYM (Qfloat, "float");
   DEFSYM (Qwindow_configuration, "window-configuration");
   DEFSYM (Qprocess, "process");
@@ -3558,7 +3561,6 @@ syms_of_data (void)
   DEFSYM (Qchar_table, "char-table");
   DEFSYM (Qbool_vector, "bool-vector");
   DEFSYM (Qhash_table, "hash-table");
-  DEFSYM (Qmisc, "misc");
 
   DEFSYM (Qdefun, "defun");
 

@@ -177,7 +177,7 @@ add_window_display_history (struct window *w, const char *msg, bool paused_p)
   ++history_idx;
 
   snprintf (buf, sizeof redisplay_history[0].trace,
-	    "%"pMu": window %p (`%s')%s\n%s",
+	    "%"pMu": window %p (%s)%s\n%s",
 	    history_tick++,
 	    ptr,
 	    ((BUFFERP (w->contents)
@@ -567,6 +567,12 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
 	      for (i = 0; i < matrix->nrows; ++i)
 		matrix->rows[i].enabled_p = false;
 	    }
+	  /* We've disabled the mode-line row, so force redrawing of
+	     the mode line, if any, since otherwise it will remain
+	     disabled in the current matrix, and expose events won't
+	     redraw it.  */
+	  if (WINDOW_WANTS_MODELINE_P (w))
+	    w->update_mode_line = 1;
 	}
       else if (matrix == w->desired_matrix)
 	{
@@ -5673,8 +5679,16 @@ additional wait period, in milliseconds; this is for backwards compatibility.
   if (duration > 0)
     {
       struct timespec t = dtotimespec (duration);
-      wait_reading_process_output (min (t.tv_sec, WAIT_READING_MAX),
-				   t.tv_nsec, 0, 0, Qnil, NULL, 0);
+      struct timespec tend = timespec_add (current_timespec (), t);
+
+      /* wait_reading_process_output returns as soon as it detects
+	 output from any subprocess, so we wait in a loop until the
+	 time expires.  */
+      do {
+	wait_reading_process_output (min (t.tv_sec, WAIT_READING_MAX),
+				     t.tv_nsec, 0, 0, Qnil, NULL, 0);
+	t = timespec_sub (tend, current_timespec ());
+      } while (timespec_sign (t) > 0);
     }
 
   return Qnil;
@@ -6030,10 +6044,10 @@ init_display (void)
     {
 #ifdef HAVE_WINDOW_SYSTEM
       if (! inhibit_window_system)
-	fprintf (stderr, "Please set the environment variable DISPLAY or TERM (see `tset').\n");
+	fprintf (stderr, "Please set the environment variable DISPLAY or TERM (see 'tset').\n");
       else
 #endif /* HAVE_WINDOW_SYSTEM */
-	fprintf (stderr, "Please set the environment variable TERM; see `tset'.\n");
+	fprintf (stderr, "Please set the environment variable TERM; see 'tset'.\n");
       exit (1);
     }
 
@@ -6239,6 +6253,7 @@ Each element can be:
 
   DEFVAR_LISP ("standard-display-table", Vstandard_display_table,
 	       doc: /* Display table to use for buffers that specify none.
+It is also used for standard output and error streams.
 See `buffer-display-table' for more information.  */);
   Vstandard_display_table = Qnil;
 

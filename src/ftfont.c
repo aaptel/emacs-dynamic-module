@@ -67,6 +67,8 @@ struct ftfont_info
   FT_Matrix matrix;
 };
 
+size_t ftfont_info_size = sizeof (struct ftfont_info);
+
 enum ftfont_cache_for
   {
     FTFONT_CACHE_FOR_FACE,
@@ -1161,8 +1163,11 @@ ftfont_list_family (struct frame *f)
 }
 
 
-static Lisp_Object
-ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
+Lisp_Object
+ftfont_open2 (struct frame *f,
+              Lisp_Object entity,
+              int pixel_size,
+              Lisp_Object font_object)
 {
   struct ftfont_info *ftfont_info;
   struct font *font;
@@ -1170,11 +1175,11 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   FT_Face ft_face;
   FT_Size ft_size;
   FT_UInt size;
-  Lisp_Object val, filename, idx, cache, font_object;
+  Lisp_Object val, filename, idx, cache;
   bool scalable;
   int spacing;
   int i;
-  int upEM;
+  double upEM;
 
   val = assq_no_quit (QCfont_entity, AREF (entity, FONT_EXTRA_INDEX));
   if (! CONSP (val))
@@ -1210,8 +1215,6 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       return Qnil;
     }
 
-  font_object = font_build_object (VECSIZE (struct ftfont_info),
-				   Qfreetype, entity, size);
   ASET (font_object, FONT_FILE_INDEX, filename);
   font = XFONT_OBJECT (font_object);
   ftfont_info = (struct ftfont_info *) font;
@@ -1232,9 +1235,9 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 	      && XINT (AREF (entity, FONT_AVGWIDTH_INDEX)) == 0);
   if (scalable)
     {
-      font->ascent = ft_face->ascender * size / upEM;
-      font->descent = - ft_face->descender * size / upEM;
-      font->height = ft_face->height * size / upEM;
+      font->ascent = ft_face->ascender * size / upEM + 0.5;
+      font->descent = - ft_face->descender * size / upEM + 0.5;
+      font->height = ft_face->height * size / upEM + 0.5;
     }
   else
     {
@@ -1252,7 +1255,7 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 #endif	/* FC_DUAL */
       )
     font->min_width = font->average_width = font->space_width
-      = (scalable ? ft_face->max_advance_width * size / upEM
+      = (scalable ? ft_face->max_advance_width * size / upEM + 0.5
 	 : ft_face->size->metrics.max_advance >> 6);
   else
     {
@@ -1282,8 +1285,10 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   font->vertical_centering = 0;
   if (scalable)
     {
-      font->underline_position = -ft_face->underline_position * size / upEM;
-      font->underline_thickness = ft_face->underline_thickness * size / upEM;
+      font->underline_position = (-ft_face->underline_position * size / upEM
+				  + 0.5);
+      font->underline_thickness = (ft_face->underline_thickness * size / upEM
+				   + 0.5);
     }
   else
     {
@@ -1294,9 +1299,26 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   return font_object;
 }
 
+static Lisp_Object
+ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
+{
+  Lisp_Object font_object;
+  FT_UInt size;
+  size = XINT (AREF (entity, FONT_SIZE_INDEX));
+  if (size == 0)
+    size = pixel_size;
+  font_object = font_build_object (VECSIZE (struct ftfont_info),
+				   Qfreetype, entity, size);
+  return ftfont_open2 (f, entity, pixel_size, font_object);
+}
+
 static void
 ftfont_close (struct font *font)
 {
+  /* FIXME: Although this function can be called while garbage-collecting,
+     the function assumes that Lisp data structures are properly-formed.
+     This invalid assumption can lead to core dumps (Bug#20890).  */
+
   struct ftfont_info *ftfont_info = (struct ftfont_info *) font;
   Lisp_Object val, cache;
 
@@ -2658,7 +2680,6 @@ syms_of_ftfont (void)
   /* Fontconfig's generic families and their aliases.  */
   DEFSYM (Qmonospace, "monospace");
   DEFSYM (Qsans_serif, "sans-serif");
-  DEFSYM (Qserif, "serif");
   DEFSYM (Qsans, "sans");
   DEFSYM (Qsans__serif, "sans serif");
 

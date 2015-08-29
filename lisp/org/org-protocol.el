@@ -394,7 +394,7 @@ The sub-protocol used to reach this function is set in
 `org-protocol-protocol-alist'.
 
 This function detects an URL, title and optional text, separated
-by '/'.  The location for a browser's bookmark looks like this:
+by `/'.  The location for a browser's bookmark looks like this:
 
   javascript:location.href='org-protocol://capture://'+ \\
         encodeURIComponent(location.href)+'/' \\
@@ -561,7 +561,7 @@ as filename."
         (let ((fname  (expand-file-name (car var))))
           (setq fname (org-protocol-check-filename-for-protocol
 		       fname (member var flist)  client))
-          (if (eq fname t) ;; greedy? We need the `t' return value.
+          (if (eq fname t) ;; greedy? We need the t return value.
               (progn
                 (ad-set-arg 0 nil)
                 (throw 'greedy t))

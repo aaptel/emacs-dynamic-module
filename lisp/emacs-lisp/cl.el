@@ -86,7 +86,7 @@
 
 (defun cl-unload-function ()
   "Stop unloading of the Common Lisp extensions."
-  (message "Cannot unload the feature `cl'")
+  (message "Cannot unload the feature ‘cl’")
   ;; Stop standard unloading!
   t)
 
@@ -397,7 +397,7 @@ lexical closures as in Common Lisp.
 	  (macroexpand-all
            `(cl-symbol-macrolet
                 ,(mapcar (lambda (x)
-                           `(,(car x) (symbol-value ,(cl-caddr x))))
+                           `(,(car x) (symbol-value ,(nth 2 x))))
                          vars)
               ,@body)
 	   (cons (cons 'function #'cl--function-convert)
@@ -410,20 +410,20 @@ lexical closures as in Common Lisp.
         ;; dynamic scoping, since with lexical scoping we'd need
         ;; (let ((foo <val>)) ...foo...).
 	`(progn
-           ,@(mapcar (lambda (x) `(defvar ,(cl-caddr x))) vars)
-           (let ,(mapcar (lambda (x) (list (cl-caddr x) (cadr x))) vars)
+           ,@(mapcar (lambda (x) `(defvar ,(nth 2 x))) vars)
+           (let ,(mapcar (lambda (x) (list (nth 2 x) (nth 1 x))) vars)
            ,(cl-sublis (mapcar (lambda (x)
-                              (cons (cl-caddr x)
-                                    `',(cl-caddr x)))
+                              (cons (nth 2 x)
+                                    `',(nth 2 x)))
                             vars)
                     ebody)))
       `(let ,(mapcar (lambda (x)
-                       (list (cl-caddr x)
+                       (list (nth 2 x)
                              `(make-symbol ,(format "--%s--" (car x)))))
                      vars)
          (setf ,@(apply #'append
                         (mapcar (lambda (x)
-                                  (list `(symbol-value ,(cl-caddr x)) (cadr x)))
+                                  (list `(symbol-value ,(nth 2 x)) (nth 1 x)))
                                 vars)))
          ,ebody))))
 
@@ -459,15 +459,15 @@ definitions, or lack thereof).
              (if (or (and (fboundp (car x))
                           (eq (car-safe (symbol-function (car x))) 'macro))
                      (cdr (assq (car x) macroexpand-all-environment)))
-                 (error "Use `labels', not `flet', to rebind macro names"))
+                 (error "Use ‘labels’, not ‘flet’, to rebind macro names"))
              (let ((func `(cl-function
                            (lambda ,(cadr x)
                              (cl-block ,(car x) ,@(cddr x))))))
                (when (cl--compiling-file)
                  ;; Bug#411.  It would be nice to fix this.
                  (and (get (car x) 'byte-compile)
-                      (error "Byte-compiling a redefinition of `%s' \
-will not work - use `labels' instead" (symbol-name (car x))))
+                      (error "Byte-compiling a redefinition of ‘%s’ \
+will not work - use ‘labels’ instead" (symbol-name (car x))))
                  ;; FIXME This affects the rest of the file, when it
                  ;; should be restricted to the flet body.
                  (and (boundp 'byte-compile-function-environment)
@@ -626,6 +626,8 @@ You can replace this form with `gv-define-setter'.
 ;;     ...the rest, and build the 5-tuple))
 (make-obsolete 'get-setf-method 'gv-letplace "24.3")
 
+(declare-function cl--arglist-args "cl-macs" (args))
+
 (defmacro define-modify-macro (name arglist func &optional doc)
   "Define a `setf'-like modify macro.
 If NAME is called, it combines its PLACE argument with the other
@@ -639,6 +641,7 @@ You can replace this macro with `gv-letplace'."
                      symbolp &optional stringp)))
   (if (memq '&key arglist)
       (error "&key not allowed in define-modify-macro"))
+  (require 'cl-macs)                    ;For cl--arglist-args.
   (let ((place (make-symbol "--cl-place--")))
     `(cl-defmacro ,name (,place ,@arglist)
        ,doc

@@ -190,6 +190,16 @@ movement commands will not work correctly."
          (calendar-redraw))
   :group 'calendar)
 
+(defcustom calendar-weekend-days '(0 6)
+  "Days of the week considered weekend days.
+0 means Sunday, 1 means Monday, and so on.
+
+Determines which day headers are fontified with
+`calendar-weekend-header'."
+  :type '(repeat integer)
+  :version "25.1"
+  :group 'calendar)
+
 (defcustom calendar-view-diary-initially-flag nil
   "Non-nil means display current date's diary entries on entry to calendar.
 The diary is displayed in another window when the calendar is first displayed,
@@ -350,7 +360,7 @@ See also `calendar-today-visible-hook'."
   "List of functions called whenever the cursor moves in the calendar.
 For example,
 
-  (add-hook 'calendar-move-hook (lambda () (diary-view-entries 1)))
+  (add-hook \\='calendar-move-hook (lambda () (diary-view-entries 1)))
 
 redisplays the diary for whatever date the cursor is moved to."
   :type 'hook
@@ -566,7 +576,7 @@ See also `calendar-intermonth-header'."
                         'font-lock-face 'font-lock-function-name-face)))
   :version "23.1")
 
-(defcustom diary-file "~/diary"
+(defcustom diary-file (locate-user-emacs-file "diary" "diary")
   "Name of the file in which one's personal diary of dates is kept.
 
 The file's entries are lines beginning with any of the forms
@@ -653,6 +663,7 @@ documentation of these hooks for details.
 
 Diary files can contain directives to include the contents of other files; for
 details, see the documentation for the variable `diary-list-entries-hook'."
+  :version "25.1"                  ; ~/diary -> locate-user-emacs-file
   :type 'file
   :group 'diary)
 
@@ -1194,7 +1205,7 @@ return negative results."
   (let ((year (calendar-extract-year date))
         offset-years)
     (cond ((zerop year)
-           (error "There was no year zero"))
+           (user-error "There was no year zero"))
           ((> year 0)
            (setq offset-years (1- year))
            (+ (calendar-day-number date) ; days this year
@@ -1379,7 +1390,7 @@ Optional integers MON and YR are used instead of today's date."
   ;; stands, almost all other calendar functions (eg holidays) would
   ;; at best have unpredictable results for such dates.
   (if (< (+ month (* 12 (1- year))) 2)
-      (error "Months before January, 1 AD cannot be displayed"))
+      (user-error "Months before January, 1 AD cannot be displayed"))
   (setq displayed-month month
         displayed-year year)
   (erase-buffer)
@@ -1453,7 +1464,7 @@ line."
      (insert
       (truncate-string-to-width
        (propertize (calendar-day-name j 'header t)
-                   'font-lock-face (if (memq j '(0 6))
+                   'font-lock-face (if (memq j calendar-weekend-days)
                                        'calendar-weekend-header
                                      'calendar-weekday-header))
        calendar-day-header-width nil ?\s)
@@ -2182,7 +2193,7 @@ in `calendar-month-name-array'.  These abbreviations are used in
 the calendar menu entries, and can also be used in the diary
 file.  Do not include a trailing `.' in the strings specified in
 this variable, though you may use such in the diary file.  By
-default, each string is the first ``calendar-abbrev-length'
+default, each string is the first `calendar-abbrev-length'
 characters of the corresponding full name."
  :group 'calendar
  :set-after '(calendar-abbrev-length calendar-month-name-array)

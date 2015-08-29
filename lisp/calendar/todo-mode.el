@@ -237,7 +237,8 @@ The final element is \"*\", indicating an unspecified month.")
 		   (when (string= (widget-value widget) todo-item-mark)
 		     (widget-put
 		      widget :error
-		      "Invalid value: must be distinct from `todo-item-mark'")
+		      (format-message
+		       "Invalid value: must be distinct from ‘todo-item-mark’"))
 		     widget)))
   :initialize 'custom-initialize-default
   :set 'todo-reset-prefix
@@ -672,7 +673,7 @@ corresponding todo file, displaying the corresponding category."
 						      todo-filtered-items-mode))))
 			  (if (funcall todo-files-function)
 			      (todo-read-file-name "Choose a todo file to visit: "
-						    nil t)
+						   nil t)
 			    (user-error "There are no todo files")))
 			 ((and (eq major-mode 'todo-archive-mode)
 			       ;; Called noninteractively via todo-quit
@@ -732,7 +733,10 @@ corresponding todo file, displaying the corresponding category."
 	(when (or (member file todo-visited)
 		  (eq todo-show-first 'first))
 	  (unless (todo-check-file file) (throw 'end nil))
-	  (set-window-buffer (selected-window)
+          ;; If todo-show is called from the minibuffer, don't visit
+          ;; the todo file there.
+	  (set-window-buffer (if (minibufferp) (minibuffer-selected-window)
+			       (selected-window))
 			     (set-buffer (find-file-noselect file 'nowarn)))
 	  (if (equal (file-name-extension (buffer-file-name)) "toda")
 	      (unless (derived-mode-p 'todo-archive-mode) (todo-archive-mode))
@@ -743,6 +747,11 @@ corresponding todo file, displaying the corresponding category."
 	    (setq todo-category-number (todo-category-number cat)))
 	  ;; If this is a new todo file, add its first category.
 	  (when (zerop (buffer-size))
+            ;; Don't confuse an erased buffer with a fresh buffer for
+            ;; adding a new todo file -- it might have been erased by
+            ;; mistake or due to a bug (e.g. Bug#20832).
+            (when (buffer-modified-p)
+              (error "Buffer is empty but modified, please report a bug"))
 	    (let (cat-added)
 	      (unwind-protect
 		  (setq todo-category-number
@@ -1338,7 +1347,7 @@ todo or done items."
 				     "the archived category will remain\n"
 				     "after deleting the todo category.  "
 				     "Do you still want to delete it\n"
-				     "(see `todo-skip-archived-categories' "
+				     "(see ‘todo-skip-archived-categories’ "
 				     "for another option)? ")))
 		  (t
 		   (todo-y-or-n-p (concat "Permanently remove category \"" cat
@@ -1686,7 +1695,8 @@ only when no items are marked."
 		   (when (string= (widget-value widget) todo-prefix)
 		     (widget-put
 		      widget :error
-		      "Invalid value: must be distinct from `todo-prefix'")
+		      (format-message
+		       "Invalid value: must be distinct from ‘todo-prefix’"))
 		     widget)))
   :set (lambda (symbol value)
 	 (custom-set-default symbol (propertize value 'face 'todo-mark)))
@@ -2606,7 +2616,8 @@ meaning to raise or lower the item's priority by one."
 	    ;; separator.
 	    (when (looking-back (concat "^"
 					(regexp-quote todo-category-done)
-					"\n"))
+					"\n")
+                                (line-beginning-position 0))
 	      (todo-backward-item))))
 	(todo-insert-with-overlays item)
 	;; If item was marked, restore the mark.
@@ -2816,7 +2827,8 @@ visible."
 			  (goto-char (point-min))
 			  (re-search-forward todo-done-string-start nil t)))
 	     (buffer-read-only nil)
-	     item done-item opoint)
+	     item done-item
+	     (opoint (point)))
 	;; Don't add empty comment to done item.
 	(setq comment (unless (zerop (length comment))
 			(concat " [" todo-comment-string ": " comment "]")))
@@ -2854,7 +2866,9 @@ visible."
 	(todo-update-categories-sexp)
 	(let ((todo-show-with-done show-done))
 	  (todo-category-select)
-	  ;; When done items are shown, put cursor on first just done item.
+	  ;; When done items are visible, put point at the top of the
+	  ;; done items section.  When done items are hidden, restore
+	  ;; point to its location prior to invoking this command.
 	  (when opoint (goto-char opoint)))))))
 
 (defun todo-item-undone ()
@@ -4228,7 +4242,8 @@ the values of FILTER and FILE-LIST."
 			   (if (and (eobp)
 				    (looking-back
 				     (concat (regexp-quote todo-done-string)
-					     "\n")))
+					     "\n")
+                                     (line-beginning-position 0)))
 			       (delete-region (point) (progn
 							(forward-line -2)
 							(point))))))
@@ -4645,7 +4660,7 @@ name in `todo-directory'.  See also the documentation string of
 		;; If the item ends with a non-comment parenthesis not
 		;; followed by a period, we lose (but we inherit that
 		;; problem from the legacy code).
-		(when (looking-back "(\\(.*\\)) ")
+		(when (looking-back "(\\(.*\\)) " (line-beginning-position))
 		  (setq comment (match-string 1))
 		  (replace-match "")
 		  (insert "[" todo-comment-string ": " comment "]"))
@@ -5021,7 +5036,7 @@ but the categories sexp differs from the current value of
 	;; Warn user if categories sexp has changed.
 	(unless (string= ssexp cats)
 	  (message (concat "The sexp at the beginning of the file differs "
-			   "from the value of `todo-categories.\n"
+			   "from the value of ‘todo-categories’.\n"
 			   "If the sexp is wrong, you can fix it with "
 			   "M-x todo-repair-categories-sexp,\n"
 			   "but note this reverts any changes you have "
@@ -5339,7 +5354,8 @@ of each other."
 		     (looking-at todo-done-string-start)
 		     (looking-back (concat "^"
 					   (regexp-quote todo-category-done)
-					   "\n")))
+					   "\n")
+                                   (line-beginning-position 0)))
 	    (setq num 1
 		  done t))
 	  (setq prefix (concat (propertize
@@ -5437,7 +5453,7 @@ dynamically create item insertion commands.")
 The list consists of item insertion parameters that can be passed
 as insertion command arguments in fixed positions.  If a position
 in the list is not occupied by the corresponding parameter, it is
-occupied by `nil'."
+occupied by nil."
   (let* ((arg (list (car todo-insert-item--args)))
 	 (args (nconc (cdr todo-insert-item--args)
 		      (list (car (todo-insert-item--argsleft
@@ -5517,7 +5533,7 @@ already entered and those still available."
 			 (todo-insert-item--this-key)
 			 todo-insert-item--argsleft)))))))))
       (setq todo-insert-item--argsleft todo-insert-item--newargsleft))
-    (when prompt (message "Press a key (so far `%s'): %s"
+    (when prompt (message "Press a key (so far ‘%s’): %s"
 			  todo-insert-item--keys-so-far prompt))
     (set-transient-map map)
     (setq todo-insert-item--argsleft argsleft)))
@@ -5571,7 +5587,7 @@ already entered and those still available."
       (`delete (todo-edit-item--text 'comment-delete))
       (`diary (todo-edit-item--diary-inclusion))
       (`nonmarking (todo-edit-item--diary-inclusion 'nonmarking))
-      (`date (let ((todo-edit-item--prompt "Press a key (so far `e d'): "))
+      (`date (let ((todo-edit-item--prompt "Press a key (so far ‘e d’): "))
 	       (todo-edit-item--next-key
 		todo-edit-item--date-param-key-alist arg)))
       (`full (progn (todo-edit-item--header 'date)
@@ -6584,7 +6600,9 @@ Added to `window-configuration-change-hook' in Todo mode."
 
 \\{todo-mode-map}"
   (if (called-interactively-p 'any)
-      (message "Type `M-x todo-show' to enter Todo mode")
+      (message "%s"
+               (substitute-command-keys
+                "Type ‘\\[todo-show]’ to enter Todo mode"))
     (todo-modes-set-1)
     (todo-modes-set-2)
     (todo-modes-set-3)

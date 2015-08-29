@@ -202,7 +202,7 @@ It is an alist of translations and corresponding keys."
 See also the documentation of `quail-define-package'."
   (nth 11 quail-current-package))
 (defsubst quail-overlay-plist ()
-  "Return property list of an overly used in the current Quail package."
+  "Return property list of an overlay used in the current Quail package."
   (nth 12 quail-current-package))
 (defsubst quail-update-translation-function ()
   "Return a function for updating translation in the current Quail package."
@@ -793,9 +793,10 @@ you type is correctly handled."
 		 keyseq)))
 
 (defun quail-insert-kbd-layout (kbd-layout)
-"Insert the visual keyboard layout table according to KBD-LAYOUT.
+  "Insert the visual keyboard layout table according to KBD-LAYOUT.
 The format of KBD-LAYOUT is the same as `quail-keyboard-layout'."
   (let (done-list layout i ch)
+    (setq bidi-paragraph-direction 'left-to-right)
     ;; At first, convert KBD-LAYOUT to the same size vector that
     ;; contains translated character or string.
     (setq layout (string-to-vector kbd-layout)
@@ -1304,7 +1305,7 @@ The returned value is a Quail map specific to KEY."
 
 (define-error 'quail-error nil)
 (defun quail-error (&rest args)
-  (signal 'quail-error (apply 'format args)))
+  (signal 'quail-error (apply #'format-message args)))
 
 (defun quail-input-string-to-events (str)
   "Convert input string STR to a list of events.
@@ -1335,9 +1336,7 @@ If STR has `advice' text property, append the following special event:
 	  overriding-local-map)
       (list key)
     (quail-setup-overlays (quail-conversion-keymap))
-    (let ((modified-p (buffer-modified-p))
-	  (buffer-undo-list t)
-	  (inhibit-modification-hooks t))
+    (with-silent-modifications
       (unwind-protect
 	  (let ((input-string (if (quail-conversion-keymap)
 				  (quail-start-conversion key)
@@ -1349,7 +1348,6 @@ If STR has `advice' text property, append the following special event:
 		  (list (aref input-string 0))
 		(quail-input-string-to-events input-string))))
 	(quail-delete-overlays)
-	(set-buffer-modified-p modified-p)
 	;; Run this hook only when the current input method doesn't require
 	;; conversion.  When conversion is required, the conversion function
 	;; should run this hook at a proper timing.
@@ -1417,7 +1415,8 @@ Return the input string."
 	      ;; KEYSEQ is not defined in the translation keymap.
 	      ;; Let's return the event(s) to the caller.
 	      (setq unread-command-events
-		    (string-to-list (this-single-command-raw-keys)))
+		    (append (this-single-command-raw-keys)
+                            unread-command-events))
 	      (setq quail-translating nil))))
 	(quail-delete-region)
 	quail-current-str)
@@ -1493,7 +1492,8 @@ Return the input string."
 	      ;; KEYSEQ is not defined in the conversion keymap.
 	      ;; Let's return the event(s) to the caller.
 	      (setq unread-command-events
-		    (string-to-list (this-single-command-raw-keys)))
+		    (append (this-single-command-raw-keys)
+                            unread-command-events))
 	      (setq quail-converting nil))))
 	(setq quail-translating nil)
 	(if (overlay-start quail-conv-overlay)

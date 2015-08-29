@@ -177,7 +177,7 @@
 		    "\\(charset\\)"
 		    "\\)\\s-+\\)?"
 		    ;; Note starting with word-syntax character:
-		    "`\\(\\sw\\(\\sw\\|\\s_\\)+\\)'")))
+		    "['`‘]\\(\\sw\\(\\sw\\|\\s_\\)+\\)['’]")))
 
 (defun coding-system-change-eol-conversion (coding-system eol-type)
   "Return a coding system which differs from CODING-SYSTEM in EOL conversion.
@@ -397,12 +397,12 @@ A coding system that requires automatic detection of text+encoding
 
 To prefer, for instance, utf-8, say the following:
 
-  \(prefer-coding-system 'utf-8)"
+  \(prefer-coding-system \\='utf-8)"
   (interactive "zPrefer coding system: ")
   (if (not (and coding-system (coding-system-p coding-system)))
-      (error "Invalid coding system `%s'" coding-system))
+      (error "Invalid coding system ‘%s’" coding-system))
   (if (memq (coding-system-type coding-system) '(raw-text undecided))
-      (error "Can't prefer the coding system `%s'" coding-system))
+      (error "Can't prefer the coding system ‘%s’" coding-system))
   (let ((base (coding-system-base coding-system))
 	(eol-type (coding-system-eol-type coding-system)))
     (set-coding-system-priority base)
@@ -417,7 +417,7 @@ To prefer, for instance, utf-8, say the following:
     (set-default-coding-systems base)
     (if (called-interactively-p 'interactive)
 	(or (eq base default-file-name-coding-system)
-	    (message "The default value of `file-name-coding-system' was not changed because the specified coding system is not suitable for file names.")))))
+	    (message "The default value of ‘file-name-coding-system’ was not changed because the specified coding system is not suitable for file names.")))))
 
 (defvar sort-coding-systems-predicate nil
   "If non-nil, a predicate function to sort coding systems.
@@ -719,14 +719,14 @@ DEFAULT is the coding system to use by default in the query."
 	      (insert "No default coding systems to try for "
 		      (if (stringp from)
 			  (format "string \"%s\"." from)
-			(format "buffer `%s'." bufname)))
+			(format-message "buffer ‘%s’." bufname)))
 	    (insert
 	     "These default coding systems were tried to encode"
 	     (if (stringp from)
 		 (concat " \"" (if (> (length from) 10)
 				   (concat (substring from 0 10) "...\"")
 				 (concat from "\"")))
-	       (format " text\nin the buffer `%s'" bufname))
+	       (format-message " text\nin the buffer ‘%s’" bufname))
 	     ":\n")
 	    (let ((pos (point))
 		  (fill-prefix "  "))
@@ -876,12 +876,12 @@ and TO is ignored."
 		(display-warning
 		 'mule
 		 (format "\
-Invalid coding system `%s' is specified
+Invalid coding system ‘%s’ is specified
 for the current buffer/file by the %s.
 It is highly recommended to fix it before writing to a file."
 			 (car auto-cs)
 			 (if (eq (cdr auto-cs) :coding) ":coding tag"
-			   (format "variable `%s'" (cdr auto-cs))))
+			   (format-message "variable ‘%s’" (cdr auto-cs))))
 		 :warning)
 		(or (yes-or-no-p "Really proceed with writing? ")
 		    (error "Save aborted"))
@@ -1451,7 +1451,7 @@ If INPUT-METHOD is nil, deactivate any current input method."
   (unless (or current-input-method (null input-method))
     (let ((slot (assoc input-method input-method-alist)))
       (if (null slot)
-	  (error "Can't activate input method `%s'" input-method))
+	  (error "Can't activate input method ‘%s’" input-method))
       (setq current-input-method-title nil)
       (let ((func (nth 2 slot)))
 	(if (functionp func)
@@ -1460,7 +1460,7 @@ If INPUT-METHOD is nil, deactivate any current input method."
 	      (progn
 		(require (cdr func))
 		(apply (car func) input-method (nthcdr 5 slot)))
-	    (error "Can't activate input method `%s'" input-method))))
+	    (error "Can't activate input method ‘%s’" input-method))))
       (setq current-input-method input-method)
       (or (stringp current-input-method-title)
 	  (setq current-input-method-title (nth 3 slot)))
@@ -1538,7 +1538,7 @@ which marks the variable `default-input-method' as set for Custom buffers."
 
   (interactive "P\np")
   (if toggle-input-method-active
-      (error "Recursive use of `toggle-input-method'"))
+      (error "Recursive use of ‘toggle-input-method’"))
   (if (and current-input-method (not arg))
       (deactivate-input-method)
     (let ((toggle-input-method-active t)
@@ -1587,8 +1587,8 @@ which marks the variable `default-input-method' as set for Custom buffers."
 			  (called-interactively-p 'interactive))
 	 (with-output-to-temp-buffer (help-buffer)
 	   (let ((elt (assoc input-method input-method-alist)))
-	     (princ (format
-		     "Input method: %s (`%s' in mode line) for %s\n  %s\n"
+	     (princ (format-message
+		     "Input method: %s (‘%s’ in mode line) for %s\n  %s\n"
 		     input-method (nth 3 elt) (nth 1 elt) (nth 4 elt))))))))))
 
 (defun describe-current-input-method ()
@@ -1598,7 +1598,7 @@ This is a subroutine for `describe-input-method'."
       (if (and (symbolp describe-current-input-method-function)
 	       (fboundp describe-current-input-method-function))
 	  (funcall describe-current-input-method-function)
-	(message "No way to describe the current input method `%s'"
+	(message "No way to describe the current input method ‘%s’"
 		 current-input-method)
 	(ding))
     (error "No input method is activated now")))
@@ -1698,7 +1698,7 @@ Usually, the input method inserts the intermediate key sequence,
 or candidate translations corresponding to the sequence,
 at point in the current buffer.
 But, if this flag is non-nil, it displays them in echo area instead."
-  :type 'hook
+  :type 'boolean
   :group 'mule)
 
 (defvar input-method-exit-on-invalid-key nil
@@ -2173,10 +2173,11 @@ See `set-language-info-alist' for use in programs."
 	      (search-backward (symbol-name (car l)))
 	      (help-xref-button 0 'help-coding-system (car l))
 	      (goto-char (point-max))
-	      (insert " (`"
+	      (insert " (‘"
 		      (coding-system-mnemonic (car l))
-		      "' in mode line):\n\t"
-		      (coding-system-doc-string (car l))
+		      "’ in mode line):\n\t"
+                      (substitute-command-keys
+                       (coding-system-doc-string (car l)))
 		      "\n")
 	      (let ((aliases (coding-system-aliases (car l))))
 		(when aliases
@@ -2518,6 +2519,9 @@ is returned.  Thus, for instance, if charset \"ISO8859-2\",
 ;; too, for setting things such as calendar holidays, ps-print paper
 ;; size, spelling dictionary.
 
+(declare-function w32-get-console-codepage "w32proc.c" ())
+(declare-function w32-get-console-output-codepage "w32proc.c" ())
+
 (defun locale-translate (locale)
   "Expand LOCALE according to `locale-translation-file-name', if possible.
 For example, translate \"swedish\" into \"sv_SE.ISO8859-1\"."
@@ -2599,7 +2603,18 @@ See also `locale-charset-language-names', `locale-language-names',
 	(setq system-time-locale locale))
 
       (if (string-match "^[a-z][a-z]" locale)
-	  (setq current-iso639-language (intern (match-string 0 locale)))))
+          ;; The value of 'current-iso639-language' is matched against
+          ;; the ':lang' property of font-spec objects when selecting
+          ;; and prioritizing available fonts for displaying
+          ;; characters; see fontset.c.
+	  (setq current-iso639-language
+                ;; The call to 'downcase' is for w32, where the
+                ;; MS-Windows locale names are in caps, as in "ENU",
+                ;; the equivalent of the Posix "en_US".  Since the
+                ;; match mentioned above uses memq, and ':lang'
+                ;; properties have lower-case values, the letter-case
+                ;; must match exactly.
+                (intern (downcase (match-string 0 locale))))))
 
     (setq woman-locale
           (or system-messages-locale
@@ -2687,14 +2702,22 @@ See also `locale-charset-language-names', `locale-language-names',
 
     ;; On Windows, override locale-coding-system,
     ;; default-file-name-coding-system, keyboard-coding-system,
-    ;; terminal-coding-system with system codepage.
+    ;; terminal-coding-system with the ANSI or console codepage.
     (when (and (eq system-type 'windows-nt)
                (boundp 'w32-ansi-code-page))
-      (let ((code-page-coding (intern (format "cp%d" w32-ansi-code-page))))
+      (let* ((code-page-coding
+              (intern (format "cp%d" (if noninteractive
+                                         (w32-get-console-codepage)
+                                       w32-ansi-code-page))))
+             (output-coding
+              (if noninteractive
+                  (intern (format "cp%d" (w32-get-console-output-codepage)))
+                code-page-coding)))
 	(when (coding-system-p code-page-coding)
+          (or output-coding (setq output-coding code-page-coding))
 	  (unless frame (setq locale-coding-system code-page-coding))
 	  (set-keyboard-coding-system code-page-coding frame)
-	  (set-terminal-coding-system code-page-coding frame)
+	  (set-terminal-coding-system output-coding frame)
 	  (setq default-file-name-coding-system code-page-coding))))
 
     (when (eq system-type 'darwin)
@@ -2941,6 +2964,14 @@ on encoding."
 	;; char with that name.
 	(setq ucs-names `(("BELL (BEL)" . 7) ,@names)))))
 
+(defun mule--ucs-names-annotation (name)
+  ;; FIXME: It would be much better to add this annotation before rather than
+  ;; after the char name, so the annotations are aligned.
+  ;; FIXME: The default behavior of displaying annotations in italics
+  ;; doesn't work well here.
+  (let ((char (assoc name ucs-names)))
+    (when char (format " (%c)" (cdr char)))))
+
 (defun read-char-by-name (prompt)
   "Read a character by its Unicode name or hex number string.
 Display PROMPT and read a string that represents a character by its
@@ -2964,7 +2995,9 @@ point or a number in hash notation, e.g. #o21430 for octal,
 	   prompt
 	   (lambda (string pred action)
 	     (if (eq action 'metadata)
-		 '(metadata (category . unicode-name))
+		 '(metadata
+		   (annotation-function . mule--ucs-names-annotation)
+		   (category . unicode-name))
 	       (complete-with-action action (ucs-names) string pred)))))
 	 (char
 	  (cond

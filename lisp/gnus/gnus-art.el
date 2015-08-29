@@ -50,6 +50,7 @@
 (autoload 'ansi-color-apply-on-region "ansi-color")
 (autoload 'mm-url-insert-file-contents-external "mm-url")
 (autoload 'mm-extern-cache-contents "mm-extern")
+(autoload 'url-expand-file-name "url-expand")
 
 (defgroup gnus-article nil
   "Article display."
@@ -254,12 +255,10 @@ This can also be a list of the above values."
   :group 'gnus-article-signature)
 
 (defcustom gnus-hidden-properties
-  (if (featurep 'xemacs)
-      ;; `intangible' is evil, but I keep it here in case it's useful.
-      '(invisible t intangible t)
-    ;; Emacs's command loop moves point out of invisible text anyway, so
-    ;; `intangible' is clearly not needed there.
-    '(invisible t))
+  ;; We use to have `intangible' here as well, but Emacs's command loop moves
+  ;; point out of invisible text anyway, so `intangible' is clearly not
+  ;; needed there.  And XEmacs doesn't handle `intangible' anyway.
+  '(invisible t)
   "Property list to use for hiding text."
   :type 'sexp
   :group 'gnus-article-hiding)
@@ -400,7 +399,7 @@ advertisements.  For example:
   "*Alist that says how to fontify certain phrases.
 Each item looks like this:
 
-  (\"_\\\\(\\\\w+\\\\)_\" 0 1 'underline)
+  (\"_\\\\(\\\\w+\\\\)_\" 0 1 \\='underline)
 
 The first element is a regular expression to be matched.  The second
 is a number that says what regular expression grouping used to find
@@ -1257,7 +1256,7 @@ how to control what it hides."
   :type gnus-article-treat-custom)
 
 (defcustom gnus-treat-strip-list-identifiers 'head
-  "Strip list identifiers from `gnus-list-identifiers`.
+  "Strip list identifiers from `gnus-list-identifiers'.
 Valid values are nil, t, `head', `first', `last', an integer or a
 predicate.  See Info node `(gnus)Customizing Articles'."
   :version "21.1"
@@ -1628,8 +1627,11 @@ It is a string, such as \"PGP\". If nil, ask user."
 
 (defvar idna-program)
 
-(defcustom gnus-use-idna (and (condition-case nil (require 'idna) (file-error))
-			      (mm-coding-system-p 'utf-8)
+(defcustom gnus-use-idna (and (mm-coding-system-p 'utf-8)
+			      (condition-case nil
+				  (require 'idna)
+				(file-error)
+				(invalid-operation))
 			      idna-program
 			      (executable-find idna-program))
   "Whether IDNA decoding of headers is used when viewing messages.
@@ -1733,7 +1735,7 @@ regexp."
     (modify-syntax-entry ?` " " table)
     table)
   "Syntax table used in article mode buffers.
-Initialized from `text-mode-syntax-table.")
+Initialized from `text-mode-syntax-table'.")
 
 (defvar gnus-save-article-buffer nil)
 
@@ -1771,19 +1773,12 @@ Initialized from `text-mode-syntax-table.")
   (re-search-forward (concat "^\\(" header "\\):") nil t))
 
 (defsubst gnus-article-hide-text (b e props)
-  "Set text PROPS on the B to E region, extending `intangible' 1 past B."
-  (gnus-add-text-properties-when 'article-type nil b e props)
-  (when (memq 'intangible props)
-    (put-text-property
-     (max (1- b) (point-min))
-     b 'intangible (cddr (memq 'intangible props)))))
+  "Set text PROPS on the B to E region."
+  (gnus-add-text-properties-when 'article-type nil b e props))
 
 (defsubst gnus-article-unhide-text (b e)
   "Remove hidden text properties from region between B and E."
-  (remove-text-properties b e gnus-hidden-properties)
-  (when (memq 'intangible gnus-hidden-properties)
-    (put-text-property (max (1- b) (point-min))
-		       b 'intangible nil)))
+  (remove-text-properties b e gnus-hidden-properties))
 
 (defun gnus-article-hide-text-type (b e type)
   "Hide text of TYPE between B and E."
@@ -1795,10 +1790,7 @@ Initialized from `text-mode-syntax-table.")
   "Unhide text of TYPE between B and E."
   (gnus-delete-wash-type type)
   (remove-text-properties
-   b e (cons 'article-type (cons type gnus-hidden-properties)))
-  (when (memq 'intangible gnus-hidden-properties)
-    (put-text-property (max (1- b) (point-min))
-		       b 'intangible nil)))
+   b e (cons 'article-type (cons type gnus-hidden-properties))))
 
 (defun gnus-article-delete-text-of-type (type)
   "Delete text of TYPE in the current buffer."
@@ -2328,7 +2320,7 @@ long lines if and only if arg is positive."
       (goto-char (point-max))
       (let ((start (point)))
 	(insert "X-Boundary: ")
-	(gnus-add-text-properties start (point) '(invisible t intangible t))
+	(gnus-add-text-properties start (point) gnus-hidden-properties)
        (insert (let (str (max (window-width)))
                  (if (featurep 'xemacs)
                      (setq max (1- max)))
@@ -2792,10 +2784,9 @@ summary buffer."
     (setq gnus-article-browse-html-temp-list nil))
   gnus-article-browse-html-temp-list)
 
-(defun gnus-article-browse-html-save-cid-content (cid handles directory abs)
+(defun gnus-article-browse-html-save-cid-content (cid handles directory)
   "Find CID content in HANDLES and save it in a file in DIRECTORY.
-Return absolute file name if ABS is non-nil, otherwise relative to
-the parent of DIRECTORY."
+Return file name relative to the parent of DIRECTORY."
   (save-match-data
     (let (file afile)
       (catch 'found
@@ -2807,7 +2798,7 @@ the parent of DIRECTORY."
 	   ((not (or (bufferp (car handle)) (stringp (car handle)))))
 	   ((equal (mm-handle-media-supertype handle) "multipart")
 	    (when (setq file (gnus-article-browse-html-save-cid-content
-			      cid handle directory abs))
+			      cid handle directory))
 	      (throw 'found file)))
 	   ((equal (concat "<" cid ">") (mm-handle-id handle))
 	    (setq file (or (mm-handle-filename handle)
@@ -2817,11 +2808,9 @@ the parent of DIRECTORY."
 					 mailcap-mime-extensions))))
 		  afile (expand-file-name file directory))
 	    (mm-save-part-to-file handle afile)
-	    (throw 'found (if abs
-			      afile
-			    (concat (file-name-nondirectory
-				     (directory-file-name directory))
-				    "/" file))))))))))
+	    (throw 'found (concat (file-name-nondirectory
+				   (directory-file-name directory))
+				  "/" file)))))))))
 
 (defun gnus-article-browse-html-parts (list &optional header)
   "View all \"text/html\" parts from LIST.
@@ -2857,13 +2846,32 @@ message header will be added to the bodies of the \"text/html\" parts."
 	       (insert content)
 	       ;; resolve cid contents
 	       (let ((case-fold-search t)
-		     abs st cid-file)
+		     st base regexp cid-file)
 		 (goto-char (point-min))
-		 (when (re-search-forward "<head[\t\n >]" nil t)
-		   (setq st (match-end 0)
-			 abs (or
-			      (not (re-search-forward "</head[\t\n >]" nil t))
-			      (re-search-backward "<base[\t\n >]" st t))))
+		 (when (and (re-search-forward "<head[\t\n >]" nil t)
+			    (progn
+			      (setq st (match-end 0))
+			      (re-search-forward "</head[\t\n >]" nil t))
+			    (re-search-backward "<base\
+\\(?:[\t\n ]+[^\t\n >]+\\)*[\t\n ]+href=\"\\([^\"]+\\)\"[^>]*>" st t))
+		   (setq base (match-string 1))
+		   (replace-match "<!--\\&-->")
+		   (setq st (point))
+		   (dolist (tag '(("a" . "href") ("form" . "action")
+				  ("img" . "src")))
+		     (setq regexp (concat "<" (car tag)
+					  "\\(?:[\t\n ]+[^\t\n >]+\\)*[\t\n ]+"
+					  (cdr tag) "=\"\\([^\"]+\\)"))
+		     (while (re-search-forward regexp nil t)
+		       (insert (prog1
+				   (condition-case nil
+				       (save-match-data
+					 (url-expand-file-name (match-string 1)
+							       base))
+				     (error (match-string 1)))
+				 (delete-region (match-beginning 1)
+						(match-end 1)))))
+		     (goto-char st)))
 		 (while (re-search-forward "\
 <img[\t\n ]+\\(?:[^\t\n >]+[\t\n ]+\\)*src=\"\\(cid:\\([^\"]+\\)\\)\""
 					   nil t)
@@ -2877,18 +2885,7 @@ message header will be added to the bodies of the \"text/html\" parts."
 				(match-string 2)
 				(with-current-buffer gnus-article-buffer
 				  gnus-article-mime-handles)
-				cid-dir abs))
-		     (when abs
-		       (setq cid-file
-			     (if (eq system-type 'cygwin)
-				 (concat "file:///"
-					 (substring
-					  (with-output-to-string
-					    (call-process "cygpath" nil
-							  standard-output
-							  nil "-m" cid-file))
-					  0 -1))
-			       (concat "file://" cid-file))))
+				cid-dir))
 		     (replace-match cid-file nil nil nil 1))))
 	       (unless content (setq content (buffer-string))))
 	     (when (or charset header (not file))
@@ -5406,9 +5403,9 @@ Compressed files like .gz and .bz2 are decompressed."
 				    'gnus-undeletable t))))
 	  ;; We're in the article header.
 	  (delete-char -1)
-	  (dolist (ovl (gnus-overlays-in btn (point)))
-	    (gnus-overlay-put ovl 'gnus-button-attachment-extra t)
-	    (gnus-overlay-put ovl 'face nil))
+	  (dolist (ovl (overlays-in btn (point)))
+	    (overlay-put ovl 'gnus-button-attachment-extra t)
+	    (overlay-put ovl 'face nil))
 	  (save-restriction
 	    (message-narrow-to-field)
 	    (let ((gnus-treatment-function-alist
@@ -5801,9 +5798,9 @@ all parts."
 				    'gnus-undeletable t))))
 	  ;; We're in the article header.
 	  (delete-char -1)
-	  (dolist (ovl (gnus-overlays-in point (point)))
-	    (gnus-overlay-put ovl 'gnus-button-attachment-extra t)
-	    (gnus-overlay-put ovl 'face nil))
+	  (dolist (ovl (overlays-in point (point)))
+	    (overlay-put ovl 'gnus-button-attachment-extra t)
+	    (overlay-put ovl 'face nil))
 	  (save-restriction
 	    (message-narrow-to-field)
 	    (let ((gnus-treatment-function-alist
@@ -5892,8 +5889,8 @@ all parts."
 		(1- (point))
 	      (point)))
     (when gnus-article-button-face
-      (gnus-overlay-put (gnus-make-overlay b e nil t)
-			'face gnus-article-button-face))
+      (overlay-put (make-overlay b e nil t)
+		   'face gnus-article-button-face))
     (widget-convert-button
      'link b e
      :mime-handle handle
@@ -6455,9 +6452,9 @@ in the body.  Use `gnus-header-face-alist' to highlight buttons."
 		  (insert "\n")
 		  (end-of-line)))
 	      (insert "\n")
-	      (dolist (ovl (gnus-overlays-in (point-min) (point)))
-		(gnus-overlay-put ovl 'gnus-button-attachment-extra t)
-		(gnus-overlay-put ovl 'face nil))
+	      (dolist (ovl (overlays-in (point-min) (point)))
+		(overlay-put ovl 'gnus-button-attachment-extra t)
+		(overlay-put ovl 'face nil))
 	      (let ((gnus-treatment-function-alist
 		     '((gnus-treat-highlight-headers
 			gnus-article-highlight-headers))))
@@ -6874,11 +6871,13 @@ KEY is a string or a vector."
       (with-current-buffer gnus-article-current-summary
 	(setq unread-command-events
 	      (if (featurep 'xemacs)
-		  (append key nil)
-		(mapcar (lambda (x) (if (and (integerp x) (>= x 128))
-					(list 'meta (- x 128))
-				      x))
-			key)))
+		  (append key unread-command-events)
+		(nconc
+		 (mapcar (lambda (x) (if (and (integerp x) (>= x 128))
+					 (list 'meta (- x 128))
+				       x))
+			 key)
+		 unread-command-events)))
 	(let ((cursor-in-echo-area t)
 	      gnus-pick-mode)
 	  (describe-key (read-key-sequence nil t))))
@@ -6896,11 +6895,13 @@ KEY is a string or a vector."
       (with-current-buffer gnus-article-current-summary
 	(setq unread-command-events
 	      (if (featurep 'xemacs)
-		  (append key nil)
-		(mapcar (lambda (x) (if (and (integerp x) (>= x 128))
-					(list 'meta (- x 128))
-				      x))
-			key)))
+		  (append key unread-command-events)
+		(nconc
+		 (mapcar (lambda (x) (if (and (integerp x) (>= x 128))
+					 (list 'meta (- x 128))
+				       x))
+			 key)
+		 unread-command-events)))
 	(let ((cursor-in-echo-area t)
 	      gnus-pick-mode)
 	  (describe-key-briefly (read-key-sequence nil t) insert)))
@@ -7030,8 +7031,7 @@ If given a prefix, show the hidden text instead."
     (gnus-check-server (gnus-find-method-for-group gnus-newsgroup-name))
     (gnus-request-group gnus-newsgroup-name t)))
 
-(eval-when-compile
-  (autoload 'nneething-get-file-name "nneething"))
+(declare-function nneething-get-file-name "nneething" (id))
 
 (defun gnus-request-article-this-buffer (article group)
   "Get an article and insert it into this buffer."
@@ -7210,6 +7210,8 @@ If given a prefix, show the hidden text instead."
 	  (set-buffer buf))))))
 
 (defun gnus-block-private-groups (group)
+  "Allows images in newsgroups to be shown, blocks images in all
+other groups."
   (if (or (gnus-news-group-p group)
 	  (gnus-member-of-valid 'global group))
       ;; Block nothing in news groups.
@@ -7829,11 +7831,11 @@ positives are possible."
     ("/\\([a-z][-a-z0-9]+\\.el\\)\\>[^.?]"
      ;; Exclude [.?] for URLs in gmane.emacs.cvs
      1 (>= gnus-button-emacs-level 8) gnus-button-handle-library 1)
-    ("`\\([a-z][-a-z0-9]+\\.el\\)'"
+    ("['`‘]\\([a-z][-a-z0-9]+\\.el\\)['’]"
      1 (>= gnus-button-emacs-level 8) gnus-button-handle-library 1)
-    ("`\\([a-z][a-z0-9]+-[a-z0-9]+-[-a-z0-9]*[a-z]\\|\\(gnus\\|message\\)-[-a-z]+\\)'"
+    ("['`‘]\\([a-z][a-z0-9]+-[a-z0-9]+-[-a-z0-9]*[a-z]\\|\\(gnus\\|message\\)-[-a-z]+\\)['’]"
      0 (>= gnus-button-emacs-level 8) gnus-button-handle-symbol 1)
-    ("`\\([a-z][a-z0-9]+-[a-z]+\\)'"
+    ("['`‘]\\([a-z][a-z0-9]+-[a-z]+\\)['’]"
      0 (>= gnus-button-emacs-level 9) gnus-button-handle-symbol 1)
     ("(setq[ \t\n]+\\([a-z][a-z0-9]+-[-a-z0-9]+\\)[ \t\n]+.+)"
      1 (>= gnus-button-emacs-level 7) gnus-button-handle-describe-variable 1)
@@ -7843,7 +7845,7 @@ positives are possible."
      0 (>= gnus-button-emacs-level 1) gnus-button-handle-describe-function 2)
     ("\\b\\(C-h\\|<?[Ff]1>?\\)[ \t\n]+v[ \t\n]+\\([^ \t\n]+\\)[ \t\n]+RET\\>"
      0 (>= gnus-button-emacs-level 1) gnus-button-handle-describe-variable 2)
-    ("`\\(\\(C-h\\|<?[Ff]1>?\\)[ \t\n]+k[ \t\n]+\\([^']+\\)\\)'"
+    ("['`‘]\\(\\(C-h\\|<?[Ff]1>?\\)[ \t\n]+k[ \t\n]+\\([^'’]+\\)\\)['’]"
      ;; Unlike the other regexps we really have to require quoting
      ;; here to determine where it ends.
      1 (>= gnus-button-emacs-level 1) gnus-button-handle-describe-key 3)
@@ -8035,8 +8037,8 @@ It does this by highlighting everything after
       (save-restriction
 	(when (and gnus-signature-face
 		   (gnus-article-narrow-to-signature))
-	  (gnus-overlay-put (gnus-make-overlay (point-min) (point-max) nil t)
-			    'face gnus-signature-face)
+	  (overlay-put (make-overlay (point-min) (point-max) nil t)
+		       'face gnus-signature-face)
 	  (widen)
 	  (gnus-article-search-signature)
 	  (let ((start (match-beginning 0))
@@ -8134,12 +8136,12 @@ url is put as the `gnus-button-url' overlay property on the button."
 				       'gnus-button-push
 				       (list beg (assq 'gnus-button-url-regexp
 						       gnus-button-alist)))))
-	  (let ((overlay (gnus-make-overlay start end)))
-	    (gnus-overlay-put overlay 'evaporate t)
-	    (gnus-overlay-put overlay 'gnus-button-url
-			      (list (mapconcat 'identity (nreverse url) "")))
+	  (let ((overlay (make-overlay start end)))
+	    (overlay-put overlay 'evaporate t)
+	    (overlay-put overlay 'gnus-button-url
+			 (list (mapconcat 'identity (nreverse url) "")))
 	    (when gnus-article-mouse-face
-	      (gnus-overlay-put overlay 'mouse-face gnus-article-mouse-face)))
+	      (overlay-put overlay 'mouse-face gnus-article-mouse-face)))
 	  t)
       (goto-char opoint))))
 
@@ -8178,8 +8180,8 @@ url is put as the `gnus-button-url' overlay property on the button."
 (defun gnus-article-add-button (from to fun &optional data text)
   "Create a button between FROM and TO with callback FUN and data DATA."
   (when gnus-article-button-face
-    (gnus-overlay-put (gnus-make-overlay from to nil t)
-		      'face gnus-article-button-face))
+    (overlay-put (make-overlay from to nil t)
+		 'face gnus-article-button-face))
   (gnus-add-text-properties
    from to
    (nconc (and gnus-article-mouse-face
@@ -8518,8 +8520,8 @@ url is put as the `gnus-button-url' overlay property on the button."
 		(1- (point))
 	      (point)))
     (when gnus-article-button-face
-      (gnus-overlay-put (gnus-make-overlay b e nil t)
-                        'face gnus-article-button-face))
+      (overlay-put (make-overlay b e nil t)
+		   'face gnus-article-button-face))
     (widget-convert-button
      'link b e
      :action 'gnus-button-prev-page
@@ -8554,8 +8556,8 @@ url is put as the `gnus-button-url' overlay property on the button."
 		(1- (point))
 	      (point)))
     (when gnus-article-button-face
-      (gnus-overlay-put (gnus-make-overlay b e nil t)
-                        'face gnus-article-button-face))
+      (overlay-put (make-overlay b e nil t)
+		   'face gnus-article-button-face))
     (widget-convert-button
      'link b e
      :action 'gnus-button-next-page
@@ -8950,8 +8952,8 @@ For example:
 		(1- (point))
 	      (point)))
     (when gnus-article-button-face
-      (gnus-overlay-put (gnus-make-overlay b e nil t)
-                        'face gnus-article-button-face))
+      (overlay-put (make-overlay b e nil t)
+		   'face gnus-article-button-face))
     (widget-convert-button
      'link b e
      :mime-handle handle

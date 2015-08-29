@@ -2099,7 +2099,7 @@ If FLAG is nil, a message is echoed if point was incremented at least
          (let* ((size (- (point-max) (point-min)))
                 (perc (if (= size 0)
                           100
-                        (/ (* 100 (- (point) (point-min))) size))))
+                        (floor (* 100.0 (- (point) (point-min))) size))))
            (when (>= perc (+ bibtex-progress-lastperc
                              bibtex-progress-interval))
              (setq bibtex-progress-lastperc perc)
@@ -2229,7 +2229,7 @@ Optional arg COMMA is as in `bibtex-enclosing-field'."
                        bibtex-entry-kill-ring))
       ;; If we copied an entry from a buffer containing only this one entry,
       ;; it can be missing the second "\n".
-      (unless (looking-back "\n\n") (insert "\n"))
+      (unless (looking-back "\n\n" (- (point) 2)) (insert "\n"))
       (unless (functionp bibtex-reference-keys)
         ;; update `bibtex-reference-keys'
         (save-excursion
@@ -4338,10 +4338,10 @@ Correct and validate again.\n"
             (goto-char (point-min))
             (forward-line 2)) ; first error message
           (display-buffer err-buf)
-          nil) ; return `nil' (i.e., buffer is invalid)
+          nil) ; return nil (i.e., buffer is invalid)
       (message "%s is syntactically correct"
                (if mark-active "Region" "Buffer"))
-      t))) ; return `t' (i.e., buffer is valid)
+      t))) ; return t (i.e., buffer is valid)
 
 (defun bibtex-validate-globally (&optional strings)
   "Check for duplicate keys in `bibtex-files'.
@@ -4395,9 +4395,9 @@ Return t if test was successful, nil otherwise."
             (goto-char (point-min))
             (forward-line 2)) ; first error message
           (display-buffer err-buf)
-          nil) ; return `nil' (i.e., buffer is invalid)
+          nil) ; return nil (i.e., buffer is invalid)
       (message "No duplicate keys.")
-      t))) ; return `t' (i.e., buffer is valid)
+      t))) ; return t (i.e., buffer is valid)
 
 (defun bibtex-next-field (begin &optional comma)
   "Move point to end of text of next BibTeX field or entry head.

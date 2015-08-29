@@ -98,7 +98,7 @@ don't know how to recognize (e.g. some macros)."
                  (stringp (setq fnfile (nth 2 form)))
                  (setq fnfile (check-declare-locate fnfile
                                                     (expand-file-name file)))
-                 ;; Use `t' to distinguish unspecified arglist from empty one.
+                 ;; Use t to distinguish unspecified arglist from empty one.
                  (or (eq t (setq arglist (if (> len 3)
                                              (nth 3 form)
                                            t)))
@@ -106,7 +106,7 @@ don't know how to recognize (e.g. some macros)."
                  (symbolp (setq fileonly (nth 4 form))))
             (setq alist (cons (list fnfile fn arglist fileonly) alist))
           ;; FIXME make this more noticeable.
-          (if form (message "Malformed declaration for `%s'" (cadr form))))))
+          (if form (message "Malformed declaration for ‘%s’" (cadr form))))))
     (message "%sdone" m)
     alist))
 
@@ -130,7 +130,7 @@ With optional argument FULL, sums the number of elements in each element."
   :group 'tools)
 
 (defcustom check-declare-ext-errors nil
-  "When non-nil, warn abount functions not found in :ext."
+  "When non-nil, warn about functions not found in :ext."
   :type 'boolean)
 
 (defun check-declare-verify (fnfile fnlist)
@@ -157,6 +157,7 @@ is a string giving details of the error."
           (setq re (format (if cflag
                                "^[ \t]*\\(DEFUN\\)[ \t]*([ \t]*\"%s\""
                              "^[ \t]*(\\(fset[ \t]+'\\|\
+cl-def\\(?:generic\\|method\\)\\|\
 def\\(?:un\\|subst\\|foo\\|method\\|class\\|\
 ine-\\(?:derived\\|generic\\|\\(?:global\\(?:ized\\)?-\\)?minor\\)-mode\\|\
 \\(?:ine-obsolete-function-\\)?alias[ \t]+'\\|\
@@ -200,8 +201,8 @@ ine-overloadable-function\\)\\)\
                               type)
                              'obsolete)
                             ;; Can't easily check arguments in these cases.
-                            ((string-match "\\`\\(def\\(alias\\|\
-method\\|class\\)\\|fset\\)\\>" type)
+                            ((string-match "\\`\\(def\\(alias\\|class\\)\\|\
+fset\\|\\(?:cl-\\)?defmethod\\)\\>" type)
                              t)
                             ((looking-at "\\((\\|nil\\)")
                              (byte-compile-arglist-signature
@@ -278,11 +279,11 @@ TYPE is a string giving the nature of the error.  Warning is displayed in
            entry))
         (warning-fill-prefix "    "))
     (display-warning 'check-declare
-                     (format "%s said `%s' was defined in %s: %s"
-                             (file-name-nondirectory file) fn
-                             (file-name-nondirectory fnfile)
-                             type)
+                     (format-message "said ‘%s’ was defined in %s: %s"
+                                     fn (file-name-nondirectory fnfile) type)
                      nil check-declare-warning-buffer)))
+
+(declare-function compilation-forget-errors "compile" ())
 
 (defun check-declare-files (&rest files)
   "Check veracity of all `declare-function' statements in FILES.
@@ -317,7 +318,7 @@ Return a list of any errors found."
 See `check-declare-directory' for more information."
   (interactive "fFile to check: ")
   (or (file-exists-p file)
-      (error "File `%s' not found" file))
+      (error "File ‘%s’ not found" file))
   (let ((m (format "Checking %s..." file))
         errlist)
     (message "%s" m)
@@ -331,8 +332,8 @@ See `check-declare-directory' for more information."
 Returns non-nil if any false statements are found."
   (interactive "DDirectory to check: ")
   (or (file-directory-p (setq root (expand-file-name root)))
-      (error "Directory `%s' not found" root))
-  (let ((m "Checking `declare-function' statements...")
+      (error "Directory ‘%s’ not found" root))
+  (let ((m "Checking ‘declare-function’ statements...")
         (m2 "Finding files with declarations...")
         errlist files)
     (message "%s" m)

@@ -95,7 +95,7 @@ Each element has the form (WHERE BYTECODE STACK) where:
                (propertize (format "%s advice: " where)
                            'face 'warning)
                (let ((fun (advice--car flist)))
-                 (if (symbolp fun) (format "`%S'" fun)
+                 (if (symbolp fun) (format-message "‘%S’" fun)
                    (let* ((name (cdr (assq 'name (advice--props flist))))
                           (doc (documentation fun t))
                           (usage (help-split-fundoc doc function)))
@@ -114,7 +114,7 @@ Each element has the form (WHERE BYTECODE STACK) where:
            (usage (help-split-fundoc origdoc function)))
       (setq usage (if (null usage)
                       (let ((arglist (help-function-arglist flist)))
-                        (format "%S" (help-make-usage function arglist)))
+                        (help--make-usage-docstring function arglist))
                     (setq origdoc (cdr usage)) (car usage)))
       (help-add-fundoc-usage (concat docstring origdoc) usage))))
 
@@ -176,7 +176,7 @@ WHERE is a symbol to select an entry in `advice--where-alist'."
           (advice--make-1 (aref main 1) (aref main 3)
                           (advice--car main) rest (advice--props main)))
       (let ((desc (assq where advice--where-alist)))
-        (unless desc (error "Unknown add-function location `%S'" where))
+        (unless desc (error "Unknown add-function location ‘%S’" where))
         (advice--make-1 (nth 1 desc) (nth 2 desc)
                         function main props)))))
 
@@ -461,7 +461,7 @@ otherwise it is named `SYMBOL@NAME'.
          (advice (cond ((null name) `(lambda ,lambda-list ,@body))
                        ((or (stringp name) (symbolp name))
                         (intern (format "%s@%s" symbol name)))
-                       (t (error "Unrecognized name spec `%S'" name)))))
+                       (t (error "Unrecognized name spec ‘%S’" name)))))
     `(prog1 ,@(and (symbolp advice) `((defun ,advice ,lambda-list ,@body)))
        (advice-add ',symbol ,where #',advice ,@(and props `(',props))))))
 
@@ -522,8 +522,9 @@ of the piece of advice."
             (while
                 (progn
                   (funcall get-next-frame)
-                  (not (and (eq (nth 1 frame2) 'apply)
-                            (eq (nth 3 frame2) inneradvice)))))
+                  (and frame2
+                       (not (and (eq (nth 1 frame2) 'apply)
+                                 (eq (nth 3 frame2) inneradvice))))))
             (funcall get-next-frame)
             (funcall get-next-frame))))
       (- i origi 1))))

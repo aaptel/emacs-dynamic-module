@@ -161,8 +161,8 @@ otherwise."
       ;; Buttons
       (when (and button (not (widgetp wid-button)))
 	(newline)
-	(insert "Here is a `" (format "%S" button-type)
-		"' button labeled `" button-label "'.\n\n"))
+	(insert (format-message "Here is a ‘%S’ button labeled ‘%s’.\n\n"
+                                button-type button-label)))
       ;; Overlays
       (when overlays
 	(newline)
@@ -539,9 +539,7 @@ relevant to POS."
                ,(let* ((beg      (point-min))
                        (end      (point-max))
                        (total    (buffer-size))
-                       (percent  (if (> total 50000) ; Avoid overflow multiplying by 100
-                                     (/ (+ (/ total 200) (1- pos))  (max (/ total 100) 1))
-                                   (/ (+ (/ total 2) (* 100 (1- pos)))  (max total 1))))
+                       (percent  (round (* 100.0 (1- pos)) (max total 1)))
                        (hscroll  (if (= (window-hscroll) 0)
                                      ""
                                    (format ", Hscroll: %d" (window-hscroll))))
@@ -618,7 +616,14 @@ relevant to POS."
                                    'help-args '(,current-input-method))
 				 "input method")
 			 (list
-			  "type \"C-x 8 RET HEX-CODEPOINT\" or \"C-x 8 RET NAME\"")))))
+                          (let ((name
+                                 (or (get-char-code-property char 'name)
+                                     (get-char-code-property char 'old-name))))
+                            (if name
+                                (format
+                                 "type \"C-x 8 RET %x\" or \"C-x 8 RET %s\""
+                                 char name)
+                              (format "type \"C-x 8 RET %x\"" char))))))))
               ("buffer code"
                ,(if multibyte-p
                     (encoded-string-description
@@ -731,8 +736,7 @@ relevant to POS."
                       (when face
                         (insert (propertize " " 'display '(space :align-to 5))
                                 "face: ")
-                        (insert (concat "`" (symbol-name face) "'"))
-                        (insert "\n")))))
+                        (insert (format-message "‘%s’\n" face))))))
               (insert "these terminal codes:\n")
               (dotimes (i (length disp-vector))
                 (insert (car (aref disp-vector i))
@@ -795,7 +799,8 @@ relevant to POS."
                   (insert "\n  " (car elt) ":"
                           (propertize " " 'display '(space :align-to 4))
                           (or (cdr elt) "-- not encodable --"))))
-              (insert "\nSee the variable `reference-point-alist' for "
+              (insert (substitute-command-keys
+		       "\nSee the variable `reference-point-alist' for ")
                       "the meaning of the rule.\n")))
 
           (unless eight-bit-p

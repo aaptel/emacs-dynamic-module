@@ -186,7 +186,7 @@ static bool in_classes (int, Lisp_Object);
 static void
 bset_syntax_table (struct buffer *b, Lisp_Object val)
 {
-  b->INTERNAL_FIELD (syntax_table) = val;
+  b->syntax_table_ = val;
 }
 
 /* Whether the syntax of the character C has the prefix flag set.  */
@@ -1129,7 +1129,7 @@ The first character of NEWENTRY should be one of the following:
   _           symbol constituent.   .   punctuation.
   (           open-parenthesis.     )   close-parenthesis.
   "           string quote.         \\   escape.
-  $           paired delimiter.     '   expression quote or prefix operator.
+  $           paired delimiter.     \\='   expression quote or prefix operator.
   <           comment starter.      >   comment ender.
   /           character-quote.      @   inherit from parent table.
   |           generic string fence. !   generic comment fence.
@@ -1333,7 +1333,11 @@ DEFUN ("internal-describe-syntax-value", Finternal_describe_syntax_value,
     insert_string (" (nestable)");
 
   if (prefix)
-    insert_string (",\n\t  is a prefix character for `backward-prefix-chars'");
+    {
+      AUTO_STRING (prefixdoc,
+		   ",\n\t  is a prefix character for `backward-prefix-chars'");
+      insert1 (Fsubstitute_command_keys (prefixdoc));
+    }
 
   return syntax;
 }
@@ -3013,7 +3017,8 @@ but before count is used up, nil is returned.  */)
 DEFUN ("backward-prefix-chars", Fbackward_prefix_chars, Sbackward_prefix_chars,
        0, 0, 0,
        doc: /* Move point backward over any number of chars with prefix syntax.
-This includes chars with "quote" or "prefix" syntax (' or p).  */)
+This includes chars with expression prefix syntax class (') and those with
+the prefix syntax flag (p).  */)
   (void)
 {
   ptrdiff_t beg = BEGV;

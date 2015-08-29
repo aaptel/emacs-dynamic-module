@@ -919,7 +919,7 @@ startup file, `~/.emacs-octave'."
       (let ((ch (read-event)))
         (if (eq ch ?\ )
             (set-window-configuration conf)
-          (setq unread-command-events (list ch)))))))
+          (push ch unread-command-events))))))
 
 (defun inferior-octave-output-digest (_proc string)
   "Special output filter for the inferior Octave process.
@@ -1064,7 +1064,7 @@ directory and makes this the current buffer's default directory."
     (pcase (and buffer-file-name (file-name-extension buffer-file-name))
       (`"cc" (funcall search
                       "\\_<DEFUN\\(?:_DLD\\)?\\s-*(\\s-*\\(\\(?:\\sw\\|\\s_\\)+\\)" 1))
-      (t (funcall search octave-function-header-regexp 3)))))
+      (_ (funcall search octave-function-header-regexp 3)))))
 
 (defun octave-function-file-p ()
   "Return non-nil if the first token is \"function\".
@@ -1820,7 +1820,7 @@ If the environment variable OCTAVE_SRCDIR is set, it is searched first."
                               (file-name-nondirectory name)))
          name
        (user-error "Aborted")))
-    (t name)))
+    (_ name)))
 
 (defvar find-tag-marker-ring)
 

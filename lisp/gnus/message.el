@@ -541,7 +541,7 @@ The provided functions are:
       newsgroup), in brackets followed by the subject
 * `message-forward-subject-name-subject' Source of article (name of author
       or newsgroup), in brackets followed by the subject
-* `message-forward-subject-fwd' Subject of article with 'Fwd:' prepended
+* `message-forward-subject-fwd' Subject of article with `Fwd:' prepended
       to it."
   :group 'message-forwarding
   :link '(custom-manual "(message)Forwarding")
@@ -989,7 +989,8 @@ are replaced:
   %n   The mail address, e.g. \"john.doe@example.invalid\".
   %N   The real name if present, e.g.: \"John Doe\", else fall
        back to the mail address.
-  %F   The first name if present, e.g.: \"John\".
+  %F   The first name if present, e.g.: \"John\", else fall
+       back to the mail address.
   %L   The last name if present, e.g.: \"Doe\".
   %Z, %z   The time zone in the numeric form, e.g.:\"+0000\".
 
@@ -1122,7 +1123,7 @@ e.g. using `gnus-posting-styles':
 
 (defcustom message-cite-style nil
   "*The overall style to be used when yanking cited text.
-Value is either `nil' (no variable overrides) or a let-style list
+Value is either nil (no variable overrides) or a let-style list
 of pairs (VARIABLE VALUE) that will be bound in
 `message-yank-original' to do the quoting.
 
@@ -1762,7 +1763,10 @@ no, only reply back to the author."
 	       (let (mucs-ignore-version-incompatibilities)
 		 (require 'un-define))
 	     (error)))
-       (condition-case nil (require 'idna) (file-error))
+       (condition-case nil
+	   (require 'idna)
+	 (file-error)
+	 (invalid-operation))
        idna-program
        (executable-find idna-program)
        (string= (idna-to-ascii "räksmörgås") "xn--rksmrgs-5wao1o")
@@ -1968,7 +1972,7 @@ You must have the \"hashcash\" binary installed, see `hashcash-path'."
   ;; "dead" nato bitnet uucp
   "Regular expression that matches a valid FQDN."
   ;; see also: gnus-button-valid-fqdn-regexp
-  :version "22.1"
+  :version "25.1"
   :group 'message-headers
   :type 'regexp)
 
@@ -2000,6 +2004,17 @@ You must have the \"hashcash\" binary installed, see `hashcash-path'."
 ;; Emacs < 24.1 do not have mail-dont-reply-to
 (unless (fboundp 'mail-dont-reply-to)
   (defalias 'mail-dont-reply-to 'rmail-dont-reply-to))
+
+(eval-and-compile
+  (if (featurep 'emacs)
+      (progn
+	(defun message-kill-all-overlays ()
+	  (mapcar #'delete-overlay (overlays-in (point-min) (point-max))))
+	(defalias 'message-window-inside-pixel-edges
+	  'window-inside-pixel-edges))
+    (defun message-kill-all-overlays ()
+      (map-extents (lambda (extent ignore) (delete-extent extent))))
+    (defalias 'message-window-inside-pixel-edges 'ignore)))
 
 
 
@@ -2960,6 +2975,30 @@ See also `message-forbidden-properties'."
 
 (autoload 'ecomplete-setup "ecomplete") ;; for Emacs <23.
 
+(defvar message-smileys '(":-)" ":)"
+                          ":-(" ":("
+                          ";-)" ";)")
+  "A list of recognized smiley faces in `message-mode'.")
+
+(defun message--syntax-propertize (beg end)
+  "Syntax-propertize certain message text specially."
+  (let ((citation-regexp (concat "^" message-cite-prefix-regexp ".*$"))
+        (smiley-regexp (regexp-opt message-smileys)))
+    (goto-char beg)
+    (while (search-forward-regexp citation-regexp
+                                  end 'noerror)
+      (let ((start (match-beginning 0))
+            (end (match-end 0)))
+        (add-text-properties start (1+ start)
+                             `(syntax-table ,(string-to-syntax "<")))
+        (add-text-properties end (min (1+ end) (point-max))
+                             `(syntax-table ,(string-to-syntax ">")))))
+    (goto-char beg)
+    (while (search-forward-regexp smiley-regexp
+            end 'noerror)
+      (add-text-properties (match-beginning 0) (match-end 0)
+                           `(syntax-table ,(string-to-syntax "."))))))
+
 ;;;###autoload
 (define-derived-mode message-mode text-mode "Message"
   "Major mode for editing mail and news to be sent.
@@ -3062,7 +3101,13 @@ M-RET    `message-newline-and-reformat' (break the line and reformat)."
     ;; multibyte is not necessary at all. -- zsh
     (mm-enable-multibyte))
   (set (make-local-variable 'indent-tabs-mode) nil) ;No tabs for indentation.
-  (mml-mode))
+  (mml-mode)
+  ;; Syntactic fontification. Helps `show-paren-mode',
+  ;; `electric-pair-mode', and C-M-* navigation by syntactically
+  ;; excluding citations and other artifacts.
+  ;;
+  (set (make-local-variable 'syntax-propertize-function) 'message--syntax-propertize)
+  (set (make-local-variable 'parse-sexp-ignore-comments) t))
 
 (defun message-setup-fill-variables ()
   "Setup message fill variables."
@@ -3963,8 +4008,6 @@ This function uses `mail-citation-hook' if that is non-nil."
   "Cite function in the standard Message manner."
   (message-cite-original-1 nil))
 
-(defvar gnus-extract-address-components)
-
 (autoload 'format-spec "format-spec")
 (autoload 'gnus-date-get-time "gnus-util")
 
@@ -3986,7 +4029,7 @@ See `message-citation-line-format'."
     (unless from
       (setq from (mail-header-from message-reply-headers)))
     (let* ((data (condition-case ()
-		     (funcall (if (boundp gnus-extract-address-components)
+		     (funcall (if (boundp 'gnus-extract-address-components)
 				  gnus-extract-address-components
 				'mail-extract-address-components)
 			      from)
@@ -4039,7 +4082,7 @@ See `message-citation-line-format'."
                       (setq fname lname lname newlname)))))
 	      ;; The following letters are not used in `format-time-string':
 	      (push ?E lst) (push "<E>" lst)
-	      (push ?F lst) (push fname lst)
+	      (push ?F lst) (push (or fname name-or-net) lst)
 	      ;; We might want to use "" instead of "<X>" later.
 	      (push ?J lst) (push "<J>" lst)
 	      (push ?K lst) (push "<K>" lst)
@@ -4348,8 +4391,7 @@ conformance."
 		to (cdar regions)
 		regions (cdr regions))
 	  (put-text-property from to 'invisible nil)
-	  (message-overlay-put (message-make-overlay from to)
-			       'face 'highlight))
+	  (overlay-put (make-overlay from to) 'face 'highlight))
 	(unless (yes-or-no-p
 		 "Invisible text found and made visible; continue sending? ")
 	  (error "Invisible text found and made visible")))))
@@ -4376,8 +4418,7 @@ conformance."
 						 control-1))
 		       (not (get-text-property
 			     (point) 'untranslated-utf-8))))
-	  (message-overlay-put (message-make-overlay (point) (1+ (point)))
-			       'face 'highlight)
+	  (overlay-put (make-overlay (point) (1+ (point))) 'face 'highlight)
 	  (setq found t))
 	(forward-char))
       (when found
@@ -7169,7 +7210,7 @@ want to get rid of this query permanently."))
 
 (defun message-is-yours-p ()
   "Non-nil means current article is yours.
-If you have added 'cancel-messages to `message-shoot-gnksa-feet', all articles
+If you have added `cancel-messages' to `message-shoot-gnksa-feet', all articles
 are yours except those that have Cancel-Lock header not belonging to you.
 Instead of shooting GNKSA feet, you should modify `message-alternative-emails'
 regexp to match all of yours addresses."
@@ -7853,14 +7894,6 @@ which specify the range to operate on."
   (goto-char (prog1 (mark t)
 	       (set-marker (mark-marker) (point)))))
 
-(defalias 'message-make-overlay 'make-overlay)
-(defalias 'message-delete-overlay 'delete-overlay)
-(defalias 'message-overlay-put 'overlay-put)
-(defun message-kill-all-overlays ()
-  (if (featurep 'xemacs)
-      (map-extents (lambda (extent ignore) (delete-extent extent)))
-    (mapcar #'delete-overlay (overlays-in (point-min) (point-max)))))
-
 ;; Support for toolbar
 (defvar tool-bar-mode)
 
@@ -8144,7 +8177,7 @@ The following arguments may contain lists of values."
 (defun message-flatten-list (list)
   "Return a new, flat list that contains all elements of LIST.
 
-\(message-flatten-list '(1 (2 3 (4 5 (6))) 7))
+\(message-flatten-list \\='(1 (2 3 (4 5 (6))) 7))
 => (1 2 3 4 5 6 7)"
   (cond ((consp list)
 	 (apply 'append (mapcar 'message-flatten-list list)))
@@ -8455,7 +8488,7 @@ Header and body are separated by `mail-header-separator'."
 	    (progn
 	      (setq sent (1+ sent))
 	      (message-send-and-exit))
-	  (message (format "Message to `%s' skipped." to))
+	  (message "Message to `%s' skipped." to)
 	  (setq skipped (1+ skipped)))
 	(when (buffer-live-p buff)
 	  (kill-buffer buff))))
@@ -8514,13 +8547,43 @@ Used in `message-simplify-recipients'."
 ;;; multipart/related and HTML support.
 
 (defun message-make-html-message-with-image-files (files)
+  "Make a message containing the current dired-marked image files."
   (interactive (list (dired-get-marked-files nil current-prefix-arg)))
   (message-mail)
   (message-goto-body)
   (insert "<#part type=text/html>\n\n")
   (dolist (file files)
     (insert (format "<img src=%S>\n\n" file)))
+  (message-toggle-image-thumbnails)
   (message-goto-to))
+
+(defun message-toggle-image-thumbnails ()
+  "For any included image files, insert a thumbnail of that image."
+  (interactive)
+  (let ((overlays (overlays-in (point-min) (point-max)))
+	(displayed nil))
+    (while overlays
+      (let ((overlay (car overlays)))
+	(when (overlay-get overlay 'put-image)
+	  (delete-overlay overlay)
+	  (setq displayed t)))
+      (setq overlays (cdr overlays)))
+    (unless displayed
+      (save-excursion
+	(goto-char (point-min))
+	(while (re-search-forward "<img.*src=\"\\([^\"]+\\)" nil t)
+	  (let ((file (match-string 1))
+		(edges (message-window-inside-pixel-edges
+			(get-buffer-window (current-buffer)))))
+	    (put-image
+	     (create-image
+	      file 'imagemagick nil
+	      :max-width (truncate
+			  (* 0.7 (- (nth 2 edges) (nth 0 edges))))
+	      :max-height (truncate
+			   (* 0.5 (- (nth 3 edges) (nth 1 edges)))))
+	     (match-beginning 0)
+	     " ")))))))
 
 (when (featurep 'xemacs)
   (require 'messagexmas)

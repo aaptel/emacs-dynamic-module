@@ -287,7 +287,7 @@ Only has effect when `ruby-use-smie' is nil."
   :group 'ruby
   :safe 'booleanp)
 
-;; FIXME Woefully under documented.  What is the point of the last `t'?.
+;; FIXME Woefully under documented.  What is the point of the last t?.
 (defcustom ruby-deep-indent-paren '(?\( ?\[ ?\] t)
   "Deep indent lists in parenthesis when non-nil.
 The value t means continuous line.
@@ -1178,9 +1178,7 @@ delimiter."
           (setq in-string (match-end 0))
           (goto-char ruby-indent-point)))
        (t
-        (error (format "Bad string %s"
-                       (buffer-substring (point) pnt)
-                       ))))))
+        (error "Bad string %s" (buffer-substring (point) pnt))))))
   (list in-string nest depth pcol))
 
 (defun ruby-parse-region (start end)
@@ -1392,7 +1390,8 @@ by `end-of-defun'."
   (interactive "p")
   (ruby-forward-sexp)
   (let (case-fold-search)
-    (when (looking-back (concat "^\\s *" ruby-block-end-re))
+    (when (looking-back (concat "^\\s *" ruby-block-end-re)
+                        (line-beginning-position))
       (forward-line 1))))
 
 (defun ruby-beginning-of-indent ()
@@ -1817,7 +1816,7 @@ It will be properly highlighted even when the call omits parens.")
   (defvar ruby-syntax-before-regexp-re
     (concat
      ;; Special tokens that can't be followed by a division operator.
-     "\\(^\\|[[=(,~;<>]"
+     "\\(^\\|[[{|=(,~;<>!]"
      ;; Distinguish ternary operator tokens.
      ;; FIXME: They don't really have to be separated with spaces.
      "\\|[?:] "
@@ -2053,8 +2052,9 @@ See `font-lock-syntax-table'.")
           "rescue"
           "retry"
           "return"
-          "then"
+          "self"
           "super"
+          "then"
           "unless"
           "undef"
           "until"
@@ -2071,10 +2071,10 @@ See `font-lock-syntax-table'.")
           "at_exit"
           "autoload"
           "autoload?"
+          "callcc"
           "catch"
           "eval"
           "exec"
-          "fork"
           "format"
           "lambda"
           "load"
@@ -2092,7 +2092,10 @@ See `font-lock-syntax-table'.")
           "sprintf"
           "syscall"
           "system"
+          "throw"
+          "trace_var"
           "trap"
+          "untrace_var"
           "warn"
           ;; keyword-like private methods on Module
           "alias_method"
@@ -2122,13 +2125,15 @@ See `font-lock-syntax-table'.")
           "__dir__"
           "__method__"
           "abort"
-          "at_exit"
           "binding"
           "block_given?"
           "caller"
           "exit"
           "exit!"
           "fail"
+          "fork"
+          "global_variables"
+          "local_variables"
           "private"
           "protected"
           "public"
@@ -2137,8 +2142,7 @@ See `font-lock-syntax-table'.")
           "readline"
           "readlines"
           "sleep"
-          "srand"
-          "throw")
+          "srand")
         'symbols))
      (1 font-lock-builtin-face))
     ;; Here-doc beginnings.
@@ -2149,13 +2153,21 @@ See `font-lock-syntax-table'.")
     "\\_<\\(?:BEGIN\\|END\\)\\_>\\|^__END__$"
     ;; Variables.
     (,(concat ruby-font-lock-keyword-beg-re
-              "\\_<\\(nil\\|self\\|true\\|false\\)\\_>")
-     1 font-lock-variable-name-face)
+              "\\_<\\(nil\\|true\\|false\\)\\_>")
+     1 font-lock-constant-face)
     ;; Keywords that evaluate to certain values.
     ("\\_<__\\(?:LINE\\|ENCODING\\|FILE\\)__\\_>"
      (0 font-lock-builtin-face))
-    ;; Symbols.
-    ("\\(^\\|[^:]\\)\\(:\\([-+~]@?\\|[/%&|^`]\\|\\*\\*?\\|<\\(<\\|=>?\\)?\\|>[>=]?\\|===?\\|=~\\|![~=]?\\|\\[\\]=?\\|@?\\(\\w\\|_\\)+\\([!?=]\\|\\b_*\\)\\|#{[^}\n\\\\]*\\(\\\\.[^}\n\\\\]*\\)*}\\)\\)"
+    ;; Symbols with symbol characters.
+    ("\\(^\\|[^:]\\)\\(:@?\\(?:\\w\\|_\\)+\\)\\([!?=]\\)?"
+     (2 font-lock-constant-face)
+     (3 (unless (and (eq (char-before (match-end 3)) ?=)
+                     (eq (char-after (match-end 3)) ?>))
+          ;; bug#18466
+          font-lock-constant-face)
+        nil t))
+    ;; Symbols with special characters.
+    ("\\(^\\|[^:]\\)\\(:\\([-+~]@?\\|[/%&|^`]\\|\\*\\*?\\|<\\(<\\|=>?\\)?\\|>[>=]?\\|===?\\|=~\\|![~=]?\\|\\[\\]=?\\|#{[^}\n\\\\]*\\(\\\\.[^}\n\\\\]*\\)*}\\)\\)"
      2 font-lock-constant-face)
     ;; Special globals.
     (,(concat "\\$\\(?:[:\"!@;,/\\._><\\$?~=*&`'+0-9]\\|-[0adFiIlpvw]\\|"

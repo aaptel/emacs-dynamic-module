@@ -749,10 +749,16 @@ as an argument to `dired-goto-file'."
   "\"Edit\" directory DIRNAME--delete, rename, print, etc. some files in it.
 Optional second argument SWITCHES specifies the `ls' options used.
 \(Interactively, use a prefix argument to be able to specify SWITCHES.)
-Dired displays a list of files in DIRNAME (which may also have
-shell wildcards appended to select certain files).  If DIRNAME is a cons,
-its first element is taken as the directory name and the rest as an explicit
-list of files to make directory entries for.
+
+If DIRNAME is a string, Dired displays a list of files in DIRNAME (which
+may also have shell wildcards appended to select certain files).
+
+If DIRNAME is a cons, its first element is taken as the directory name
+and the rest as an explicit list of files to make directory entries for.
+In this case, SWITCHES are applied to each of the files separately, and
+therefore switches that control the order of the files in the produced
+listing have no effect.
+
 \\<dired-mode-map>\
 You can flag files for deletion with \\[dired-flag-file-deletion] and then
 delete them by typing \\[dired-do-flagged-delete].
@@ -2850,11 +2856,16 @@ Any other value means to ask for each directory."
 ;; to e.g. recursive-delete-file and put it somewhere else.
 (defun dired-delete-file (file &optional recursive trash) "\
 Delete FILE or directory (possibly recursively if optional RECURSIVE is true.)
-RECURSIVE determines what to do with a non-empty directory.  If RECURSIVE is:
-nil, do not delete.
-`always', delete recursively without asking.
-`top', ask for each directory at top level.
-Anything else, ask for each sub-directory."
+RECURSIVE determines what to do with a non-empty directory.  The effect of
+its possible values is:
+
+  nil           -- do not delete.
+  `always'      -- delete recursively without asking.
+  `top'         -- ask for each directory at top level.
+  Anything else -- ask for each sub-directory.
+
+TRASH non-nil means to trash the file instead of deleting, provided
+`delete-by-moving-to-trash' (which see) is non-nil."
   ;; This test is equivalent to
   ;; (and (file-directory-p fn) (not (file-symlink-p fn)))
   ;; but more efficient
@@ -3547,7 +3558,7 @@ Thus, use \\[backward-page] to find the beginning of a group of errors."
       (let ((inhibit-read-only t))
 	(cond ((stringp log)
 	       (insert (if args
-			   (apply (function format) log args)
+			   (apply #'format-message log args)
 			 log)))
 	      ((bufferp log)
 	       (insert-buffer-substring log))
@@ -3556,7 +3567,7 @@ Thus, use \\[backward-page] to find the beginning of a group of errors."
 	       (unless (bolp)
 		 (insert "\n"))
 	       (insert (current-time-string)
-		       "\tBuffer `" (buffer-name obuf) "'\n")
+		       (format-message "\tBuffer ‘%s’\n" (buffer-name obuf)))
 	       (goto-char (point-max))
 	       (insert "\f\n")))))))
 
@@ -3800,7 +3811,8 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 	    ((memq action '(copy private move link))
 	     (let ((overwrite (and (file-exists-p to)
 				   (y-or-n-p
-				    (format "Overwrite existing file `%s'? " to))))
+				    (format-message
+				     "Overwrite existing file `%s'? " to))))
 		   ;; Binding dired-overwrite-confirmed to nil makes
 		   ;; dired-handle-overwrite a no-op.  We instead use
 		   ;; y-or-n-p, which pops a graphical menu.
@@ -3813,7 +3825,7 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 				(car (find-backup-file-name to)))
 			  (or (eq dired-backup-overwrite 'always)
 			      (y-or-n-p
-			       (format
+			       (format-message
 				"Make backup for existing file `%s'? " to))))
 		 (rename-file to backup-file 0)
 		 (dired-relist-entry backup-file))
@@ -3884,7 +3896,7 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 
 ;;; Start of automatically extracted autoloads.
 
-;;;### (autoloads nil "dired-aux" "dired-aux.el" "65f8aa57ace423283926d92dff903ca7")
+;;;### (autoloads nil "dired-aux" "dired-aux.el" "637aadf6baffb10be036ba4cec2372f9")
 ;;; Generated autoloads from dired-aux.el
 
 (autoload 'dired-diff "dired-aux" "\
@@ -4387,7 +4399,7 @@ instead.
 
 ;;;***
 
-;;;### (autoloads nil "dired-x" "dired-x.el" "d8d702a50887671b9128ba60bd9ebb8e")
+;;;### (autoloads nil "dired-x" "dired-x.el" "c1a6289ba8504b605595321436a9c04d")
 ;;; Generated autoloads from dired-x.el
 
 (autoload 'dired-jump "dired-x" "\

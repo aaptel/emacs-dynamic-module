@@ -83,8 +83,10 @@
 ;;    (add-to-list 'desktop-minor-mode-handlers
 ;;                 '(bar-mode . bar-desktop-restore))
 
-;; in the module itself, and make sure that the mode function is
-;; autoloaded.  See the docstrings of `desktop-buffer-mode-handlers' and
+;; in the module itself.  The mode function must either be autoloaded,
+;; or of the form "foobar-mode" and defined in library "foobar", so that
+;; desktop can guess how to load its definition.
+;; See the docstrings of `desktop-buffer-mode-handlers' and
 ;; `desktop-minor-mode-handlers' for more info.
 
 ;; Minor modes.
@@ -163,8 +165,8 @@ one session to another.  In particular, Emacs will save the desktop when
 it exits (this may prompt you; see the option `desktop-save').  The next
 time Emacs starts, if this mode is active it will restore the desktop.
 
-To manually save the desktop at any time, use the command `M-x desktop-save'.
-To load it, use `M-x desktop-read'.
+To manually save the desktop at any time, use the command `\\[desktop-save]'.
+To load it, use `\\[desktop-read]'.
 
 Once a desktop file exists, Emacs will auto-save it according to the
 option `desktop-auto-save-timeout'.
@@ -520,7 +522,9 @@ code like
    (add-to-list 'desktop-buffer-mode-handlers
                 '(foo-mode . foo-restore-desktop-buffer))
 
-Furthermore the major mode function must be autoloaded.")
+The major mode function must either be autoloaded, or of the form
+\"foobar-mode\" and defined in library \"foobar\", so that desktop
+can guess how to load the mode's definition.")
 
 ;;;###autoload
 (put 'desktop-buffer-mode-handlers 'risky-local-variable t)
@@ -585,7 +589,9 @@ code like
    (add-to-list 'desktop-minor-mode-handlers
                 '(foo-mode . foo-desktop-restore))
 
-Furthermore the minor mode function must be autoloaded.
+The minor mode function must either be autoloaded, or of the form
+\"foobar-mode\" and defined in library \"foobar\", so that desktop
+can guess how to load the mode's definition.
 
 See also `desktop-minor-mode-table'.")
 
@@ -756,6 +762,24 @@ is nil, ask the user where to save the desktop."
 
 ;; ----------------------------------------------------------------------------
 (defun desktop-buffer-info (buffer)
+  "Return information describing BUFFER.
+This function is not pure, as BUFFER is made current with
+`set-buffer'.
+
+Returns a list of all the necessary information to recreate the
+buffer, which is (in order):
+
+    `uniquify-buffer-base-name';
+    `buffer-file-name';
+    `buffer-name';
+    `major-mode';
+    list of minor-modes,;
+    `point';
+    `mark';
+    `buffer-read-only';
+    auxiliary information given by `desktop-save-buffer';
+    local variables;
+    auxiliary information given by `desktop-var-serdes-funs'."
   (set-buffer buffer)
   (list
    ;; base name of the buffer; replaces the buffer name if managed by uniquify
@@ -766,16 +790,13 @@ is nil, ask the user where to save the desktop."
    major-mode
    ;; minor modes
    (let (ret)
-     (mapc
-      #'(lambda (minor-mode)
-	  (and (boundp minor-mode)
-	       (symbol-value minor-mode)
-	       (let* ((special (assq minor-mode desktop-minor-mode-table))
-		      (value (cond (special (cadr special))
-				   ((functionp minor-mode) minor-mode))))
-		 (when value (add-to-list 'ret value)))))
-      (mapcar #'car minor-mode-alist))
-     ret)
+     (dolist (minor-mode (mapcar #'car minor-mode-alist) ret)
+       (and (boundp minor-mode)
+            (symbol-value minor-mode)
+            (let* ((special (assq minor-mode desktop-minor-mode-table))
+                   (value (cond (special (cadr special))
+                                ((functionp minor-mode) minor-mode))))
+              (when value (cl-pushnew value ret))))))
    ;; point and mark, and read-only status
    (point)
    (list (mark t) mark-active)
@@ -1337,9 +1358,18 @@ after that many seconds of idle time."
       nil)))
 
 (defun desktop-load-file (function)
-  "Load the file where auto loaded FUNCTION is defined."
-  (when (fboundp function)
-    (autoload-do-load (symbol-function function) function)))
+  "Load the file where auto loaded FUNCTION is defined.
+If FUNCTION is not currently defined, guess the library that defines it
+and try to load that."
+  (if (fboundp function)
+      (autoload-do-load (symbol-function function) function)
+    ;; Guess that foobar-mode is defined in foobar.
+    ;; TODO rather than guessing or requiring an autoload, the desktop
+    ;; file should record the name of the library.
+    (let ((name (symbol-name function)))
+      (if (string-match "\\`\\(.*\\)-mode\\'" name)
+          (with-demoted-errors "Require error in desktop-load-file: %S"
+              (require (intern (match-string 1 name)) nil t))))))
 
 ;; ----------------------------------------------------------------------------
 ;; Create a buffer, load its file, set its mode, ...;
@@ -1453,7 +1483,7 @@ after that many seconds of idle time."
 	    (dolist (record compacted-vars)
 	      (let*
 		  ((var (car record))
-		   (deser-fun (cl-caddr (assq var desktop-var-serdes-funs))))
+		   (deser-fun (nth 2 (assq var desktop-var-serdes-funs))))
 		(if deser-fun (set var (funcall deser-fun (cadr record))))))))
 	result))))
 
@@ -1556,9 +1586,6 @@ If there are no buffers left to create, kill the timer."
                                          (not (daemonp)))))
         (desktop-read)
         (setq inhibit-startup-screen t)))))
-
-;; So we can restore vc-dir buffers.
-(autoload 'vc-dir-mode "vc-dir" nil t)
 
 (provide 'desktop)
 

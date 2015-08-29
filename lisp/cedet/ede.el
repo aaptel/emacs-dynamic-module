@@ -339,7 +339,7 @@ Argument MENU-DEF is the menu definition to use."
 	  (progn
 	    (while (and class (slot-exists-p class 'menu))
 	      ;;(message "Looking at class %S" class)
-	      (setq menu (append menu (oref class menu))
+	      (setq menu (append menu (oref-default class menu))
 		    class (eieio-class-parent class))
 	      (if (listp class) (setq class (car class))))
 	    (append
@@ -1516,6 +1516,22 @@ It does not apply the value to buffers."
 (cl-defmethod ede-commit-local-variables ((proj ede-project))
   "Commit change to local variables in PROJ."
   nil)
+
+;;; Integration with project.el
+
+(defun project-try-ede (dir)
+  (let ((project-dir
+         (locate-dominating-file
+          dir
+          (lambda (dir)
+            (ede-directory-get-open-project dir 'ROOT)))))
+    (when project-dir
+      (ede-directory-get-open-project project-dir 'ROOT))))
+
+(cl-defmethod project-roots ((project ede-project))
+  (list (ede-project-root-directory project)))
+
+(add-hook 'project-find-functions #'project-try-ede)
 
 (provide 'ede)
 
