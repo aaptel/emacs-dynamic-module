@@ -23,8 +23,6 @@
 #include "emacs_module.h"
 #include <dynlib.h>
 
-#define MODULE_CALL_FUN_NAME "module-call"
-
 void                         syms_of_module         (void);
 static struct emacs_runtime* module_get_runtime     (void);
 static emacs_env*            module_get_environment (struct emacs_runtime *ert);
@@ -95,7 +93,7 @@ static emacs_value module_make_function (emacs_env *env,
   */
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
-  Lisp_Object Qmodule_call = intern (MODULE_CALL_FUN_NAME);
+  Lisp_Object Qmodule_call = intern ("module-call");
   Lisp_Object envptr = make_save_ptr ((void*) env);
   Lisp_Object subrptr = make_save_ptr ((void*) subr);
 
@@ -107,10 +105,7 @@ static emacs_value module_make_function (emacs_env *env,
                                           subrptr,
                                           Qarglist)));
 
-  struct gcpro gcpro1;
-  GCPRO1 (Qform);
   Lisp_Object ret = Feval (form, Qnil);
-  UNGCPRO;
 
   return (emacs_value) ret;
 }
@@ -137,7 +132,7 @@ static emacs_value module_funcall (emacs_env *env,
   return (emacs_value) ret;
 }
 
-DEFUN (MODULE_CALL_FUN_NAME, Fmodule_call, Smodule_call, 3, 3, 0,
+DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
        doc: "Call a module function")
   (Lisp_Object envptr, Lisp_Object subrptr, Lisp_Object arglist)
 {
