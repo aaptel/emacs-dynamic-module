@@ -111,8 +111,8 @@ struct emacs_env_25 {
    * Type conversion
    */
 
-  emacs_type (*type_of)(emacs_env *env,
-                        emacs_value value);
+  enum emacs_type (*type_of)(emacs_env *env,
+                             emacs_value value);
 
   int64_t (*fixnum_to_int)(emacs_env *env,
                            emacs_value value);

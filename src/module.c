@@ -48,7 +48,9 @@ static bool module_copy_string_contents (emacs_env *env,
                                          emacs_value value,
                                          char *buffer,
                                          size_t* length);
-
+static enum emacs_type module_type_of (emacs_env *env, emacs_value value);
+static emacs_value module_make_float (emacs_env *env, double d);
+static double module_float_to_c_double (emacs_env *env, emacs_value f);
 
 static int32_t next_module_id = 1;
 
@@ -149,7 +151,7 @@ static emacs_value module_make_float (emacs_env *env, double d)
 
 static double module_float_to_c_double (emacs_env *env, emacs_value f)
 {
-  return (double) XFLOAT (value_to_lisp (f));
+  return (double) XFLOAT_DATA (value_to_lisp (f));
 }
 
 static emacs_value module_intern (emacs_env *env, const char *name)
@@ -191,7 +193,7 @@ static bool module_copy_string_contents (emacs_env *env,
   return true;
 }
 
-static emacs_type module_type_of (emacs_env *env, emacs_value value)
+static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
 {
   Lisp_Object obj = value_to_lisp (value);
 
