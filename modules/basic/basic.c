@@ -5,9 +5,9 @@
   This module provides a simple `basic-sum' function.
 
   I've used the following prefixes throughout the code:
-  - Sfoo: subr (function wraper)
-  - Qfoo: symbol value
-  - Ffoo: function value
+  - Sfoo: function value (Subr)
+  - Qfoo: symbol value (Quote)
+  - Ffoo: function callable by Emacs
 
 */
 
