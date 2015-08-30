@@ -33,11 +33,11 @@ static emacs_value Fsum (emacs_env *env, int nargs, emacs_value args[])
 }
 
 /* Binds NAME to FUN */
-static void bind_function (emacs_env *env, const char *name, emacs_value Ffun)
+static void bind_function (emacs_env *env, const char *name, emacs_value Sfun)
 {
   emacs_value Qfset = env->intern (env, "fset");
   emacs_value Qsym = env->intern (env, name);
-  emacs_value args[] = { Qsym, Ffun };
+  emacs_value args[] = { Qsym, Sfun };
 
   env->funcall (env, Qfset, 2, args);
 }
