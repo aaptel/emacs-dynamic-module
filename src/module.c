@@ -21,7 +21,8 @@
 #include <config.h>
 #include "lisp.h"
 #include "emacs_module.h"
-#include <dynlib.h>
+#include "dynlib.h"
+#include "coding.h"
 
 void syms_of_module (void);
 static struct emacs_runtime* module_get_runtime (void);
@@ -41,6 +42,13 @@ static emacs_value module_make_global_ref (emacs_env *env,
                                            emacs_value ref);
 static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref);
+
+static emacs_value module_make_string (emacs_env *env, const char *str);
+static bool module_copy_string_contents (emacs_env *env,
+                                         emacs_value value,
+                                         char *buffer,
+                                         size_t* length);
+
 
 static int32_t next_module_id = 1;
 
@@ -77,6 +85,8 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->intern          = module_intern;
   env->make_function   = module_make_function;
   env->funcall         = module_funcall;
+  env->make_string     = module_make_string;
+  env->copy_string_contents = module_copy_string_contents;
 
   return env;
 }
@@ -133,6 +143,41 @@ static emacs_value module_intern (emacs_env *env, const char *name)
 {
   return lisp_to_value (intern (name));
 }
+
+static emacs_value module_make_string (emacs_env *env, const char *str)
+{
+  /* Assume STR is utf8 encoded */
+  return lisp_to_value (make_string (str, strlen (str)));
+}
+
+static bool module_copy_string_contents (emacs_env *env,
+                                         emacs_value value,
+                                         char *buffer,
+                                         size_t* length)
+{
+  Lisp_Object lisp_str = value_to_lisp (value);
+  size_t raw_size = SBYTES (lisp_str);
+
+  /*
+   * Emacs internal encoding is more-or-less UTF8, let's assume utf8
+   * encoded emacs string are the same byte size.
+   */
+
+  if (!buffer || length == 0 || *length-1 < raw_size)
+    {
+      *length = raw_size + 1;
+      return false;
+    }
+
+  Lisp_Object lisp_str_utf8 = ENCODE_UTF_8 (lisp_str);
+  eassert (raw_size == SBYTES (lisp_str_utf8));
+  *length = raw_size + 1;
+  memcpy (buffer, SDATA (lisp_str_utf8), SBYTES (lisp_str_utf8));
+  buffer[raw_size] = 0;
+
+  return true;
+}
+
 
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,

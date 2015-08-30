@@ -114,10 +114,25 @@ struct emacs_env_25 {
   emacs_value (*make_float)(emacs_env *env,
                             double value);
 
+  /*
+   * Copy the content of the lisp string VALUE to BUFFER as an utf8
+   * null-terminated string.
+   *
+   * SIZE must point to the total size of the buffer.  If BUFFER is
+   * NULL or if SIZE is not big enough, write the required buffer size
+   * to SIZE and return false.
+   *
+   * Note that SIZE must include the last null byte (e.g. "abc" needs
+   * a buffer of size 4).
+   *
+   * Returns true if the string was successfully copied.
+   */
+
   bool (*copy_string_contents)(emacs_env *env,
                                emacs_value value,
                                char *buffer,
-                               size_t* length_inout);
+                               size_t *size_inout);
+
 
   emacs_value (*make_string)(emacs_env *env,
                              const char *contents);
