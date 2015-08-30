@@ -83,6 +83,8 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->type_of         = module_type_of;
   env->make_fixnum     = module_make_fixnum;
   env->fixnum_to_int   = module_fixnum_to_int;
+  env->make_float      = module_make_float;
+  env->float_to_c_double = module_float_to_c_double;
   env->intern          = module_intern;
   env->make_function   = module_make_function;
   env->funcall         = module_funcall;
@@ -138,6 +140,16 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 {
   return (int64_t) XINT (value_to_lisp (n));
+}
+
+static emacs_value module_make_float (emacs_env *env, double d)
+{
+  return lisp_to_value (make_float (d));
+}
+
+static double module_float_to_c_double (emacs_env *env, emacs_value f)
+{
+  return (double) XFLOAT (value_to_lisp (f));
 }
 
 static emacs_value module_intern (emacs_env *env, const char *name)
@@ -310,7 +322,6 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
 
   return Qt;
 }
-
 
 void syms_of_module (void)
 {
