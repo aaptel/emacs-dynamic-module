@@ -209,7 +209,6 @@ DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
   return value_to_lisp (ret);
 }
 
-EXFUN (Fmodule_load, 1);
 DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
        doc: /* Load module FILE.  */)
   (Lisp_Object file)
