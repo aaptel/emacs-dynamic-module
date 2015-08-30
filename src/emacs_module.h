@@ -49,16 +49,18 @@ struct emacs_env_25 {
    */
 
   size_t size;
+  int32_t module_id;
 
   /*
    * Memory management
    */
 
-  emacs_value (*make_global_reference)(emacs_env *env,
-                                       emacs_value any_reference);
 
-  void (*free_global_reference)(emacs_env *env,
-                                emacs_value global_reference);
+  emacs_value (*make_global_ref)(emacs_env *env,
+                                 emacs_value any_reference);
+
+  void (*free_global_ref)(emacs_env *env,
+                          emacs_value global_reference);
 
   /*
    * Error handling
@@ -66,13 +68,13 @@ struct emacs_env_25 {
 
   bool (*error_check)(emacs_env *env);
 
-  void (*clear_error)(emacs_env *env);
+  void (*error_clear)(emacs_env *env);
 
-  bool (*get_error)(emacs_env *env,
+  bool (*error_get)(emacs_env *env,
                     emacs_value *error_symbol_out,
                     emacs_value *error_data_out);
 
-  void (*signal_error)(emacs_env *env,
+  void (*error_signal)(emacs_env *env,
                        emacs_value error_symbol,
                        emacs_value error_data);
 
