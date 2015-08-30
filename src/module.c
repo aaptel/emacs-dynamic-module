@@ -80,6 +80,7 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->module_id       = next_module_id++;
   env->make_global_ref = module_make_global_ref;
   env->free_global_ref = module_free_global_ref;
+  env->type_of         = module_type_of;
   env->make_fixnum     = module_make_fixnum;
   env->fixnum_to_int   = module_fixnum_to_int;
   env->intern          = module_intern;
@@ -178,6 +179,35 @@ static bool module_copy_string_contents (emacs_env *env,
   return true;
 }
 
+static emacs_type module_type_of (emacs_env *env, emacs_value value)
+{
+  Lisp_Object obj = value_to_lisp (value);
+
+  /* Module writer probably don't care about internal types which are
+     subject to change anyway... */
+
+  switch (XTYPE (obj))
+    {
+    case_Lisp_Int:
+      return EMACS_FIXNUM;
+    case Lisp_Symbol:
+      return EMACS_SYMBOL;
+    case Lisp_Float:
+      return EMACS_FLOAT;
+    case Lisp_String:
+      return EMACS_STRING;
+    case Lisp_Cons:
+      return EMACS_CONS;
+    case Lisp_Vectorlike:
+      if (HASH_TABLE_P (obj))
+        return EMACS_HASHTABLE;
+      if (VECTORP (obj))
+        return EMACS_VECTOR;
+    /* FALLTHROUGH */
+    default:
+      return EMACS_OTHER;
+    }
+}
 
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
