@@ -4,7 +4,7 @@ int plugin_is_GPL_compatible;
 
 static emacs_value Qnil;
 
-static emacs_value Fstring_test_a_to_b (emacs_env *env, int nargs, emacs_value args[])
+static emacs_value Fmodt_string_a_to_b (emacs_env *env, int nargs, emacs_value args[])
 {
   if (nargs != 1)
     {
@@ -52,7 +52,7 @@ int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
   Qnil = env->intern (env, "nil");
-  bind_function (env, "string-test-a-to-b", env->make_function (env, 1, 1, Fstring_test_a_to_b));
-  provide (env, "string-test");
+  bind_function (env, "modt-string-a-to-b", env->make_function (env, 1, 1, Fmodt_string_a_to_b));
+  provide (env, "modt-string");
   return 0;
 }

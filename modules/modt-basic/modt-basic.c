@@ -21,7 +21,7 @@ static int64_t sum (int64_t a, int64_t b)
   return a + b;
 }
 
-/* Proper module subr that wraps the C function */
+/* Proper module function that wraps the C function */
 static emacs_value Fsum (emacs_env *env, int nargs, emacs_value args[])
 {
   int64_t a = env->fixnum_to_int (env, args[0]);
@@ -57,8 +57,8 @@ int emacs_module_init (struct emacs_runtime *ert)
   emacs_env *env = ert->get_environment (ert);
   emacs_value Ssum = env->make_function (env, 2, 2, Fsum);
 
-  bind_function (env, "basic-sum", Ssum);
-  provide (env, "basic");
+  bind_function (env, "modt-basic-sum", Ssum);
+  provide (env, "modt-basic");
 
   return 0;
 }

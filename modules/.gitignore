@@ -1,0 +1,5 @@
+# built modules
+*.so
+
+# built DOCFILEs
+*.doc
