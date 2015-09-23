@@ -353,6 +353,7 @@ OPTION_DEFAULT_ON([gsettings],[don't compile with GSettings support])
 OPTION_DEFAULT_ON([selinux],[don't compile with SELinux support])
 OPTION_DEFAULT_ON([gnutls],[don't use -lgnutls for SSL/TLS support])
 OPTION_DEFAULT_ON([zlib],[don't compile with zlib decompression support])
+OPTION_DEFAULT_OFF([modules],[compile with dynamic modules support])
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
  [use a file notification library (LIB one of: yes, gfile, inotify, w32, no)])],
@@ -3252,6 +3253,20 @@ if test "${HAVE_ZLIB}" = "yes"; then
 fi
 AC_SUBST(LIBZ)
 
+LIBMODULES=
+if test "${with_modules}" != "no"; then
+   AC_DEFINE(HAVE_MODULES, 1, [Define to 1 if dynamic modules are enabled])
+   if test "$opsys" = "gnu-linux"; then
+      LIBMODULES="-ldl"
+   elif test "$opsys" = "cygwin"; then
+      LIBMODULES="-lcygwin"
+   else
+      # XXX: compile test program using dlopen and see whether it
+      # needs a particial lib/flag
+      true
+   fi
+fi
+
 ### Use -lpng if available, unless '--with-png=no'.
 HAVE_PNG=no
 LIBPNG=
@@ -5146,7 +5161,7 @@ optsep=
 emacs_config_features=
 for opt in XAW3D XPM JPEG TIFF GIF PNG RSVG CAIRO IMAGEMAGICK SOUND GPM DBUS \
   GCONF GSETTINGS NOTIFY ACL LIBSELINUX GNUTLS LIBXML2 FREETYPE M17N_FLT \
-  LIBOTF XFT ZLIB TOOLKIT_SCROLL_BARS X_TOOLKIT X11 NS; do
+  LIBOTF XFT ZLIB TOOLKIT_SCROLL_BARS X_TOOLKIT X11 NS MODULES; do
 
     case $opt in
       NOTIFY|ACL) eval val=\${${opt}_SUMMARY} ;;
@@ -5197,6 +5212,7 @@ echo "  Does Emacs use -lm17n-flt?                              ${HAVE_M17N_FLT}
 echo "  Does Emacs use -lotf?                                   ${HAVE_LIBOTF}"
 echo "  Does Emacs use -lxft?                                   ${HAVE_XFT}"
 echo "  Does Emacs directly use zlib?                           ${HAVE_ZLIB}"
+echo "  Does Emacs has dynamic modules support?                 ${HAVE_MODULES}"
 
 echo "  Does Emacs use toolkit scroll bars?                     ${USE_TOOLKIT_SCROLL_BARS}"
 echo
