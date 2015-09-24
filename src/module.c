@@ -217,7 +217,7 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
 {
   Lisp_Object obj = value_to_lisp (value);
 
-  /* Module writer probably don't care about internal types which are
+  /* Module writers probably don't care about internal types which are
      subject to change anyway... */
 
   switch (XTYPE (obj))
