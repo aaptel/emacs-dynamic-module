@@ -25,7 +25,7 @@ static emacs_value Fmodt_string_a_to_b (emacs_env *env, int nargs, emacs_value a
       buf[i] = 'b';
   }
 
-  return env->make_string (env, buf);
+  return env->make_string (env, buf, size-1);
 }
 
 /* Binds NAME to FUN */

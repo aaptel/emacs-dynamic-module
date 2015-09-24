@@ -44,7 +44,7 @@ static emacs_value module_make_global_ref (emacs_env *env,
 static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref);
 
-static emacs_value module_make_string (emacs_env *env, const char *str);
+static emacs_value module_make_string (emacs_env *env, const char *str, size_t lenght);
 static bool module_copy_string_contents (emacs_env *env,
                                          emacs_value value,
                                          char *buffer,
@@ -171,10 +171,10 @@ static emacs_value module_intern (emacs_env *env, const char *name)
   return lisp_to_value (intern (name));
 }
 
-static emacs_value module_make_string (emacs_env *env, const char *str)
+static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
   /* Assume STR is utf8 encoded */
-  return lisp_to_value (make_string (str, strlen (str)));
+  return lisp_to_value (make_string (str, length));
 }
 
 static bool module_copy_string_contents (emacs_env *env,

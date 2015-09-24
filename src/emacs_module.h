@@ -145,9 +145,11 @@ struct emacs_env_25 {
                                char *buffer,
                                size_t *size_inout);
 
-
+  /*
+   * Create a lisp string from a utf8 encoded string.
+   */
   emacs_value (*make_string)(emacs_env *env,
-                             const char *contents);
+                             const char *contents, size_t length);
 };
 
 #endif /* EMACS_MODULE_H */
