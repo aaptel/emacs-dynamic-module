@@ -27,6 +27,7 @@
 void syms_of_module (void);
 static struct emacs_runtime* module_get_runtime (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
+static void module_error_signal (emacs_env *env, emacs_value *sym, emacs_value *data);
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
 static emacs_value module_intern (emacs_env *env, const char *name);
@@ -83,6 +84,7 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->make_global_ref = module_make_global_ref;
   env->free_global_ref = module_free_global_ref;
   env->type_of         = module_type_of;
+  env->error_signal    = module_error_signal;
   env->make_fixnum     = module_make_fixnum;
   env->fixnum_to_int   = module_fixnum_to_int;
   env->make_float      = module_make_float;
@@ -132,6 +134,16 @@ static void module_free_global_ref (emacs_env *env,
                            Fdelq (value_to_lisp (ref),
                                   HASH_VALUE (h, i)));
     }
+}
+
+/*
+ * Like for `signal', DATA must be a list
+ *
+ * This function doesnt return.
+ */
+static void module_error_signal (emacs_env *env, emacs_value *sym, emacs_value *data)
+{
+    xsignal (value_to_lisp (sym), value_to_lisp (data));
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
