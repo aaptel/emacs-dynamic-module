@@ -53,6 +53,9 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
 
+/*
+ * Each instance of emacs_env get its own id from a simple counter
+ */
 static int32_t next_module_id = 1;
 
 static inline Lisp_Object value_to_lisp (emacs_value v)
@@ -97,6 +100,11 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
 
   return env;
 }
+
+/*
+ * To make global refs (GC-protected global values) we keep a hash
+ * that maps module-id to a list of their global values.
+ */
 
 static emacs_value module_make_global_ref (emacs_env *env,
                                            emacs_value ref)
@@ -235,20 +243,25 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
     }
 }
 
+/*
+ * A module function is lambda function that calls `module-call',
+ * passing the function pointer of the module function along with the
+ * module emacs_env pointer as arguments.
+ *
+ *   (function
+ *    (lambda
+ *     (&rest arglist)
+ *     (module-call
+ *      envptr
+ *      subrptr
+ *      arglist)))
+ *
+ */
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
                                          emacs_subr subr)
 {
-  /*
-    (function
-     (lambda
-      (&rest arglist)
-      (module-call
-       envptr
-       subrptr
-       arglist)))
-  */
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
   Lisp_Object Qmodule_call = intern ("module-call");
@@ -291,7 +304,10 @@ static emacs_value module_funcall (emacs_env *env,
 }
 
 DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
-       doc: /* Call a module function.  */)
+       doc: /* Internal function to call a module function.
+ENVPTR is the emacs_env pointer to pass the module function.
+SUBRPTR is the module function pointer (emacs_subr prototype) to call.
+ARGLIST is a list of argument passed to SUBRPTR. */)
   (Lisp_Object envptr, Lisp_Object subrptr, Lisp_Object arglist)
 {
   int len = XINT (Flength (arglist));
