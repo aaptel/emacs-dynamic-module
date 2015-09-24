@@ -3,3 +3,6 @@
 
 # built DOCFILEs
 *.doc
+
+# include makefile for now
+!Makefile
