@@ -39,7 +39,7 @@ def cmd_test(args):
         print '[*] %s: running test' % m
         testpath = os.path.join(m, 'test.el')
         if os.path.isfile(testpath):
-            emacs_cmd = [EMACS, '-batch', '-L', '.', '-l', 'ert', '-l', testpath, '-f', 'ert-run-tests-batch']
+            emacs_cmd = [EMACS, '-batch', '-L', '.', '-l', 'ert', '-l', testpath, '-f', 'ert-run-tests-batch-and-exit']
             print ' '.join(emacs_cmd)
             r = sp.call(emacs_cmd)
             if r != 0:
