@@ -3784,8 +3784,10 @@ Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
 extern bool let_shadows_global_binding_p (Lisp_Object symbol);
 
+#ifdef HAVE_MODULES
 /* Defined in module.c.  */
 void syms_of_module (void);
+#endif
 
 /* Defined in editfns.c.  */
 extern void insert1 (Lisp_Object);

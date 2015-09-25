@@ -1450,7 +1450,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_term ();
       syms_of_undo ();
 
+#ifdef HAVE_MODULES
       syms_of_module ();
+#endif
 
 #ifdef HAVE_SOUND
       syms_of_sound ();

@@ -3253,19 +3253,31 @@ if test "${HAVE_ZLIB}" = "yes"; then
 fi
 AC_SUBST(LIBZ)
 
+### Dynamic modules support
 LIBMODULES=
+HAVE_MODULES=no
+MODULES_OBJ=
 if test "${with_modules}" != "no"; then
-   AC_DEFINE(HAVE_MODULES, 1, [Define to 1 if dynamic modules are enabled])
-   if test "$opsys" = "gnu-linux"; then
-      LIBMODULES="-ldl"
-   elif test "$opsys" = "cygwin"; then
-      LIBMODULES="-lcygwin"
-   else
-      # XXX: compile test program using dlopen and see whether it
-      # needs a particial lib/flag
-      true
-   fi
+  if test "$opsys" = "gnu-linux"; then
+    LIBMODULES="-ldl"
+    HAVE_MODULES=yes
+  elif test "$opsys" = "cygwin"; then
+    # XXX: not tested
+    LIBMODULES="-lcygwin"
+    HAVE_MODULES=yes
+  else
+    # XXX: compile test program using dlopen and see whether it
+    # needs a particial lib/flag
+    true # fail?
+  fi
 fi
+
+if test "${HAVE_MODULES}" = yes; then
+   MODULES_OBJ="dynlib.o module.o"
+   AC_DEFINE(HAVE_MODULES, 1, [Define to 1 if dynamic modules are enabled])
+fi
+AC_SUBST(MODULES_OBJ)
+AC_SUBST(LIBMODULES)
 
 ### Use -lpng if available, unless '--with-png=no'.
 HAVE_PNG=no
