@@ -27,7 +27,7 @@
 void syms_of_module (void);
 static struct emacs_runtime* module_get_runtime (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
-static void module_error_signal (emacs_env *env, emacs_value *sym, emacs_value *data);
+static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
 static emacs_value module_intern (emacs_env *env, const char *name);
@@ -149,7 +149,7 @@ static void module_free_global_ref (emacs_env *env,
  *
  * This function doesnt return.
  */
-static void module_error_signal (emacs_env *env, emacs_value *sym, emacs_value *data)
+static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
     xsignal (value_to_lisp (sym), value_to_lisp (data));
 }
