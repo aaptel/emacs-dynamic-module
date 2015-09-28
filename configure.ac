@@ -3265,6 +3265,8 @@ if test "${with_modules}" != "no"; then
     # XXX: not tested
     LIBMODULES="-lcygwin"
     HAVE_MODULES=yes
+  elif test "$opsys" = "darwin"; then
+    HAVE_MODULES=yes
   else
     # XXX: compile test program using dlopen and see whether it
     # needs a particial lib/flag
