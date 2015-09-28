@@ -27,6 +27,9 @@
 void syms_of_module (void);
 static struct emacs_runtime* module_get_runtime (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
+static bool module_error_check (emacs_env *env);
+static void module_error_clear (emacs_env *env);
+static bool module_error_get (emacs_env *emv, emacs_value *sym, emacs_value *data);
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
@@ -87,6 +90,9 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->make_global_ref = module_make_global_ref;
   env->free_global_ref = module_free_global_ref;
   env->type_of         = module_type_of;
+  env->error_check     = module_error_check;
+  env->error_clear     = module_error_clear;
+  env->error_get       = module_error_get;
   env->error_signal    = module_error_signal;
   env->make_fixnum     = module_make_fixnum;
   env->fixnum_to_int   = module_fixnum_to_int;
@@ -144,14 +150,36 @@ static void module_free_global_ref (emacs_env *env,
     }
 }
 
+static bool module_pending_error;
+static Lisp_Object module_error_symbol;
+static Lisp_Object module_error_data;
+
+static bool module_error_check (emacs_env *env)
+{
+  return module_pending_error;
+}
+
+static void module_error_clear (emacs_env *env)
+{
+  module_pending_error = false;
+}
+
+static bool module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
+{
+  if (! module_pending_error) return false;
+  *sym = lisp_to_value (module_error_symbol);
+  *data = lisp_to_value (module_error_data);
+  return true;
+}
+
 /*
  * Like for `signal', DATA must be a list
- *
- * This function doesnt return.
  */
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
-    xsignal (value_to_lisp (sym), value_to_lisp (data));
+  module_pending_error = true;
+  module_error_symbol = value_to_lisp (sym);
+  module_error_data = value_to_lisp (data);
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
@@ -281,6 +309,14 @@ static emacs_value module_make_function (emacs_env *env,
   return lisp_to_value (ret);
 }
 
+static Lisp_Object module_handle_signal (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
+{
+  module_pending_error = true;
+  module_error_symbol = XCAR (err);
+  module_error_data = XCDR (err);
+  return Qnil;
+}
+
 static emacs_value module_funcall (emacs_env *env,
                                    emacs_value fun,
                                    int nargs,
@@ -297,7 +333,7 @@ static emacs_value module_funcall (emacs_env *env,
   for (i = 0; i < nargs; i++)
     newargs[1 + i] = value_to_lisp (args[i]);
 
-  Lisp_Object ret = Ffuncall (nargs+1, newargs);
+  Lisp_Object ret = internal_condition_case_n (Ffuncall, nargs+1, newargs, Qt, module_handle_signal);
 
   xfree (newargs);
   return lisp_to_value (ret);
@@ -322,7 +358,10 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
 
   emacs_env *env = (emacs_env*) XSAVE_POINTER (envptr, 0);
   emacs_subr subr = (emacs_subr) XSAVE_POINTER (subrptr, 0);
+  module_pending_error = false;
   emacs_value ret = subr (env, len, args);
+  if (module_pending_error)
+    Fsignal (module_error_symbol, module_error_data);
   return value_to_lisp (ret);
 }
 
