@@ -1068,6 +1068,44 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object), Lisp_Object 
     }
 }
 
+/* Like internal_catch, but catches all throws for all tags.
+   Used for functions taking a variable number of arguments.
+   BFUN is called and its result is returned, but if
+   BFUN or any function directly or indirectly called by it
+   calls `throw', then HFUN is called with the TAG and VAL
+   passed to `throw', and the result of HFUN is returned. */
+
+Lisp_Object
+catch_all_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
+             ptrdiff_t nargs,
+             Lisp_Object *args,
+             Lisp_Object (*hfun) (Lisp_Object tag,
+                                  Lisp_Object val,
+                                  ptrdiff_t nargs,
+                                  Lisp_Object *args))
+{
+  struct handler *c;
+  /* CATCHER_ALL is a special handler type used only here
+     that serves as a handler for all possible invocations
+     of `throw'. */
+  PUSH_HANDLER (c, Qunbound, CATCHER_ALL);
+
+  if (sys_setjmp (c->jmp))
+    {
+      /* For CATCHER_ALL val is a cons (real-tag . real-val)
+         because tag itself is unbound. */
+      const Lisp_Object tag_val = handlerlist->val;
+      clobbered_eassert (handlerlist == c);
+      handlerlist = handlerlist->next;
+      return (*hfun) (XCAR (tag_val), XCDR (tag_val), nargs, args);
+    }
+
+  const Lisp_Object val = (*bfun) (nargs, args);
+  clobbered_eassert (handlerlist == c);
+  handlerlist = handlerlist->next;
+  return val;
+}
+
 /* Unwind the specbind, catch, and handler stacks back to CATCH, and
    jump to that CATCH, returning VALUE as the value of that catch.
 
@@ -1129,7 +1167,9 @@ Both TAG and VALUE are evalled.  */
   if (!NILP (tag))
     for (c = handlerlist; c; c = c->next)
       {
-	if (c->type == CATCHER && EQ (c->tag_or_ch, tag))
+	if (c->type == CATCHER_ALL)
+          unwind_to_catch (c, Fcons (tag, value));
+        if (c->type == CATCHER && EQ (c->tag_or_ch, tag))
 	  unwind_to_catch (c, value);
       }
   xsignal2 (Qno_catch, tag, value);
