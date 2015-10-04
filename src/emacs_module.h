@@ -54,7 +54,8 @@ typedef int (*emacs_init_function)(struct emacs_runtime *ert);
 /* Function prototype for the module Lisp functions */
 typedef emacs_value (*emacs_subr)(emacs_env *env,
                                   int nargs,
-                                  emacs_value args[]);
+                                  emacs_value args[],
+                                  void *data);
 struct emacs_env_25 {
   /*
    * Structure size (for version checking)
@@ -97,7 +98,8 @@ struct emacs_env_25 {
   emacs_value (*make_function)(emacs_env *env,
                                int min_arity,
                                int max_arity,
-                               emacs_subr function);
+                               emacs_subr function,
+                               void *data);
 
   emacs_value (*funcall)(emacs_env *env,
                          emacs_value function,
