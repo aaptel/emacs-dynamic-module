@@ -322,6 +322,19 @@ static Lisp_Object module_handle_signal (Lisp_Object err, ptrdiff_t nargs, Lisp_
   return Qnil;
 }
 
+static Lisp_Object module_handle_throw (Lisp_Object tag, Lisp_Object value, ptrdiff_t nargs, Lisp_Object *args)
+{
+  module_pending_error = true;
+  module_error_symbol = Qno_catch;
+  module_error_data = list2 (tag, value);
+  return Qnil;
+}
+
+static Lisp_Object module_funcall_2 (ptrdiff_t nargs, Lisp_Object *args)
+{
+  return catch_all_n (Ffuncall, nargs, args, module_handle_throw);
+}
+
 static emacs_value module_funcall (emacs_env *env,
                                    emacs_value fun,
                                    int nargs,
@@ -338,7 +351,7 @@ static emacs_value module_funcall (emacs_env *env,
   for (i = 0; i < nargs; i++)
     newargs[1 + i] = value_to_lisp (args[i]);
 
-  Lisp_Object ret = internal_condition_case_n (Ffuncall, nargs+1, newargs, Qt, module_handle_signal);
+  Lisp_Object ret = internal_condition_case_n (module_funcall_2, nargs+1, newargs, Qt, module_handle_signal);
 
   xfree (newargs);
   return lisp_to_value (ret);
