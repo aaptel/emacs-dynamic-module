@@ -27,7 +27,7 @@
 
 /* Current environement */
 typedef struct emacs_env_25 emacs_env;
-typedef void* emacs_value;
+typedef struct emacs_value_tag* emacs_value;
 
 enum emacs_type {
   EMACS_FIXNUM,

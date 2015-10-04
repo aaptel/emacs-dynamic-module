@@ -24,6 +24,8 @@
 #include "dynlib.h"
 #include "coding.h"
 
+struct emacs_value_tag { Lisp_Object v; };
+
 void syms_of_module (void);
 static struct emacs_runtime* module_get_runtime (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
