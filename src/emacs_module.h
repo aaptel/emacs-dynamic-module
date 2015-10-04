@@ -25,6 +25,22 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+#define EMACS_EXTERN_C_BEGIN extern "C" {
+#define EMACS_EXTERN_C_END }
+#else
+#define EMACS_EXTERN_C_BEGIN
+#define EMACS_EXTERN_C_END
+#endif
+
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define EMACS_NOEXCEPT noexcept
+#else
+#define EMACS_NOEXCEPT
+#endif
+
+EMACS_EXTERN_C_BEGIN
+
 /* Current environement */
 typedef struct emacs_env_25 emacs_env;
 typedef void* emacs_value;
@@ -98,7 +114,7 @@ struct emacs_env_25 {
   emacs_value (*make_function)(emacs_env *env,
                                int min_arity,
                                int max_arity,
-                               emacs_subr function,
+                               emacs_value (*function)(emacs_env*, int, emacs_value*, void*) EMACS_NOEXCEPT,
                                void *data);
 
   emacs_value (*funcall)(emacs_env *env,
@@ -153,5 +169,7 @@ struct emacs_env_25 {
   emacs_value (*make_string)(emacs_env *env,
                              const char *contents, size_t length);
 };
+
+EMACS_EXTERN_C_END
 
 #endif /* EMACS_MODULE_H */
