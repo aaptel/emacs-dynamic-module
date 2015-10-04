@@ -367,6 +367,7 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
   void *data = XSAVE_POINTER (dataptr, 0);
   module_pending_error = false;
   emacs_value ret = subr (env, len, args, data);
+  xfree (args);
   if (module_pending_error)
     Fsignal (module_error_symbol, module_error_data);
   return value_to_lisp (ret);
