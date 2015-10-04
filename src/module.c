@@ -173,24 +173,51 @@ static bool module_error_get (emacs_env *env, emacs_value *sym, emacs_value *dat
   return true;
 }
 
+static void module_error_signal_1 (Lisp_Object sym, Lisp_Object data)
+{
+  eassert (! module_pending_error);
+  module_pending_error = true;
+  module_error_symbol = sym;
+  module_error_data = data;
+}
+
 /*
  * Like for `signal', DATA must be a list
  */
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
-  module_pending_error = true;
-  module_error_symbol = value_to_lisp (sym);
-  module_error_data = value_to_lisp (data);
+  module_error_signal_1 (value_to_lisp (sym), value_to_lisp (data));
+}
+
+static void module_wrong_type (Lisp_Object predicate, Lisp_Object value)
+{
+  module_error_signal_1 (Qwrong_type_argument, list2 (predicate, value));
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 {
+  if (n < MOST_NEGATIVE_FIXNUM)
+    {
+      module_error_signal_1 (Qunderflow_error, Qnil);
+      return NULL;
+    }
+  if (n > MOST_POSITIVE_FIXNUM)
+    {
+      module_error_signal_1 (Qoverflow_error, Qnil);
+      return NULL;
+    }
   return lisp_to_value (make_number (n));
 }
 
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 {
-  return (int64_t) XINT (value_to_lisp (n));
+  const Lisp_Object l = value_to_lisp (n);
+  if (! INTEGERP (l))
+    {
+      module_wrong_type (Qintegerp, l);
+      return 0;
+    }
+  return (int64_t) XINT (l);
 }
 
 static emacs_value module_make_float (emacs_env *env, double d)
@@ -200,7 +227,13 @@ static emacs_value module_make_float (emacs_env *env, double d)
 
 static double module_float_to_c_double (emacs_env *env, emacs_value f)
 {
-  return (double) XFLOAT_DATA (value_to_lisp (f));
+  const Lisp_Object lisp = value_to_lisp (f);
+  if (! FLOATP (lisp))
+    {
+      module_wrong_type (Qfloatp, lisp);
+      return 0;
+    }
+  return (double) XFLOAT_DATA (lisp);
 }
 
 static emacs_value module_intern (emacs_env *env, const char *name)
@@ -220,6 +253,12 @@ static bool module_copy_string_contents (emacs_env *env,
                                          size_t* length)
 {
   Lisp_Object lisp_str = value_to_lisp (value);
+  if (! STRINGP (lisp_str))
+    {
+      module_wrong_type (Qstringp, lisp_str);
+      return false;
+    }
+
   size_t raw_size = SBYTES (lisp_str);
 
   /*
