@@ -3759,6 +3759,8 @@ extern Lisp_Object internal_condition_case_2 (Lisp_Object (*) (Lisp_Object, Lisp
 extern Lisp_Object internal_condition_case_n
     (Lisp_Object (*) (ptrdiff_t, Lisp_Object *), ptrdiff_t, Lisp_Object *,
      Lisp_Object, Lisp_Object (*) (Lisp_Object, ptrdiff_t, Lisp_Object *));
+extern Lisp_Object internal_condition_case_ptr (Lisp_Object (*) (const void *), const void *, Lisp_Object,
+                                                Lisp_Object (*) (Lisp_Object, const void *));
 extern void specbind (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
 extern void record_unwind_protect_ptr (void (*) (void *), void *);

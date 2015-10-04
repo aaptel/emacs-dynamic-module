@@ -1418,6 +1418,32 @@ internal_condition_case_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
   return val;
 }
 
+/* Like internal_condition_case but call BFUN with ARG as its argument. */
+
+Lisp_Object
+internal_condition_case_ptr (Lisp_Object (*bfun) (const void *),
+                             const void *arg,
+                             Lisp_Object handlers,
+                             Lisp_Object (*hfun) (Lisp_Object err, const void *arg))
+{
+  Lisp_Object val;
+  struct handler *c;
+
+  PUSH_HANDLER (c, handlers, CONDITION_CASE);
+  if (sys_setjmp (c->jmp))
+    {
+      Lisp_Object val = handlerlist->val;
+      clobbered_eassert (handlerlist == c);
+      handlerlist = handlerlist->next;
+      return (*hfun) (val, arg);
+    }
+
+  val = (*bfun) (arg);
+  clobbered_eassert (handlerlist == c);
+  handlerlist = handlerlist->next;
+  return val;
+}
+
 
 static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig,

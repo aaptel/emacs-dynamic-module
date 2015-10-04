@@ -194,6 +194,12 @@ static void module_wrong_type (Lisp_Object predicate, Lisp_Object value)
   module_error_signal_1 (Qwrong_type_argument, list2 (predicate, value));
 }
 
+static Lisp_Object module_handle_error_ptr (Lisp_Object err, const void *ptr)
+{
+  module_error_signal_1 (XCAR (err), XCDR (err));
+  return Qnil;
+}
+
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 {
   if (n < MOST_NEGATIVE_FIXNUM)
@@ -236,15 +242,32 @@ static double module_float_to_c_double (emacs_env *env, emacs_value f)
   return (double) XFLOAT_DATA (lisp);
 }
 
+static Lisp_Object module_intern_1 (const void *name)
+{
+  return intern ((const char *) name);
+}
+
 static emacs_value module_intern (emacs_env *env, const char *name)
 {
-  return lisp_to_value (intern (name));
+  return lisp_to_value (internal_condition_case_ptr (module_intern_1, name, Qt, module_handle_error_ptr));
+}
+
+struct module_make_string_args {
+  const char *str;
+  size_t length;
+};
+
+static Lisp_Object module_make_string_1 (const void *args)
+{
+  const struct module_make_string_args *const a = (const struct module_make_string_args *) args;
+  return make_string (a->str, a->length);
 }
 
 static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
   /* Assume STR is utf8 encoded */
-  return lisp_to_value (make_string (str, length));
+  const struct module_make_string_args args = {str, length};
+  return lisp_to_value (internal_condition_case_ptr (module_make_string_1, &args, Qt, module_handle_error_ptr));
 }
 
 static bool module_copy_string_contents (emacs_env *env,
@@ -355,17 +378,13 @@ static emacs_value module_make_function (emacs_env *env,
 
 static Lisp_Object module_handle_signal (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
 {
-  module_pending_error = true;
-  module_error_symbol = XCAR (err);
-  module_error_data = XCDR (err);
+  module_error_signal_1 (XCAR (err), XCDR (err));
   return Qnil;
 }
 
 static Lisp_Object module_handle_throw (Lisp_Object tag, Lisp_Object value, ptrdiff_t nargs, Lisp_Object *args)
 {
-  module_pending_error = true;
-  module_error_symbol = Qno_catch;
-  module_error_data = list2 (tag, value);
+  module_error_signal_1 (Qno_catch, list2 (tag, value));
   return Qnil;
 }
 
