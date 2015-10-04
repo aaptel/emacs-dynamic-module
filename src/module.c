@@ -323,6 +323,7 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
   emacs_env *env = (emacs_env*) XSAVE_POINTER (envptr, 0);
   emacs_subr subr = (emacs_subr) XSAVE_POINTER (subrptr, 0);
   emacs_value ret = subr (env, len, args);
+  xfree (args);
   return value_to_lisp (ret);
 }
 
