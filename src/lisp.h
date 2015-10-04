@@ -3003,7 +3003,9 @@ SPECPDL_INDEX (void)
    A call like (throw TAG VAL) searches for a catchtag whose `tag_or_ch'
    member is TAG, and then unbinds to it.  The `val' member is used to
    hold VAL while the stack is unwound; `val' is returned as the value
-   of the catch form.
+   of the catch form.  If there is a handler of type CATCHER_ALL, it will
+   be treated as a handler for all invocations of `throw'; in this case
+   `val' will be set to (TAG . VAL).
 
    All the other members are concerned with restoring the interpreter
    state.
@@ -3011,7 +3013,7 @@ SPECPDL_INDEX (void)
    Members are volatile if their values need to survive _longjmp when
    a 'struct handler' is a local variable.  */
 
-enum handlertype { CATCHER, CONDITION_CASE };
+enum handlertype { CATCHER, CONDITION_CASE, CATCHER_ALL };
 
 struct handler
 {
@@ -3747,6 +3749,9 @@ extern Lisp_Object call5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Li
 extern Lisp_Object call6 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object call7 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
+extern Lisp_Object catch_all_n
+    (Lisp_Object (*) (ptrdiff_t, Lisp_Object *), ptrdiff_t, Lisp_Object *,
+     Lisp_Object (*) (Lisp_Object, Lisp_Object, ptrdiff_t, Lisp_Object *));
 extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_condition_case (Lisp_Object (*) (void), Lisp_Object, Lisp_Object (*) (Lisp_Object));
 extern Lisp_Object internal_condition_case_1 (Lisp_Object (*) (Lisp_Object), Lisp_Object, Lisp_Object, Lisp_Object (*) (Lisp_Object));
