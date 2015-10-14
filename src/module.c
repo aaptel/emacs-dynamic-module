@@ -27,7 +27,6 @@
 struct emacs_value_tag { Lisp_Object v; };
 
 void syms_of_module (void);
-static struct emacs_runtime* module_get_runtime (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
 static bool module_error_check (emacs_env *env);
 static void module_error_clear (emacs_env *env);
@@ -72,16 +71,6 @@ static inline Lisp_Object value_to_lisp (emacs_value v)
 static inline emacs_value lisp_to_value (Lisp_Object o)
 {
   return (emacs_value) o;
-}
-
-static struct emacs_runtime* module_get_runtime (void)
-{
-  struct emacs_runtime *ert = xzalloc (sizeof *ert);
-
-  ert->size = sizeof *ert;
-  ert->get_environment = module_get_environment;
-
-  return ert;
 }
 
 static emacs_env* module_get_environment (struct emacs_runtime *ert)
@@ -468,7 +457,11 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   if (!module_init)
     error ("Module %s does not have an init function.", SDATA (file));
 
-  int r = module_init (module_get_runtime ());
+  struct emacs_runtime runtime = {
+    .size = sizeof runtime,
+    .get_environment = module_get_environment,
+  };
+  int r = module_init (&runtime);
 
   return Qt;
 }
