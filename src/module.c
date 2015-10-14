@@ -318,7 +318,7 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
 
   for (i = 0; i < len; i++)
     {
-      args[i] = (emacs_value) XCAR (arglist);
+      args[i] = lisp_to_value (XCAR (arglist));
       arglist = XCDR (arglist);
     }
 
