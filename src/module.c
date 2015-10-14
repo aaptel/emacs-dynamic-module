@@ -73,10 +73,15 @@ static inline emacs_value lisp_to_value (Lisp_Object o)
   return (emacs_value) o;
 }
 
+static emacs_env *initial_environment;
+
 static emacs_env* module_get_environment (struct emacs_runtime *ert)
 {
-  emacs_env *env = xzalloc (sizeof *env);
+  return initial_environment;
+}
 
+static void initialize_environment (emacs_env *env)
+{
   env->size            = sizeof *env;
   env->module_id       = next_module_id++;
   env->make_global_ref = module_make_global_ref;
@@ -95,8 +100,10 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->funcall         = module_funcall;
   env->make_string     = module_make_string;
   env->copy_string_contents = module_copy_string_contents;
+}
 
-  return env;
+static void finalize_environment (emacs_env *env)
+{
 }
 
 /*
@@ -461,7 +468,12 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
     .size = sizeof runtime,
     .get_environment = module_get_environment,
   };
+  emacs_env env;
+  initialize_environment (&env);
+  initial_environment = &env;
   int r = module_init (&runtime);
+  initial_environment = 0;
+  finalize_environment (&env);
 
   return Qt;
 }
