@@ -356,15 +356,13 @@ static emacs_value module_make_function (emacs_env *env,
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
   Lisp_Object Qmodule_call = intern ("module-call");
-  Lisp_Object envptr = make_save_ptr ((void*) env);
   Lisp_Object subrptr = make_save_ptr ((void*) subr);
   Lisp_Object dataptr = make_save_ptr (data);
 
   Lisp_Object form = list2 (Qfunction,
                             list3 (Qlambda,
                                    list2 (Qrest, Qarglist),
-                                   list5 (Qmodule_call,
-                                          envptr,
+                                   list4 (Qmodule_call,
                                           subrptr,
                                           dataptr,
                                           Qarglist)));
@@ -413,13 +411,12 @@ static emacs_value module_funcall (emacs_env *env,
   return lisp_to_value (ret);
 }
 
-DEFUN ("module-call", Fmodule_call, Smodule_call, 4, 4, 0,
+DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
        doc: /* Internal function to call a module function.
-ENVPTR is the emacs_env pointer to pass the module function.
 SUBRPTR is the module function pointer (emacs_subr prototype) to call.
 DATAPTR is the data pointer passed to make_function.
 ARGLIST is a list of argument passed to SUBRPTR. */)
-  (Lisp_Object envptr, Lisp_Object subrptr, Lisp_Object dataptr, Lisp_Object arglist)
+  (Lisp_Object subrptr, Lisp_Object dataptr, Lisp_Object arglist)
 {
   int len = XINT (Flength (arglist));
   emacs_value *args = xzalloc (len * sizeof (*args));
@@ -431,12 +428,14 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
       arglist = XCDR (arglist);
     }
 
-  emacs_env *env = (emacs_env*) XSAVE_POINTER (envptr, 0);
+  emacs_env env;
+  initialize_environment (&env);
   emacs_subr subr = (emacs_subr) XSAVE_POINTER (subrptr, 0);
   void *data = XSAVE_POINTER (dataptr, 0);
   module_pending_error = false;
-  emacs_value ret = subr (env, len, args, data);
+  emacs_value ret = subr (&env, len, args, data);
   xfree (args);
+  finalize_environment (&env);
   if (module_pending_error)
     Fsignal (module_error_symbol, module_error_data);
   return value_to_lisp (ret);
