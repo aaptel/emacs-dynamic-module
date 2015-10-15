@@ -61,6 +61,7 @@ enum emacs_type {
 struct emacs_runtime {
   size_t size;
   emacs_env* (*get_environment)(struct emacs_runtime *ert);
+  struct emacs_runtime_private *private_members;
 };
 
 

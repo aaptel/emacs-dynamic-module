@@ -113,11 +113,13 @@ struct env_storage {
   struct emacs_env_private priv;
 };
 
-static emacs_env *initial_environment;
+struct emacs_runtime_private {
+  struct env_storage environment;
+};
 
 static emacs_env* module_get_environment (struct emacs_runtime *ert)
 {
-  return initial_environment;
+  return &ert->private_members->environment.pub;
 }
 
 static void initialize_environment (struct env_storage *env)
@@ -517,16 +519,19 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   if (!module_init)
     error ("Module %s does not have an init function.", SDATA (file));
 
-  struct emacs_runtime runtime = {
-    .size = sizeof runtime,
-    .get_environment = module_get_environment,
+  struct {
+    struct emacs_runtime pub;
+    struct emacs_runtime_private priv;
+  } runtime = {
+    .pub = {
+      .size = sizeof runtime.pub,
+      .get_environment = module_get_environment,
+      .private_members = &runtime.priv
+    }
   };
-  struct env_storage env;
-  initialize_environment (&env);
-  initial_environment = &env.pub;
-  int r = module_init (&runtime);
-  initial_environment = 0;
-  finalize_environment (&env);
+  initialize_environment (&runtime.priv.environment);
+  int r = module_init (&runtime.pub);
+  finalize_environment (&runtime.priv.environment);
 
   return Qt;
 }
