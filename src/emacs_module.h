@@ -169,8 +169,7 @@ struct emacs_env_25 {
   emacs_value (*make_string)(emacs_env *env,
                              const char *contents, size_t length);
 
-  struct emacs_value_frame *initial_frame;
-  struct emacs_value_frame *current_frame;
+  struct emacs_env_private *private_members;
 };
 
 EMACS_EXTERN_C_END

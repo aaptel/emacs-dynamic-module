@@ -42,6 +42,11 @@ static void initialize_frame (struct emacs_value_frame *frame)
   frame->next = 0;
 }
 
+struct emacs_env_private {
+  struct emacs_value_frame initial_frame;
+  struct emacs_value_frame *current_frame;
+};
+
 void syms_of_module (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
 static bool module_error_check (emacs_env *env);
@@ -86,21 +91,27 @@ static inline Lisp_Object value_to_lisp (emacs_value v)
 
 static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
 {
-  eassert (env->current_frame);
-  eassert (env->current_frame->offset < value_frame_size);
-  eassert (! env->current_frame->next);
-  if (env->current_frame->offset == value_frame_size - 1)
+  struct emacs_env_private *const p = env->private_members;
+  eassert (p->current_frame);
+  eassert (p->current_frame->offset < value_frame_size);
+  eassert (! p->current_frame->next);
+  if (p->current_frame->offset == value_frame_size - 1)
     {
-      env->current_frame->next = malloc (sizeof *env->current_frame->next);
-      if (! env->current_frame->next) return 0;
-      initialize_frame (env->current_frame->next);
-      env->current_frame = env->current_frame->next;
+      p->current_frame->next = malloc (sizeof *p->current_frame->next);
+      if (! p->current_frame->next) return 0;
+      initialize_frame (p->current_frame->next);
+      p->current_frame = p->current_frame->next;
     }
-  emacs_value value = env->current_frame->objects + env->current_frame->offset;
+  emacs_value value = p->current_frame->objects + p->current_frame->offset;
   value->v = o;
-  ++env->current_frame->offset;
+  ++p->current_frame->offset;
   return value;
 }
+
+struct env_storage {
+  emacs_env pub;
+  struct emacs_env_private priv;
+};
 
 static emacs_env *initial_environment;
 
@@ -109,33 +120,34 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   return initial_environment;
 }
 
-static void initialize_environment (emacs_env *env, struct emacs_value_frame *initial_frame)
+static void initialize_environment (struct env_storage *env)
 {
-  env->size            = sizeof *env;
-  env->module_id       = next_module_id++;
-  env->make_global_ref = module_make_global_ref;
-  env->free_global_ref = module_free_global_ref;
-  env->type_of         = module_type_of;
-  env->error_check     = module_error_check;
-  env->error_clear     = module_error_clear;
-  env->error_get       = module_error_get;
-  env->error_signal    = module_error_signal;
-  env->make_fixnum     = module_make_fixnum;
-  env->fixnum_to_int   = module_fixnum_to_int;
-  env->make_float      = module_make_float;
-  env->float_to_c_double = module_float_to_c_double;
-  env->intern          = module_intern;
-  env->make_function   = module_make_function;
-  env->funcall         = module_funcall;
-  env->make_string     = module_make_string;
-  env->copy_string_contents = module_copy_string_contents;
-  env->initial_frame = initial_frame;
-  env->current_frame = initial_frame;
+  initialize_frame (&env->priv.initial_frame);
+  env->priv.current_frame = &env->priv.initial_frame;
+  env->pub.size            = sizeof env->pub;
+  env->pub.module_id       = next_module_id++;
+  env->pub.make_global_ref = module_make_global_ref;
+  env->pub.free_global_ref = module_free_global_ref;
+  env->pub.type_of         = module_type_of;
+  env->pub.error_check     = module_error_check;
+  env->pub.error_clear     = module_error_clear;
+  env->pub.error_get       = module_error_get;
+  env->pub.error_signal    = module_error_signal;
+  env->pub.make_fixnum     = module_make_fixnum;
+  env->pub.fixnum_to_int   = module_fixnum_to_int;
+  env->pub.make_float      = module_make_float;
+  env->pub.float_to_c_double = module_float_to_c_double;
+  env->pub.intern          = module_intern;
+  env->pub.make_function   = module_make_function;
+  env->pub.funcall         = module_funcall;
+  env->pub.make_string     = module_make_string;
+  env->pub.copy_string_contents = module_copy_string_contents;
+  env->pub.private_members = &env->priv;
 }
 
-static void finalize_environment (emacs_env *env)
+static void finalize_environment (struct env_storage *env)
 {
-  for (struct emacs_value_frame *frame = env->initial_frame->next; frame; frame = frame->next)
+  for (struct emacs_value_frame *frame = env->priv.initial_frame.next; frame; frame = frame->next)
     free (frame);
 }
 
@@ -459,10 +471,8 @@ DATAPTR is the data pointer passed to make_function.
 ARGLIST is a list of argument passed to SUBRPTR. */)
   (Lisp_Object envobj, Lisp_Object arglist)
 {
-  emacs_env env;
-  struct emacs_value_frame frame;
-  initialize_frame (&frame);
-  initialize_environment (&env, &frame);
+  struct env_storage env;
+  initialize_environment (&env);
 
   int len = XINT (Flength (arglist));
   emacs_value *args = xzalloc (len * sizeof (*args));
@@ -470,14 +480,14 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
 
   for (i = 0; i < len; i++)
     {
-      args[i] = lisp_to_value (&env, XCAR (arglist));
+      args[i] = lisp_to_value (&env.pub, XCAR (arglist));
       if (! args[i]) memory_full (sizeof *args[i]);
       arglist = XCDR (arglist);
     }
 
   struct module_fun_env *envptr = (struct module_fun_env*) XSAVE_POINTER (envobj, 0);
   module_pending_error = false;
-  emacs_value ret = envptr->subr (&env, len, args, envptr->data);
+  emacs_value ret = envptr->subr (&env.pub, len, args, envptr->data);
   xfree (args);
   finalize_environment (&env);
   if (module_pending_error)
@@ -511,11 +521,9 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
     .size = sizeof runtime,
     .get_environment = module_get_environment,
   };
-  emacs_env env;
-  struct emacs_value_frame frame;
-  initialize_frame (&frame);
-  initialize_environment (&env, &frame);
-  initial_environment = &env;
+  struct env_storage env;
+  initialize_environment (&env);
+  initial_environment = &env.pub;
   int r = module_init (&runtime);
   initial_environment = 0;
   finalize_environment (&env);
