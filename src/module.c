@@ -53,6 +53,7 @@ static bool module_error_check (emacs_env *env);
 static void module_error_clear (emacs_env *env);
 static bool module_error_get (emacs_env *emv, emacs_value *sym, emacs_value *data);
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
+static bool module_is_not_nil (emacs_env *env, emacs_value value);
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
 static emacs_value module_intern (emacs_env *env, const char *name);
@@ -131,6 +132,7 @@ static void initialize_environment (struct env_storage *env)
   env->pub.make_global_ref = module_make_global_ref;
   env->pub.free_global_ref = module_free_global_ref;
   env->pub.type_of         = module_type_of;
+  env->pub.is_not_nil      = module_is_not_nil;
   env->pub.error_check     = module_error_check;
   env->pub.error_clear     = module_error_clear;
   env->pub.error_get       = module_error_get;
@@ -243,6 +245,11 @@ static Lisp_Object module_handle_error_ptr (Lisp_Object err, const void *ptr)
 {
   module_error_signal_1 (XCAR (err), XCDR (err));
   return Qnil;
+}
+
+static bool module_is_not_nil (emacs_env *env, emacs_value value)
+{
+  return ! NILP (value_to_lisp (value));
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)

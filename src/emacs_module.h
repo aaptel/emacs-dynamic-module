@@ -133,6 +133,8 @@ struct emacs_env_25 {
   enum emacs_type (*type_of)(emacs_env *env,
                              emacs_value value);
 
+  bool (*is_not_nil)(emacs_env *env, emacs_value value);
+
   int64_t (*fixnum_to_int)(emacs_env *env,
                            emacs_value value);
 
