@@ -365,6 +365,12 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
     }
 }
 
+struct module_fun_env
+{
+  emacs_subr subr;
+  void *data;
+};
+
 /*
  * A module function is lambda function that calls `module-call',
  * passing the function pointer of the module function along with the
@@ -374,9 +380,7 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
  *    (lambda
  *     (&rest arglist)
  *     (module-call
- *      envptr
- *      subrptr
- *      dataptr
+ *      envobj
  *      arglist)))
  *
  */
@@ -386,18 +390,22 @@ static emacs_value module_make_function (emacs_env *env,
                                          emacs_subr subr,
                                          void *data)
 {
+  Lisp_Object envobj;
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
   Lisp_Object Qmodule_call = intern ("module-call");
-  Lisp_Object subrptr = make_save_ptr ((void*) subr);
-  Lisp_Object dataptr = make_save_ptr (data);
+
+  /* XXX: This should need to be freed when envobj is GC'd */
+  struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
+  envptr->subr = subr;
+  envptr->data = data;
+  envobj = make_save_ptr ((void*) envptr);
 
   Lisp_Object form = list2 (Qfunction,
                             list3 (Qlambda,
                                    list2 (Qrest, Qarglist),
-                                   list4 (Qmodule_call,
-                                          subrptr,
-                                          dataptr,
+                                   list3 (Qmodule_call,
+                                          envobj,
                                           Qarglist)));
 
   Lisp_Object ret = Feval (form, Qnil);
@@ -444,12 +452,12 @@ static emacs_value module_funcall (emacs_env *env,
   return lisp_to_value (env, ret);
 }
 
-DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
+DEFUN ("module-call", Fmodule_call, Smodule_call, 2, 2, 0,
        doc: /* Internal function to call a module function.
 SUBRPTR is the module function pointer (emacs_subr prototype) to call.
 DATAPTR is the data pointer passed to make_function.
 ARGLIST is a list of argument passed to SUBRPTR. */)
-  (Lisp_Object subrptr, Lisp_Object dataptr, Lisp_Object arglist)
+  (Lisp_Object envobj, Lisp_Object arglist)
 {
   emacs_env env;
   struct emacs_value_frame frame;
@@ -467,10 +475,9 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
       arglist = XCDR (arglist);
     }
 
-  emacs_subr subr = (emacs_subr) XSAVE_POINTER (subrptr, 0);
-  void *data = XSAVE_POINTER (dataptr, 0);
+  struct module_fun_env *envptr = (struct module_fun_env*) XSAVE_POINTER (envobj, 0);
   module_pending_error = false;
-  emacs_value ret = subr (&env, len, args, data);
+  emacs_value ret = envptr->subr (&env, len, args, envptr->data);
   xfree (args);
   finalize_environment (&env);
   if (module_pending_error)

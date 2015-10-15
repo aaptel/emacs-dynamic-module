@@ -3257,19 +3257,23 @@ AC_SUBST(LIBZ)
 LIBMODULES=
 HAVE_MODULES=no
 MODULES_OBJ=
+MODULES_SUFFIX=
 if test "${with_modules}" != "no"; then
   if test "$opsys" = "gnu-linux"; then
     LIBMODULES="-ldl"
+    MODULES_SUFFIX=".so"
     HAVE_MODULES=yes
   elif test "$opsys" = "cygwin"; then
     # XXX: not tested
     LIBMODULES="-lcygwin"
+    MODULES_SUFFIX=".dll"
     HAVE_MODULES=yes
   elif test "$opsys" = "darwin"; then
+    MODULES_SUFFIX=".so"
     HAVE_MODULES=yes
   else
     # XXX: compile test program using dlopen and see whether it
-    # needs a particial lib/flag
+    # needs a particular lib/flag
     true # fail?
   fi
 fi
@@ -3277,6 +3281,7 @@ fi
 if test "${HAVE_MODULES}" = yes; then
    MODULES_OBJ="dynlib.o module.o"
    AC_DEFINE(HAVE_MODULES, 1, [Define to 1 if dynamic modules are enabled])
+   AC_DEFINE_UNQUOTED(MODULES_SUFFIX, "$MODULES_SUFFIX", [System extension for dynamic libraries])
 fi
 AC_SUBST(MODULES_OBJ)
 AC_SUBST(LIBMODULES)
