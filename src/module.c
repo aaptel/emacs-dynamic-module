@@ -18,6 +18,8 @@
   along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stddef.h>
+
 #include <config.h>
 #include "lisp.h"
 #include "emacs_module.h"
@@ -25,6 +27,20 @@
 #include "coding.h"
 
 struct emacs_value_tag { Lisp_Object v; };
+
+static const size_t value_frame_size = 512;
+
+struct emacs_value_frame {
+  struct emacs_value_tag objects[value_frame_size];
+  size_t offset;
+  struct emacs_value_frame *next;
+};
+
+static void initialize_frame (struct emacs_value_frame *frame)
+{
+  frame->offset = 0;
+  frame->next = 0;
+}
 
 void syms_of_module (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
@@ -65,12 +81,25 @@ static int32_t next_module_id = 1;
 
 static inline Lisp_Object value_to_lisp (emacs_value v)
 {
-  return (Lisp_Object) v;
+  return v->v;
 }
 
-static inline emacs_value lisp_to_value (Lisp_Object o)
+static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
 {
-  return (emacs_value) o;
+  eassert (env->current_frame);
+  eassert (env->current_frame->offset < value_frame_size);
+  eassert (! env->current_frame->next);
+  if (env->current_frame->offset == value_frame_size - 1)
+    {
+      env->current_frame->next = malloc (sizeof *env->current_frame->next);
+      if (! env->current_frame->next) return 0;
+      initialize_frame (env->current_frame->next);
+      env->current_frame = env->current_frame->next;
+    }
+  emacs_value value = env->current_frame->objects + env->current_frame->offset;
+  value->v = o;
+  ++env->current_frame->offset;
+  return value;
 }
 
 static emacs_env *initial_environment;
@@ -80,7 +109,7 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   return initial_environment;
 }
 
-static void initialize_environment (emacs_env *env)
+static void initialize_environment (emacs_env *env, struct emacs_value_frame *initial_frame)
 {
   env->size            = sizeof *env;
   env->module_id       = next_module_id++;
@@ -100,10 +129,14 @@ static void initialize_environment (emacs_env *env)
   env->funcall         = module_funcall;
   env->make_string     = module_make_string;
   env->copy_string_contents = module_copy_string_contents;
+  env->initial_frame = initial_frame;
+  env->current_frame = initial_frame;
 }
 
 static void finalize_environment (emacs_env *env)
 {
+  for (struct emacs_value_frame *frame = env->initial_frame->next; frame; frame = frame->next)
+    free (frame);
 }
 
 /*
@@ -166,8 +199,8 @@ static void module_error_clear (emacs_env *env)
 static bool module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
 {
   if (! module_pending_error) return false;
-  *sym = lisp_to_value (module_error_symbol);
-  *data = lisp_to_value (module_error_data);
+  *sym = lisp_to_value (env, module_error_symbol);
+  *data = lisp_to_value (env, module_error_data);
   return true;
 }
 
@@ -210,7 +243,7 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
       module_error_signal_1 (Qoverflow_error, Qnil);
       return NULL;
     }
-  return lisp_to_value (make_number (n));
+  return lisp_to_value (env, make_number (n));
 }
 
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
@@ -226,7 +259,7 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 
 static emacs_value module_make_float (emacs_env *env, double d)
 {
-  return lisp_to_value (make_float (d));
+  return lisp_to_value (env, make_float (d));
 }
 
 static double module_float_to_c_double (emacs_env *env, emacs_value f)
@@ -247,7 +280,7 @@ static Lisp_Object module_intern_1 (const void *name)
 
 static emacs_value module_intern (emacs_env *env, const char *name)
 {
-  return lisp_to_value (internal_condition_case_ptr (module_intern_1, name, Qt, module_handle_error_ptr));
+  return lisp_to_value (env, internal_condition_case_ptr (module_intern_1, name, Qt, module_handle_error_ptr));
 }
 
 struct module_make_string_args {
@@ -265,7 +298,7 @@ static emacs_value module_make_string (emacs_env *env, const char *str, size_t l
 {
   /* Assume STR is utf8 encoded */
   const struct module_make_string_args args = {str, length};
-  return lisp_to_value (internal_condition_case_ptr (module_make_string_1, &args, Qt, module_handle_error_ptr));
+  return lisp_to_value (env, internal_condition_case_ptr (module_make_string_1, &args, Qt, module_handle_error_ptr));
 }
 
 static bool module_copy_string_contents (emacs_env *env,
@@ -369,7 +402,7 @@ static emacs_value module_make_function (emacs_env *env,
 
   Lisp_Object ret = Feval (form, Qnil);
 
-  return lisp_to_value (ret);
+  return lisp_to_value (env, ret);
 }
 
 static Lisp_Object module_handle_signal (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
@@ -408,7 +441,7 @@ static emacs_value module_funcall (emacs_env *env,
   Lisp_Object ret = internal_condition_case_n (module_funcall_2, nargs+1, newargs, Qt, module_handle_signal);
 
   xfree (newargs);
-  return lisp_to_value (ret);
+  return lisp_to_value (env, ret);
 }
 
 DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
@@ -418,18 +451,22 @@ DATAPTR is the data pointer passed to make_function.
 ARGLIST is a list of argument passed to SUBRPTR. */)
   (Lisp_Object subrptr, Lisp_Object dataptr, Lisp_Object arglist)
 {
+  emacs_env env;
+  struct emacs_value_frame frame;
+  initialize_frame (&frame);
+  initialize_environment (&env, &frame);
+
   int len = XINT (Flength (arglist));
   emacs_value *args = xzalloc (len * sizeof (*args));
   int i;
 
   for (i = 0; i < len; i++)
     {
-      args[i] = (emacs_value) XCAR (arglist);
+      args[i] = lisp_to_value (&env, XCAR (arglist));
+      if (! args[i]) memory_full (sizeof *args[i]);
       arglist = XCDR (arglist);
     }
 
-  emacs_env env;
-  initialize_environment (&env);
   emacs_subr subr = (emacs_subr) XSAVE_POINTER (subrptr, 0);
   void *data = XSAVE_POINTER (dataptr, 0);
   module_pending_error = false;
@@ -468,7 +505,9 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
     .get_environment = module_get_environment,
   };
   emacs_env env;
-  initialize_environment (&env);
+  struct emacs_value_frame frame;
+  initialize_frame (&frame);
+  initialize_environment (&env, &frame);
   initial_environment = &env;
   int r = module_init (&runtime);
   initial_environment = 0;
