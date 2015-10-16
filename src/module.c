@@ -43,6 +43,8 @@ static void initialize_frame (struct emacs_value_frame *frame)
 }
 
 struct emacs_env_private {
+  bool pending_error;
+  struct emacs_value_tag error_symbol, error_data;
   struct emacs_value_frame initial_frame;
   struct emacs_value_frame *current_frame;
 };
@@ -93,6 +95,7 @@ static inline Lisp_Object value_to_lisp (emacs_value v)
 static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
 {
   struct emacs_env_private *const p = env->private_members;
+  if (p->pending_error) return NULL;
   eassert (p->current_frame);
   eassert (p->current_frame->offset < value_frame_size);
   eassert (! p->current_frame->next);
@@ -125,6 +128,7 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
 
 static void initialize_environment (struct env_storage *env)
 {
+  env->priv.pending_error = false;
   initialize_frame (&env->priv.initial_frame);
   env->priv.current_frame = &env->priv.initial_frame;
   env->pub.size            = sizeof env->pub;
@@ -198,34 +202,32 @@ static void module_free_global_ref (emacs_env *env,
     }
 }
 
-static bool module_pending_error;
-static Lisp_Object module_error_symbol;
-static Lisp_Object module_error_data;
-
 static bool module_error_check (emacs_env *env)
 {
-  return module_pending_error;
+  return env->private_members->pending_error;
 }
 
 static void module_error_clear (emacs_env *env)
 {
-  module_pending_error = false;
+  env->private_members->pending_error = false;
 }
 
 static bool module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
 {
-  if (! module_pending_error) return false;
-  *sym = lisp_to_value (env, module_error_symbol);
-  *data = lisp_to_value (env, module_error_data);
+  struct emacs_env_private *const p = env->private_members;
+  if (! p->pending_error) return false;
+  *sym = &p->error_symbol;
+  *data = &p->error_data;
   return true;
 }
 
-static void module_error_signal_1 (Lisp_Object sym, Lisp_Object data)
+static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data)
 {
-  eassert (! module_pending_error);
-  module_pending_error = true;
-  module_error_symbol = sym;
-  module_error_data = data;
+  struct emacs_env_private *const p = env->private_members;
+  eassert (! p->pending_error);
+  p->pending_error = true;
+  p->error_symbol.v = sym;
+  p->error_data.v = data;
 }
 
 /*
@@ -233,17 +235,46 @@ static void module_error_signal_1 (Lisp_Object sym, Lisp_Object data)
  */
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
-  module_error_signal_1 (value_to_lisp (sym), value_to_lisp (data));
+  module_error_signal_1 (env, value_to_lisp (sym), value_to_lisp (data));
 }
 
-static void module_wrong_type (Lisp_Object predicate, Lisp_Object value)
+static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value)
 {
-  module_error_signal_1 (Qwrong_type_argument, list2 (predicate, value));
+  module_error_signal_1 (env, Qwrong_type_argument, list2 (predicate, value));
 }
 
-static Lisp_Object module_handle_error_ptr (Lisp_Object err, const void *ptr)
+/* Arguments for all the signal-handling functions below.  Each
+   argument of type const void * is in fact of type
+   const struct module_args *, and the active union member is
+   determined by the function being called. */
+struct module_args {
+  emacs_env *env;
+  union {
+    struct {
+      const char *name;
+    } intern;
+    struct {
+      const char *str;
+      size_t length;
+    } make_string;
+    struct {
+      ptrdiff_t nargs;
+      Lisp_Object *args;
+    } funcall;
+  };
+};
+
+static Lisp_Object module_handle_signal (Lisp_Object err, const void *data)
 {
-  module_error_signal_1 (XCAR (err), XCDR (err));
+  const struct module_args *const a = (const struct module_args *) data;
+  module_error_signal_1 (a->env, XCAR (err), XCDR (err));
+  return Qnil;
+}
+
+static Lisp_Object module_handle_throw (Lisp_Object tag, Lisp_Object value, const void *data)
+{
+  const struct module_args *const a = (const struct module_args *) data;
+  module_error_signal_1 (a->env, Qno_catch, list2 (tag, value));
   return Qnil;
 }
 
@@ -256,12 +287,12 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 {
   if (n < MOST_NEGATIVE_FIXNUM)
     {
-      module_error_signal_1 (Qunderflow_error, Qnil);
+      module_error_signal_1 (env, Qunderflow_error, Qnil);
       return NULL;
     }
   if (n > MOST_POSITIVE_FIXNUM)
     {
-      module_error_signal_1 (Qoverflow_error, Qnil);
+      module_error_signal_1 (env, Qoverflow_error, Qnil);
       return NULL;
     }
   return lisp_to_value (env, make_number (n));
@@ -272,7 +303,7 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
   const Lisp_Object l = value_to_lisp (n);
   if (! INTEGERP (l))
     {
-      module_wrong_type (Qintegerp, l);
+      module_wrong_type (env, Qintegerp, l);
       return 0;
     }
   return (int64_t) XINT (l);
@@ -288,38 +319,38 @@ static double module_float_to_c_double (emacs_env *env, emacs_value f)
   const Lisp_Object lisp = value_to_lisp (f);
   if (! FLOATP (lisp))
     {
-      module_wrong_type (Qfloatp, lisp);
+      module_wrong_type (env, Qfloatp, lisp);
       return 0;
     }
   return (double) XFLOAT_DATA (lisp);
 }
 
-static Lisp_Object module_intern_1 (const void *name)
+static Lisp_Object module_intern_1 (const void *data)
 {
-  return intern ((const char *) name);
+  const struct module_args *const a = (const struct module_args *) data;
+  return intern (a->intern.name);
 }
 
 static emacs_value module_intern (emacs_env *env, const char *name)
 {
-  return lisp_to_value (env, internal_condition_case_ptr (module_intern_1, name, Qt, module_handle_error_ptr));
+  const struct module_args args = {
+    .env = env,
+    .intern.name = name
+  };
+  return lisp_to_value (env, internal_condition_case_ptr (module_intern_1, &args, Qt, module_handle_signal));
 }
 
-struct module_make_string_args {
-  const char *str;
-  size_t length;
-};
-
-static Lisp_Object module_make_string_1 (const void *args)
+static Lisp_Object module_make_string_1 (const void *data)
 {
-  const struct module_make_string_args *const a = (const struct module_make_string_args *) args;
-  return make_string (a->str, a->length);
+  const struct module_args *const a = (const struct module_args *) data;
+  return make_string (a->make_string.str, a->make_string.length);
 }
 
 static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
   /* Assume STR is utf8 encoded */
-  const struct module_make_string_args args = {str, length};
-  return lisp_to_value (env, internal_condition_case_ptr (module_make_string_1, &args, Qt, module_handle_error_ptr));
+  const struct module_args args = {.env = env, .make_string.str = str, .make_string.length = length};
+  return lisp_to_value (env, internal_condition_case_ptr (module_make_string_1, &args, Qt, module_handle_signal));
 }
 
 static bool module_copy_string_contents (emacs_env *env,
@@ -330,7 +361,7 @@ static bool module_copy_string_contents (emacs_env *env,
   Lisp_Object lisp_str = value_to_lisp (value);
   if (! STRINGP (lisp_str))
     {
-      module_wrong_type (Qstringp, lisp_str);
+      module_wrong_type (env, Qstringp, lisp_str);
       return false;
     }
 
@@ -434,21 +465,10 @@ static emacs_value module_make_function (emacs_env *env,
   return lisp_to_value (env, ret);
 }
 
-static Lisp_Object module_handle_signal (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
+static Lisp_Object module_funcall_2 (const void *data)
 {
-  module_error_signal_1 (XCAR (err), XCDR (err));
-  return Qnil;
-}
-
-static Lisp_Object module_handle_throw (Lisp_Object tag, Lisp_Object value, ptrdiff_t nargs, Lisp_Object *args)
-{
-  module_error_signal_1 (Qno_catch, list2 (tag, value));
-  return Qnil;
-}
-
-static Lisp_Object module_funcall_2 (ptrdiff_t nargs, Lisp_Object *args)
-{
-  return catch_all_n (Ffuncall, nargs, args, module_handle_throw);
+  const struct module_args *a = (const struct module_args *) data;
+  return catch_all_n (Ffuncall, a->funcall.nargs, a->funcall.args, a, module_handle_throw);
 }
 
 static emacs_value module_funcall (emacs_env *env,
@@ -460,16 +480,19 @@ static emacs_value module_funcall (emacs_env *env,
    *  Make a new Lisp_Object array starting with the function as the
    *  first arg, because that's what Ffuncall takes
    */
-  int i;
-  Lisp_Object *newargs = xmalloc ((nargs+1) * sizeof (*newargs));
-
+  Lisp_Object newargs[nargs + 1];
   newargs[0] = value_to_lisp (fun);
-  for (i = 0; i < nargs; i++)
+  for (int i = 0; i < nargs; i++)
     newargs[1 + i] = value_to_lisp (args[i]);
 
-  Lisp_Object ret = internal_condition_case_n (module_funcall_2, nargs+1, newargs, Qt, module_handle_signal);
+  const struct module_args margs = {
+    .env = env,
+    .funcall.nargs = nargs + 1,
+    .funcall.args = newargs
+  };
 
-  xfree (newargs);
+  Lisp_Object ret = internal_condition_case_ptr (module_funcall_2, &margs, Qt, module_handle_signal);
+
   return lisp_to_value (env, ret);
 }
 
@@ -495,12 +518,11 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
     }
 
   struct module_fun_env *envptr = (struct module_fun_env*) XSAVE_POINTER (envobj, 0);
-  module_pending_error = false;
   emacs_value ret = envptr->subr (&env.pub, len, args, envptr->data);
   xfree (args);
   finalize_environment (&env);
-  if (module_pending_error)
-    Fsignal (module_error_symbol, module_error_data);
+  if (env.priv.pending_error)
+    Fsignal (value_to_lisp (&env.priv.error_symbol), value_to_lisp (&env.priv.error_data));
   return value_to_lisp (ret);
 }
 

@@ -1079,10 +1079,10 @@ Lisp_Object
 catch_all_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
              ptrdiff_t nargs,
              Lisp_Object *args,
+             const void *data,
              Lisp_Object (*hfun) (Lisp_Object tag,
                                   Lisp_Object val,
-                                  ptrdiff_t nargs,
-                                  Lisp_Object *args))
+                                  const void *data))
 {
   struct handler *c;
   /* CATCHER_ALL is a special handler type used only here
@@ -1097,7 +1097,7 @@ catch_all_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
       const Lisp_Object tag_val = handlerlist->val;
       clobbered_eassert (handlerlist == c);
       handlerlist = handlerlist->next;
-      return (*hfun) (XCAR (tag_val), XCDR (tag_val), nargs, args);
+      return (*hfun) (XCAR (tag_val), XCDR (tag_val), data);
     }
 
   const Lisp_Object val = (*bfun) (nargs, args);
