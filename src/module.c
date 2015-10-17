@@ -364,6 +364,7 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 
 static emacs_value module_make_float (emacs_env *env, double d)
 {
+  MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, make_float (d));
 }
 
@@ -401,6 +402,7 @@ static bool module_copy_string_contents (emacs_env *env,
                                          char *buffer,
                                          size_t* length)
 {
+  MODULE_HANDLE_SIGNALS;
   Lisp_Object lisp_str = value_to_lisp (value);
   if (! STRINGP (lisp_str))
     {
