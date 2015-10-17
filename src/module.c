@@ -545,6 +545,7 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
 
 void syms_of_module (void)
 {
+  DEFSYM (Qmodule_refs_hash, "module-refs-hash");
   DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
 	       doc: /* Module global referrence table.  */);
 
@@ -552,6 +553,7 @@ void syms_of_module (void)
                                        make_float (DEFAULT_REHASH_SIZE),
                                        make_float (DEFAULT_REHASH_THRESHOLD),
                                        Qnil);
+  Funintern (Qmodule_refs_hash, Qnil);
 
   defsubr (&Smodule_call);
   defsubr (&Smodule_load);
