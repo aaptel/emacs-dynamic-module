@@ -80,6 +80,8 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
 
+static void out_of_memory (emacs_env *env);
+
 /*
  * Each instance of emacs_env get its own id from a simple counter
  */
@@ -99,7 +101,11 @@ static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
   if (p->current_frame->offset == value_frame_size - 1)
     {
       p->current_frame->next = malloc (sizeof *p->current_frame->next);
-      if (! p->current_frame->next) return 0;
+      if (! p->current_frame->next)
+        {
+          out_of_memory (env);
+          return NULL;
+        }
       initialize_frame (p->current_frame->next);
       p->current_frame = p->current_frame->next;
     }
@@ -239,6 +245,12 @@ static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value da
 static void module_wrong_type (Lisp_Object predicate, Lisp_Object value)
 {
   module_error_signal_1 (Qwrong_type_argument, list2 (predicate, value));
+}
+
+static void out_of_memory (emacs_env *env)
+{
+  // TODO: Reimplement this so it works even if memory-signal-data has been modified.
+  module_error_signal_1 (XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
 }
 
 static Lisp_Object module_handle_error_ptr (Lisp_Object err, const void *ptr)
