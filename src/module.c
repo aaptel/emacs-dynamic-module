@@ -556,6 +556,8 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
   finalize_environment (&env);
   if (env.priv.pending_error)
     xsignal (value_to_lisp (&env.priv.error_symbol), value_to_lisp (&env.priv.error_data));
+  if (ret == NULL)
+    xsignal0 (Qinvalid_module_call);
   return value_to_lisp (ret);
 }
 
@@ -595,6 +597,9 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   int r = module_init (&runtime.pub);
   finalize_environment (&runtime.priv.environment);
 
+  if (r != 0)
+    xsignal2 (Qmodule_load_failed, file, make_number (r));
+
   return Qt;
 }
 
@@ -609,6 +614,20 @@ void syms_of_module (void)
                                        make_float (DEFAULT_REHASH_THRESHOLD),
                                        Qnil);
   Funintern (Qmodule_refs_hash, Qnil);
+
+  DEFSYM (Qmodule_load_failed, "module-load-failed");
+  Fput (Qmodule_load_failed, Qerror_conditions,
+        listn (CONSTYPE_PURE, 2, Qmodule_load_failed, Qerror));
+  Fput (Qmodule_load_failed, Qerror_message,
+        build_pure_c_string ("Module load failed"));
+
+  DEFSYM (Qinvalid_module_call, "invalid-module-call");
+  Fput (Qinvalid_module_call, Qerror_conditions,
+        listn (CONSTYPE_PURE, 2, Qinvalid_module_call, Qerror));
+  Fput (Qinvalid_module_call, Qerror_message,
+        build_pure_c_string ("Invalid module call"));
+
+  initialize_storage (&global_storage);
 
   defsubr (&Smodule_call);
   defsubr (&Smodule_load);
