@@ -398,8 +398,9 @@ static void check_main_thread ()
 #if defined(HAVE_PTHREAD)
   eassert (pthread_equal (pthread_self (), main_thread));
 #elif defined(WINDOWSNT)
-  /* CompareObjectHandles would be perfect, but is only available
-     in Windows 10. */
+  /* CompareObjectHandles would be perfect, but is only available in
+     Windows 10.  Also check whether the thread is still running to
+     protect against thread identifier reuse. */
   eassert (GetCurrentThreadID () == GetThreadID (main_thread) &&
            WaitForSingleObject (main_thread, 0) == WAIT_TIMEOUT);
 #endif
