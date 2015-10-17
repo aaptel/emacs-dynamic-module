@@ -401,8 +401,8 @@ static void check_main_thread ()
 #elif defined(WINDOWSNT)
   /* CompareObjectHandles would be perfect, but is only available
      in Windows 10. */
-  if (WaitForSingleObject (main_thread, 0) != WAIT_TIMEOUT ||
-      GetCurrentThreadID () != GetThreadID (main_thread))
+  if (GetCurrentThreadID () != GetThreadID (main_thread) ||
+      WaitForSingleObject (main_thread, 0) != WAIT_TIMEOUT)
     emacs_abort ();
 #endif
 }
