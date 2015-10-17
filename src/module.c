@@ -555,7 +555,7 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
   xfree (args);
   finalize_environment (&env);
   if (env.priv.pending_error)
-    Fsignal (value_to_lisp (&env.priv.error_symbol), value_to_lisp (&env.priv.error_data));
+    xsignal (value_to_lisp (&env.priv.error_symbol), value_to_lisp (&env.priv.error_data));
   return value_to_lisp (ret);
 }
 
