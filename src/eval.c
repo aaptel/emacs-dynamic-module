@@ -1068,44 +1068,6 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object), Lisp_Object 
     }
 }
 
-/* Like internal_catch, but catches all throws for all tags.
-   Used for functions taking a variable number of arguments.
-   BFUN is called and its result is returned, but if
-   BFUN or any function directly or indirectly called by it
-   calls `throw', then HFUN is called with the TAG and VAL
-   passed to `throw', and the result of HFUN is returned. */
-
-Lisp_Object
-catch_all_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
-             ptrdiff_t nargs,
-             Lisp_Object *args,
-             const void *data,
-             Lisp_Object (*hfun) (Lisp_Object tag,
-                                  Lisp_Object val,
-                                  const void *data))
-{
-  struct handler *c;
-  /* CATCHER_ALL is a special handler type used only here
-     that serves as a handler for all possible invocations
-     of `throw'. */
-  PUSH_HANDLER (c, Qunbound, CATCHER_ALL);
-
-  if (sys_setjmp (c->jmp))
-    {
-      /* For CATCHER_ALL val is a cons (real-tag . real-val)
-         because tag itself is unbound. */
-      const Lisp_Object tag_val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return (*hfun) (XCAR (tag_val), XCDR (tag_val), data);
-    }
-
-  const Lisp_Object val = (*bfun) (nargs, args);
-  clobbered_eassert (handlerlist == c);
-  handlerlist = handlerlist->next;
-  return val;
-}
-
 /* Unwind the specbind, catch, and handler stacks back to CATCH, and
    jump to that CATCH, returning VALUE as the value of that catch.
 
@@ -1418,30 +1380,53 @@ internal_condition_case_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
   return val;
 }
 
-/* Like internal_condition_case but call BFUN with ARG as its argument. */
+static void init_handler (struct handler *c, Lisp_Object tag_ch_val,
+                          enum handlertype handlertype);
 
-Lisp_Object
-internal_condition_case_ptr (Lisp_Object (*bfun) (const void *),
-                             const void *arg,
-                             Lisp_Object handlers,
-                             Lisp_Object (*hfun) (Lisp_Object err, const void *arg))
+void push_handler (struct handler **const c, const Lisp_Object tag_ch_val,
+                   const enum handlertype handlertype)
 {
-  Lisp_Object val;
-  struct handler *c;
-
-  PUSH_HANDLER (c, handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
+  if (handlerlist->nextfree)
+    *c = handlerlist->nextfree;
+  else
     {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return (*hfun) (val, arg);
+      *c = xmalloc (sizeof (struct handler));
+      (*c)->nextfree = NULL;
+      handlerlist->nextfree = *c;
     }
+  init_handler (*c, tag_ch_val, handlertype);
+}
 
-  val = (*bfun) (arg);
-  clobbered_eassert (handlerlist == c);
-  handlerlist = handlerlist->next;
-  return val;
+bool push_handler_nosignal (struct handler **const c, const Lisp_Object tag_ch_val,
+                            const enum handlertype handlertype)
+{
+  if (handlerlist->nextfree)
+    *c = handlerlist->nextfree;
+  else
+    {
+      struct handler *const h = malloc (sizeof (struct handler));
+      if (! h) return false;
+      *c = h;
+      h->nextfree = NULL;
+      handlerlist->nextfree = h;
+    }
+  init_handler (*c, tag_ch_val, handlertype);
+  return true;
+}
+
+static void init_handler (struct handler *const c, const Lisp_Object tag_ch_val,
+                          const enum handlertype handlertype)
+{
+  c->type = handlertype;
+  c->tag_or_ch = tag_ch_val;
+  c->val = Qnil;
+  c->next = handlerlist;
+  c->lisp_eval_depth = lisp_eval_depth;
+  c->pdlcount = SPECPDL_INDEX ();
+  c->poll_suppress_count = poll_suppress_count;
+  c->interrupt_input_blocked = interrupt_input_blocked;
+  c->byte_stack = byte_stack_list;
+  handlerlist = c;
 }
 
 
