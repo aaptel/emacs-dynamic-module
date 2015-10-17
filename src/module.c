@@ -396,14 +396,12 @@ static emacs_value module_funcall (emacs_env *env,
 static void check_main_thread ()
 {
 #if defined(HAVE_PTHREAD)
-  if (! pthread_equal (pthread_self (), main_thread))
-    emacs_abort ();
+  eassert (pthread_equal (pthread_self (), main_thread));
 #elif defined(WINDOWSNT)
   /* CompareObjectHandles would be perfect, but is only available
      in Windows 10. */
-  if (GetCurrentThreadID () != GetThreadID (main_thread) ||
-      WaitForSingleObject (main_thread, 0) != WAIT_TIMEOUT)
-    emacs_abort ();
+  eassert (GetCurrentThreadID () == GetThreadID (main_thread) &&
+           WaitForSingleObject (main_thread, 0) == WAIT_TIMEOUT);
 #endif
 }
 
