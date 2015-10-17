@@ -82,6 +82,8 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
 
+static void out_of_memory (emacs_env *env);
+
 /*
  * Each instance of emacs_env get its own id from a simple counter
  */
@@ -102,7 +104,11 @@ static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
   if (p->current_frame->offset == value_frame_size - 1)
     {
       p->current_frame->next = malloc (sizeof *p->current_frame->next);
-      if (! p->current_frame->next) return 0;
+      if (! p->current_frame->next)
+        {
+          out_of_memory (env);
+          return NULL;
+        }
       initialize_frame (p->current_frame->next);
       p->current_frame = p->current_frame->next;
     }
@@ -155,8 +161,8 @@ static void initialize_environment (struct env_storage *env)
 
 static void finalize_environment (struct env_storage *env)
 {
-  for (struct emacs_value_frame *frame = env->priv.initial_frame.next; frame; frame = frame->next)
-    free (frame);
+  for (struct emacs_value_frame *frame = &env->priv.initial_frame; frame->next; frame = frame->next)
+    free (frame->next);
 }
 
 /*
@@ -241,6 +247,12 @@ static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value da
 static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value)
 {
   module_error_signal_1 (env, Qwrong_type_argument, list2 (predicate, value));
+}
+
+static void out_of_memory (emacs_env *env)
+{
+  // TODO: Reimplement this so it works even if memory-signal-data has been modified.
+  module_error_signal_1 (env, XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
 }
 
 /* Arguments for all the signal-handling functions below.  Each
@@ -567,6 +579,7 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
 
 void syms_of_module (void)
 {
+  DEFSYM (Qmodule_refs_hash, "module-refs-hash");
   DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
 	       doc: /* Module global referrence table.  */);
 
@@ -574,6 +587,7 @@ void syms_of_module (void)
                                        make_float (DEFAULT_REHASH_SIZE),
                                        make_float (DEFAULT_REHASH_THRESHOLD),
                                        Qnil);
+  Funintern (Qmodule_refs_hash, Qnil);
 
   defsubr (&Smodule_call);
   defsubr (&Smodule_load);
