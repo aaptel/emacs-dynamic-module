@@ -151,8 +151,8 @@ static void initialize_environment (struct env_storage *env)
 
 static void finalize_environment (struct env_storage *env)
 {
-  for (struct emacs_value_frame *frame = env->priv.initial_frame.next; frame; frame = frame->next)
-    free (frame);
+  for (struct emacs_value_frame *frame = &env->priv.initial_frame; frame->next; frame = frame->next)
+    free (frame->next);
 }
 
 /*
