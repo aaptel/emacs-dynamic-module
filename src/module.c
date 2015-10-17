@@ -351,13 +351,15 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 {
+  static_assert(INT64_MIN <= MOST_NEGATIVE_FIXNUM, "int64_t is too small");
+  static_assert(INT64_MAX >= MOST_POSITIVE_FIXNUM, "int64_t is too small");
   const Lisp_Object l = value_to_lisp (n);
   if (! INTEGERP (l))
     {
       module_wrong_type (env, Qintegerp, l);
       return 0;
     }
-  return (int64_t) XINT (l);
+  return XINT (l);
 }
 
 static emacs_value module_make_float (emacs_env *env, double d)
