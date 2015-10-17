@@ -34,9 +34,14 @@ static pthread_t main_thread;
 static HANDLE main_thread;
 #endif
 
+struct emacs_value_tag { Lisp_Object v; };
+
 void syms_of_module (void);
 static struct emacs_runtime* module_get_runtime (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
+static bool module_error_check (emacs_env *env);
+static void module_error_clear (emacs_env *env);
+static bool module_error_get (emacs_env *emv, emacs_value *sym, emacs_value *data);
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
@@ -44,7 +49,8 @@ static emacs_value module_intern (emacs_env *env, const char *name);
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
-                                         emacs_subr subr);
+                                         emacs_subr subr,
+                                         void *data);
 static emacs_value module_funcall (emacs_env *env,
                                    emacs_value fun,
                                    int nargs,
@@ -100,6 +106,9 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->make_global_ref = module_make_global_ref;
   env->free_global_ref = module_free_global_ref;
   env->type_of         = module_type_of;
+  env->error_check     = module_error_check;
+  env->error_clear     = module_error_clear;
+  env->error_get       = module_error_get;
   env->error_signal    = module_error_signal;
   env->make_fixnum     = module_make_fixnum;
   env->fixnum_to_int   = module_fixnum_to_int;
@@ -159,15 +168,37 @@ static void module_free_global_ref (emacs_env *env,
     }
 }
 
+static bool module_pending_error;
+static Lisp_Object module_error_symbol;
+static Lisp_Object module_error_data;
+
+static bool module_error_check (emacs_env *env)
+{
+  return module_pending_error;
+}
+
+static void module_error_clear (emacs_env *env)
+{
+  module_pending_error = false;
+}
+
+static bool module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
+{
+  if (! module_pending_error) return false;
+  *sym = lisp_to_value (module_error_symbol);
+  *data = lisp_to_value (module_error_data);
+  return true;
+}
+
 /*
  * Like for `signal', DATA must be a list
- *
- * This function doesnt return.
  */
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
   check_main_thread ();
-    xsignal (value_to_lisp (sym), value_to_lisp (data));
+  module_pending_error = true;
+  module_error_symbol = value_to_lisp (sym);
+  module_error_data = value_to_lisp (data);
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
@@ -267,6 +298,13 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
     }
 }
 
+struct module_fun_env
+{
+  emacs_env *env;
+  emacs_subr subr;
+  void *data;
+};
+
 /*
  * A module function is lambda function that calls `module-call',
  * passing the function pointer of the module function along with the
@@ -276,34 +314,60 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
  *    (lambda
  *     (&rest arglist)
  *     (module-call
- *      envptr
- *      subrptr
+ *      envobj
  *      arglist)))
  *
  */
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
-                                         emacs_subr subr)
+                                         emacs_subr subr,
+                                         void *data)
 {
   check_main_thread();
+  Lisp_Object envobj;
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
   Lisp_Object Qmodule_call = intern ("module-call");
-  Lisp_Object envptr = make_save_ptr ((void*) env);
-  Lisp_Object subrptr = make_save_ptr ((void*) subr);
+
+  /* XXX: This should need to be freed when envobj is GC'd */
+  struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
+  envptr->env = env;
+  envptr->subr = subr;
+  envptr->data = data;
+  envobj = make_save_ptr ((void*) envptr);
 
   Lisp_Object form = list2 (Qfunction,
                             list3 (Qlambda,
                                    list2 (Qrest, Qarglist),
-                                   list4 (Qmodule_call,
-                                          envptr,
-                                          subrptr,
+                                   list3 (Qmodule_call,
+                                          envobj,
                                           Qarglist)));
 
   Lisp_Object ret = Feval (form, Qnil);
 
   return lisp_to_value (ret);
+}
+
+static Lisp_Object module_handle_signal (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
+{
+  module_pending_error = true;
+  module_error_symbol = XCAR (err);
+  module_error_data = XCDR (err);
+  return Qnil;
+}
+
+static Lisp_Object module_handle_throw (Lisp_Object tag, Lisp_Object value, ptrdiff_t nargs, Lisp_Object *args)
+{
+  module_pending_error = true;
+  module_error_symbol = Qno_catch;
+  module_error_data = list2 (tag, value);
+  return Qnil;
+}
+
+static Lisp_Object module_funcall_2 (ptrdiff_t nargs, Lisp_Object *args)
+{
+  return catch_all_n (Ffuncall, nargs, args, module_handle_throw);
 }
 
 static emacs_value module_funcall (emacs_env *env,
@@ -323,7 +387,7 @@ static emacs_value module_funcall (emacs_env *env,
   for (i = 0; i < nargs; i++)
     newargs[1 + i] = value_to_lisp (args[i]);
 
-  Lisp_Object ret = Ffuncall (nargs+1, newargs);
+  Lisp_Object ret = internal_condition_case_n (module_funcall_2, nargs+1, newargs, Qt, module_handle_signal);
 
   xfree (newargs);
   return lisp_to_value (ret);
@@ -343,12 +407,13 @@ static void check_main_thread ()
 #endif
 }
 
-DEFUN ("module-call", Fmodule_call, Smodule_call, 3, 3, 0,
+DEFUN ("module-call", Fmodule_call, Smodule_call, 2, 2, 0,
        doc: /* Internal function to call a module function.
 ENVPTR is the emacs_env pointer to pass the module function.
 SUBRPTR is the module function pointer (emacs_subr prototype) to call.
+DATAPTR is the data pointer passed to make_function.
 ARGLIST is a list of argument passed to SUBRPTR. */)
-  (Lisp_Object envptr, Lisp_Object subrptr, Lisp_Object arglist)
+  (Lisp_Object envobj, Lisp_Object arglist)
 {
   int len = XINT (Flength (arglist));
   emacs_value *args = xzalloc (len * sizeof (*args));
@@ -356,13 +421,16 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
 
   for (i = 0; i < len; i++)
     {
-      args[i] = (emacs_value) XCAR (arglist);
+      args[i] = lisp_to_value (XCAR (arglist));
       arglist = XCDR (arglist);
     }
 
-  emacs_env *env = (emacs_env*) XSAVE_POINTER (envptr, 0);
-  emacs_subr subr = (emacs_subr) XSAVE_POINTER (subrptr, 0);
-  emacs_value ret = subr (env, len, args);
+  struct module_fun_env *envptr = (struct module_fun_env*) XSAVE_POINTER (envobj, 0);
+  module_pending_error = false;
+  emacs_value ret = envptr->subr (envptr->env, len, args, envptr->data);
+  xfree (args);
+  if (module_pending_error)
+    Fsignal (module_error_symbol, module_error_data);
   return value_to_lisp (ret);
 }
 
