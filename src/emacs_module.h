@@ -123,6 +123,8 @@ struct emacs_env_25 {
 
   bool (*is_not_nil)(emacs_env *env, emacs_value value);
 
+  bool (*eq)(emacs_env *env, emacs_value a, emacs_value b);
+
   int64_t (*fixnum_to_int)(emacs_env *env,
                            emacs_value value);
 
