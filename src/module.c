@@ -122,7 +122,7 @@ static bool module_copy_string_contents (emacs_env *env,
                                          emacs_value value,
                                          char *buffer,
                                          size_t* length);
-static enum emacs_type module_type_of (emacs_env *env, emacs_value value);
+static emacs_value module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
 
@@ -432,34 +432,9 @@ static bool module_copy_string_contents (emacs_env *env,
   return true;
 }
 
-static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
+static emacs_value module_type_of (emacs_env *env, emacs_value value)
 {
-  Lisp_Object obj = value_to_lisp (value);
-
-  /* Module writers probably don't care about internal types which are
-     subject to change anyway... */
-
-  switch (XTYPE (obj))
-    {
-    case_Lisp_Int:
-      return EMACS_FIXNUM;
-    case Lisp_Symbol:
-      return EMACS_SYMBOL;
-    case Lisp_Float:
-      return EMACS_FLOAT;
-    case Lisp_String:
-      return EMACS_STRING;
-    case Lisp_Cons:
-      return EMACS_CONS;
-    case Lisp_Vectorlike:
-      if (HASH_TABLE_P (obj))
-        return EMACS_HASHTABLE;
-      if (VECTORP (obj))
-        return EMACS_VECTOR;
-    /* FALLTHROUGH */
-    default:
-      return EMACS_OTHER;
-    }
+  return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
 }
 
 struct module_fun_env
