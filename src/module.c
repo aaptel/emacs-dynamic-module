@@ -70,6 +70,18 @@ static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
 static void check_main_thread ();
 
+emacs_value module_make_user_ptr (emacs_env *env,
+                                  emacs_finalizer_function fin,
+                                  void *ptr);
+
+void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr);
+void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr);
+
+emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr);
+void module_set_user_ptr_finalizer (emacs_env *env,
+                                    emacs_value uptr,
+                                    emacs_finalizer_function fin);
+
 /*
  * Each instance of emacs_env get its own id from a simple counter
  */
@@ -119,7 +131,11 @@ static emacs_env* module_get_environment (struct emacs_runtime *ert)
   env->funcall         = module_funcall;
   env->make_string     = module_make_string;
   env->copy_string_contents = module_copy_string_contents;
-
+  env->make_user_ptr = module_make_user_ptr;
+  env->get_user_ptr_ptr = module_get_user_ptr_ptr;
+  env->set_user_ptr_ptr = module_set_user_ptr_ptr;
+  env->get_user_ptr_finalizer = module_get_user_ptr_finalizer;
+  env->set_user_ptr_finalizer = module_set_user_ptr_finalizer;
   return env;
 }
 
@@ -296,6 +312,37 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
     default:
       return EMACS_OTHER;
     }
+}
+
+emacs_value module_make_user_ptr (emacs_env *env,
+                                  emacs_finalizer_function fin,
+                                  void *ptr)
+{
+  return lisp_to_value (make_user_ptr (env->module_id, fin, ptr));
+}
+
+
+void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
+{
+  return XUSER_PTR (value_to_lisp (uptr))->p;
+}
+
+void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
+{
+  XUSER_PTR (value_to_lisp (uptr))->p = ptr;
+}
+
+
+emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
+{
+  return XUSER_PTR (value_to_lisp (uptr))->finalizer;
+}
+
+void module_set_user_ptr_finalizer (emacs_env *env,
+                                    emacs_value uptr,
+                                    emacs_finalizer_function fin)
+{
+  XUSER_PTR (value_to_lisp (uptr))->finalizer = fin;
 }
 
 struct module_fun_env
