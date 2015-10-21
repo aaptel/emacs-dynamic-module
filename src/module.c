@@ -18,7 +18,6 @@
   along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -28,12 +27,24 @@
 #include "emacs_module.h"
 #include "dynlib.h"
 #include "coding.h"
+#include "verify.h"
+
+enum {
+  module_has_cleanup =
+#if defined(__has_attribute) && __has_attribute(cleanup)
+  1
+#elif defined(__GNUC__) && __GNUC__ >= 4
+  1
+#else
+  0
+#endif
+};
 
 struct emacs_value_tag { Lisp_Object v; };
 
 static void module_out_of_memory (emacs_env *env);
 
-static const size_t value_frame_size = 512;
+enum { value_frame_size = 512 };
 
 struct emacs_value_frame {
   struct emacs_value_tag objects[value_frame_size];
@@ -127,6 +138,18 @@ static emacs_value module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
 
+emacs_value module_make_user_ptr (emacs_env *env,
+                                  emacs_finalizer_function fin,
+                                  void *ptr);
+
+void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr);
+void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr);
+
+emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr);
+void module_set_user_ptr_finalizer (emacs_env *env,
+                                    emacs_value uptr,
+                                    emacs_finalizer_function fin);
+
 static void module_handle_signal (emacs_env *env, Lisp_Object err);
 static void module_handle_throw (emacs_env *env, Lisp_Object tag_val);
 
@@ -157,7 +180,7 @@ static void module_reset_handlerlist(const int *dummy)
     module_out_of_memory(env);                                                 \
     return retval;                                                             \
   }                                                                            \
-  static_assert(__has_attribute(cleanup), "__attribute__((cleanup)) missing"); \
+  verify(module_has_cleanup);                                                  \
   const int dummy __attribute__((cleanup(module_reset_handlerlist)));          \
   if (sys_setjmp(c->jmp)) {                                                    \
     (handlerfunc)(env, c->val);                                                \
@@ -222,6 +245,11 @@ static void initialize_environment (struct env_storage *env)
   env->pub.make_string     = module_make_string;
   env->pub.copy_string_contents = module_copy_string_contents;
   env->pub.private_members = &env->priv;
+  env->pub.make_user_ptr = module_make_user_ptr;
+  env->pub.get_user_ptr_ptr = module_get_user_ptr_ptr;
+  env->pub.set_user_ptr_ptr = module_set_user_ptr_ptr;
+  env->pub.get_user_ptr_finalizer = module_get_user_ptr_finalizer;
+  env->pub.set_user_ptr_finalizer = module_set_user_ptr_finalizer;
 }
 
 static void finalize_environment (struct env_storage *env)
@@ -358,8 +386,8 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 
 static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 {
-  static_assert(INT64_MIN <= MOST_NEGATIVE_FIXNUM, "int64_t is too small");
-  static_assert(INT64_MAX >= MOST_POSITIVE_FIXNUM, "int64_t is too small");
+  verify(INT64_MIN <= MOST_NEGATIVE_FIXNUM);
+  verify(INT64_MAX >= MOST_POSITIVE_FIXNUM);
   const Lisp_Object l = value_to_lisp (n);
   if (! INTEGERP (l))
     {
@@ -442,6 +470,37 @@ static bool module_copy_string_contents (emacs_env *env,
 static emacs_value module_type_of (emacs_env *env, emacs_value value)
 {
   return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
+}
+
+emacs_value module_make_user_ptr (emacs_env *env,
+                                  emacs_finalizer_function fin,
+                                  void *ptr)
+{
+  return lisp_to_value (env, make_user_ptr (env->module_id, fin, ptr));
+}
+
+
+void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
+{
+  return XUSER_PTR (value_to_lisp (uptr))->p;
+}
+
+void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
+{
+  XUSER_PTR (value_to_lisp (uptr))->p = ptr;
+}
+
+
+emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
+{
+  return XUSER_PTR (value_to_lisp (uptr))->finalizer;
+}
+
+void module_set_user_ptr_finalizer (emacs_env *env,
+                                    emacs_value uptr,
+                                    emacs_finalizer_function fin)
+{
+  XUSER_PTR (value_to_lisp (uptr))->finalizer = fin;
 }
 
 struct module_fun_env
