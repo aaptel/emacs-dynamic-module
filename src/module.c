@@ -28,7 +28,7 @@
 
 struct emacs_value_tag { Lisp_Object v; };
 
-static const size_t value_frame_size = 512;
+enum { value_frame_size = 512 };
 
 struct emacs_value_frame {
   struct emacs_value_tag objects[value_frame_size];
@@ -79,6 +79,18 @@ static bool module_copy_string_contents (emacs_env *env,
 static enum emacs_type module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
+
+emacs_value module_make_user_ptr (emacs_env *env,
+                                  emacs_finalizer_function fin,
+                                  void *ptr);
+
+void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr);
+void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr);
+
+emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr);
+void module_set_user_ptr_finalizer (emacs_env *env,
+                                    emacs_value uptr,
+                                    emacs_finalizer_function fin);
 
 static void out_of_memory (emacs_env *env);
 
@@ -152,6 +164,11 @@ static void initialize_environment (struct env_storage *env)
   env->pub.funcall         = module_funcall;
   env->pub.make_string     = module_make_string;
   env->pub.copy_string_contents = module_copy_string_contents;
+  env->pub.make_user_ptr = module_make_user_ptr;
+  env->pub.get_user_ptr_ptr = module_get_user_ptr_ptr;
+  env->pub.set_user_ptr_ptr = module_set_user_ptr_ptr;
+  env->pub.get_user_ptr_finalizer = module_get_user_ptr_finalizer;
+  env->pub.set_user_ptr_finalizer = module_set_user_ptr_finalizer;
   env->pub.private_members = &env->priv;
 }
 
@@ -396,6 +413,37 @@ static enum emacs_type module_type_of (emacs_env *env, emacs_value value)
     default:
       return EMACS_OTHER;
     }
+}
+
+emacs_value module_make_user_ptr (emacs_env *env,
+                                  emacs_finalizer_function fin,
+                                  void *ptr)
+{
+  return lisp_to_value (env, make_user_ptr (env->module_id, fin, ptr));
+}
+
+
+void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
+{
+  return XUSER_PTR (value_to_lisp (uptr))->p;
+}
+
+void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
+{
+  XUSER_PTR (value_to_lisp (uptr))->p = ptr;
+}
+
+
+emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
+{
+  return XUSER_PTR (value_to_lisp (uptr))->finalizer;
+}
+
+void module_set_user_ptr_finalizer (emacs_env *env,
+                                    emacs_value uptr,
+                                    emacs_finalizer_function fin)
+{
+  XUSER_PTR (value_to_lisp (uptr))->finalizer = fin;
 }
 
 struct module_fun_env

@@ -73,6 +73,10 @@ typedef emacs_value (*emacs_subr)(emacs_env *env,
                                   int nargs,
                                   emacs_value args[],
                                   void *data);
+
+/* Function prototype for module user-pointer finalizers */
+typedef void (*emacs_finalizer_function)(void*) EMACS_NOEXCEPT;
+
 struct emacs_env_25 {
   /*
    * Structure size (for version checking)
@@ -171,6 +175,21 @@ struct emacs_env_25 {
    */
   emacs_value (*make_string)(emacs_env *env,
                              const char *contents, size_t length);
+
+  /*
+   * Embedded pointer type
+   */
+  emacs_value (*make_user_ptr)(emacs_env *env,
+                               emacs_finalizer_function fin,
+                               void *ptr);
+
+  void* (*get_user_ptr_ptr)(emacs_env *env, emacs_value uptr);
+  void (*set_user_ptr_ptr)(emacs_env *env, emacs_value uptr, void *ptr);
+
+  emacs_finalizer_function (*get_user_ptr_finalizer)(emacs_env *env, emacs_value uptr);
+  void (*set_user_ptr_finalizer)(emacs_env *env,
+                                 emacs_value uptr,
+                                 emacs_finalizer_function fin);
 
   struct emacs_env_private *private_members;
 };
