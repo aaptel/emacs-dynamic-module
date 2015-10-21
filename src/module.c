@@ -318,23 +318,27 @@ emacs_value module_make_user_ptr (emacs_env *env,
                                   emacs_finalizer_function fin,
                                   void *ptr)
 {
+  check_main_thread ();
   return lisp_to_value (make_user_ptr (env->module_id, fin, ptr));
 }
 
 
 void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
 {
+  check_main_thread ();
   return XUSER_PTR (value_to_lisp (uptr))->p;
 }
 
 void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
 {
+  check_main_thread ();
   XUSER_PTR (value_to_lisp (uptr))->p = ptr;
 }
 
 
 emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
 {
+  check_main_thread ();
   return XUSER_PTR (value_to_lisp (uptr))->finalizer;
 }
 
@@ -342,6 +346,7 @@ void module_set_user_ptr_finalizer (emacs_env *env,
                                     emacs_value uptr,
                                     emacs_finalizer_function fin)
 {
+  check_main_thread ();
   XUSER_PTR (value_to_lisp (uptr))->finalizer = fin;
 }
 
