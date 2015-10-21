@@ -137,7 +137,7 @@ int plugin_is_GPL_compatible;
 static emacs_value Qnil;
 static emacs_value Qt;
 
-static emacs_value ${c_func} (emacs_env *env, int nargs, emacs_value args[])
+static emacs_value ${c_func} (emacs_env *env, int nargs, emacs_value args[], void *data)
 {
   return Qt;
 }

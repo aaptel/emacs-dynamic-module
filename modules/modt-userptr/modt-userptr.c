@@ -19,7 +19,7 @@ static void finalizer (void *p)
     free (p);
 }
 
-static emacs_value Fmodt_userptr_make (emacs_env *env, int nargs, emacs_value args[])
+static emacs_value Fmodt_userptr_make (emacs_env *env, int nargs, emacs_value args[], void *data)
 {
   if (nargs != 1)
     return Qnil;
@@ -29,7 +29,7 @@ static emacs_value Fmodt_userptr_make (emacs_env *env, int nargs, emacs_value ar
   return env->make_user_ptr (env, finalizer, p);
 }
 
-static emacs_value Fmodt_userptr_get (emacs_env *env, int nargs, emacs_value args[])
+static emacs_value Fmodt_userptr_get (emacs_env *env, int nargs, emacs_value args[], void *data)
 {
   if (nargs != 1)
     return Qnil;
