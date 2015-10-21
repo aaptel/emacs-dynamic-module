@@ -167,7 +167,7 @@ int emacs_module_init (struct emacs_runtime *ert)
   emacs_env *env = ert->get_environment (ert);
   Qnil = env->intern (env, "nil");
   Qt = env->intern (env, "t");
-  bind_function (env, "${lisp_func}", env->make_function (env, 1, 1, ${c_func}));
+  bind_function (env, "${lisp_func}", env->make_function (env, 1, 1, ${c_func}, NULL));
   provide (env, "${module}");
   return 0;
 }
