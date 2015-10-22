@@ -40,6 +40,16 @@ enum {
 #endif
 };
 
+#if defined(HAVE_PTHREAD)
+#include <pthread.h>
+static pthread_t main_thread;
+#elif defined(WINDOWSNT)
+#include <windows.h>
+/* On Windows, we store a handle to the main thread instead of the
+   thread ID because the latter can be reused when a thread terminates. */
+static HANDLE main_thread;
+#endif
+
 struct emacs_value_tag { Lisp_Object v; };
 
 static void module_out_of_memory (emacs_env *env);
@@ -137,6 +147,7 @@ static bool module_copy_string_contents (emacs_env *env,
 static emacs_value module_type_of (emacs_env *env, emacs_value value);
 static emacs_value module_make_float (emacs_env *env, double d);
 static double module_float_to_c_double (emacs_env *env, emacs_value f);
+static void check_main_thread ();
 
 emacs_value module_make_user_ptr (emacs_env *env,
                                   emacs_finalizer_function fin,
@@ -265,6 +276,7 @@ static void finalize_environment (struct env_storage *env)
 static emacs_value module_make_global_ref (emacs_env *env,
                                            emacs_value ref)
 {
+  check_main_thread ();
   MODULE_HANDLE_SIGNALS;
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
   Lisp_Object mid = make_number (env->module_id);
@@ -288,6 +300,7 @@ static emacs_value module_make_global_ref (emacs_env *env,
 static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref)
 {
+  check_main_thread ();
   MODULE_HANDLE_SIGNALS_VOID;
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
   Lisp_Object mid = make_number (env->module_id);
@@ -366,11 +379,13 @@ static bool module_is_not_nil (emacs_env *env, emacs_value value)
 
 static bool module_eq (emacs_env *env, emacs_value a, emacs_value b)
 {
+  check_main_thread ();
   return EQ (value_to_lisp (a), value_to_lisp (b));
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 {
+  check_main_thread ();
   if (n < MOST_NEGATIVE_FIXNUM)
     {
       module_error_signal_1 (env, Qunderflow_error, Qnil);
@@ -388,6 +403,7 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 {
   verify(INT64_MIN <= MOST_NEGATIVE_FIXNUM);
   verify(INT64_MAX >= MOST_POSITIVE_FIXNUM);
+  check_main_thread ();
   const Lisp_Object l = value_to_lisp (n);
   if (! INTEGERP (l))
     {
@@ -399,12 +415,14 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 
 static emacs_value module_make_float (emacs_env *env, double d)
 {
+  check_main_thread ();
   MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, make_float (d));
 }
 
 static double module_float_to_c_double (emacs_env *env, emacs_value f)
 {
+  check_main_thread ();
   const Lisp_Object lisp = value_to_lisp (f);
   if (! FLOATP (lisp))
     {
@@ -416,12 +434,14 @@ static double module_float_to_c_double (emacs_env *env, emacs_value f)
 
 static emacs_value module_intern (emacs_env *env, const char *name)
 {
+  check_main_thread ();
   MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, intern (name));
 }
 
 static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
+  check_main_thread ();
   MODULE_HANDLE_SIGNALS;
   if (length > PTRDIFF_MAX)
     {
@@ -437,6 +457,7 @@ static bool module_copy_string_contents (emacs_env *env,
                                          char *buffer,
                                          size_t* length)
 {
+  check_main_thread ();
   MODULE_HANDLE_SIGNALS;
   Lisp_Object lisp_str = value_to_lisp (value);
   if (! STRINGP (lisp_str))
@@ -469,6 +490,7 @@ static bool module_copy_string_contents (emacs_env *env,
 
 static emacs_value module_type_of (emacs_env *env, emacs_value value)
 {
+  check_main_thread ();
   return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
 }
 
@@ -476,23 +498,27 @@ emacs_value module_make_user_ptr (emacs_env *env,
                                   emacs_finalizer_function fin,
                                   void *ptr)
 {
+  check_main_thread ();
   return lisp_to_value (env, make_user_ptr (env->module_id, fin, ptr));
 }
 
 
 void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
 {
+  check_main_thread ();
   return XUSER_PTR (value_to_lisp (uptr))->p;
 }
 
 void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
 {
+  check_main_thread ();
   XUSER_PTR (value_to_lisp (uptr))->p = ptr;
 }
 
 
 emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
 {
+  check_main_thread ();
   return XUSER_PTR (value_to_lisp (uptr))->finalizer;
 }
 
@@ -500,6 +526,7 @@ void module_set_user_ptr_finalizer (emacs_env *env,
                                     emacs_value uptr,
                                     emacs_finalizer_function fin)
 {
+  check_main_thread ();
   XUSER_PTR (value_to_lisp (uptr))->finalizer = fin;
 }
 
@@ -528,6 +555,7 @@ static emacs_value module_make_function (emacs_env *env,
                                          emacs_subr subr,
                                          void *data)
 {
+  check_main_thread();
   MODULE_HANDLE_SIGNALS;
 
   Lisp_Object envobj;
@@ -556,6 +584,7 @@ static emacs_value module_funcall (emacs_env *env,
                                    int nargs,
                                    emacs_value args[])
 {
+  check_main_thread();
   MODULE_HANDLE_SIGNALS;
   MODULE_HANDLE_THROW;
 
@@ -568,6 +597,19 @@ static emacs_value module_funcall (emacs_env *env,
   for (int i = 0; i < nargs; i++)
     newargs[1 + i] = value_to_lisp (args[i]);
   return lisp_to_value (env, Ffuncall (nargs + 1, newargs));
+}
+
+static void check_main_thread ()
+{
+#if defined(HAVE_PTHREAD)
+  eassert (pthread_equal (pthread_self (), main_thread));
+#elif defined(WINDOWSNT)
+  /* CompareObjectHandles would be perfect, but is only available in
+     Windows 10.  Also check whether the thread is still running to
+     protect against thread identifier reuse. */
+  eassert (GetCurrentThreadID () == GetThreadID (main_thread) &&
+           WaitForSingleObject (main_thread, 0) == WAIT_TIMEOUT);
+#endif
 }
 
 DEFUN ("module-call", Fmodule_call, Smodule_call, 2, 2, 0,
@@ -646,6 +688,19 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
 
 void syms_of_module (void)
 {
+  /* It is not guaranteed that dynamic initializers run in the main thread,
+     therefore we detect the main thread here. */
+#if defined(HAVE_PTHREAD)
+  main_thread = pthread_self ();
+#elif defined(WINDOWSNT)
+  /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
+  if (! DuplicateHandle (GetCurrentProcess(), GetCurrentThread(),
+                         GetCurrentProcess(), &main_thread,
+                         SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION,
+                         FALSE, 0))
+    emacs_abort ();
+#endif
+
   DEFSYM (Qmodule_refs_hash, "module-refs-hash");
   DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
 	       doc: /* Module global referrence table.  */);
