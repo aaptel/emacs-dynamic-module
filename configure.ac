@@ -3271,7 +3271,8 @@ if test "${with_modules}" != "no"; then
   elif test "$opsys" = "darwin"; then
     MODULES_SUFFIX=".so"
     HAVE_MODULES=yes
-  elif test "$opsys" = "darwin"; then
+  elif test "$opsys" = "mingw32"; then
+    MODULES_SUFFIX=".dll"
     HAVE_MODULES=yes
   else
     # XXX: compile test program using dlopen and see whether it
