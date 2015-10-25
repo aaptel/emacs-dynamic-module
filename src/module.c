@@ -31,9 +31,7 @@
 
 enum {
   module_has_cleanup =
-#if defined(__has_attribute) && __has_attribute(cleanup)
-  1
-#elif defined(__GNUC__) && __GNUC__ >= 4
+#ifdef HAVE_VAR_ATTRIBUTE_CLEANUP
   1
 #else
   0
