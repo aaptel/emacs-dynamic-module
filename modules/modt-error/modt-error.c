@@ -46,6 +46,8 @@ static emacs_value Fmodt_error_funcall (emacs_env *env, int nargs, emacs_value a
         return env->funcall (env, Flist, 3, list_args);
       }
     }
+  /* never reached */
+  return Qnil;
 }
 
 /* Binds NAME to FUN */
