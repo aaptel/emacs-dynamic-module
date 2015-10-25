@@ -107,6 +107,7 @@ static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_stor
 }
 
 struct emacs_env_private {
+  int32_t module_id;
   enum emacs_funcall_exit pending_error;
   struct emacs_value_tag error_symbol, error_data;
   struct emacs_value_storage storage;
@@ -235,8 +236,8 @@ static void initialize_environment (struct env_storage *env)
 {
   env->priv.pending_error = emacs_funcall_exit_return;
   initialize_storage (&env->priv.storage);
+  env->priv.module_id      = next_module_id++;
   env->pub.size            = sizeof env->pub;
-  env->pub.module_id       = next_module_id++;
   env->pub.make_global_ref = module_make_global_ref;
   env->pub.free_global_ref = module_free_global_ref;
   env->pub.type_of         = module_type_of;
@@ -280,7 +281,7 @@ static emacs_value module_make_global_ref (emacs_env *env,
   check_main_thread ();
   MODULE_HANDLE_SIGNALS;
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
-  Lisp_Object mid = make_number (env->module_id);
+  Lisp_Object mid = make_number (env->private_members->module_id);
   Lisp_Object new_obj = value_to_lisp (ref);
   EMACS_UINT hashcode;
   ptrdiff_t i = hash_lookup (h, mid, &hashcode);
@@ -304,7 +305,7 @@ static void module_free_global_ref (emacs_env *env,
   check_main_thread ();
   MODULE_HANDLE_SIGNALS_VOID;
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
-  Lisp_Object mid = make_number (env->module_id);
+  Lisp_Object mid = make_number (env->private_members->module_id);
   EMACS_UINT hashcode;
   ptrdiff_t i = hash_lookup (h, mid, &hashcode);
 
@@ -519,7 +520,7 @@ emacs_value module_make_user_ptr (emacs_env *env,
                                   void *ptr)
 {
   check_main_thread ();
-  return lisp_to_value (env, make_user_ptr (env->module_id, fin, ptr));
+  return lisp_to_value (env, make_user_ptr (env->private_members->module_id, fin, ptr));
 }
 
 void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)

@@ -85,7 +85,6 @@ struct emacs_env_25 {
    */
 
   size_t size;
-  int32_t module_id;
 
   /*
    * Memory management
