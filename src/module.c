@@ -634,9 +634,8 @@ static void check_main_thread ()
 
 DEFUN ("module-call", Fmodule_call, Smodule_call, 2, 2, 0,
        doc: /* Internal function to call a module function.
-SUBRPTR is the module function pointer (emacs_subr prototype) to call.
-DATAPTR is the data pointer passed to make_function.
-ARGLIST is a list of argument passed to SUBRPTR. */)
+ENVOBJ is a save pointer to a module_fun_env structure.
+ARGLIST is a list of arguments passed to SUBRPTR. */)
   (Lisp_Object envobj, Lisp_Object arglist)
 {
   struct env_storage env;
