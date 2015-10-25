@@ -9,8 +9,15 @@ static emacs_value Qt;
 
 static emacs_value Fmodt_error_signal (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
-  assert (!env->error_check (env));
+  assert (env->error_check (env) == emacs_funcall_exit_return);
   env->error_signal (env, env->intern (env, "error"), env->make_fixnum (env, 56));
+  return Qt;
+}
+
+static emacs_value Fmodt_error_throw (emacs_env *env, int nargs, emacs_value args[], void* data)
+{
+  assert (env->error_check (env) == emacs_funcall_exit_return);
+  env->error_throw (env, env->intern (env, "tag"), env->make_fixnum (env, 65));
   return Qt;
 }
 
@@ -19,16 +26,25 @@ static emacs_value Fmodt_error_funcall (emacs_env *env, int nargs, emacs_value a
   assert (nargs == 1);
   const emacs_value result = env->funcall (env, args[0], 0, NULL);
   emacs_value error_symbol, error_data;
-  if (env->error_get (env, &error_symbol, &error_data))
+  enum emacs_funcall_exit code = env->error_get (env, &error_symbol, &error_data);
+  switch (code)
     {
-      env->error_clear (env);
-      const emacs_value Flist = env->intern (env, "list");
-      emacs_value list_args[] = {env->intern (env, "signal"), error_symbol, error_data};
-      return env->funcall (env, Flist, 3, list_args);
-    }
-  else
-    {
+    case emacs_funcall_exit_return:
       return result;
+    case emacs_funcall_exit_signal:
+      {
+        env->error_clear (env);
+        const emacs_value Flist = env->intern (env, "list");
+        emacs_value list_args[] = {env->intern (env, "signal"), error_symbol, error_data};
+        return env->funcall (env, Flist, 3, list_args);
+      }
+    case emacs_funcall_exit_throw:
+      {
+        env->error_clear (env);
+        const emacs_value Flist = env->intern (env, "list");
+        emacs_value list_args[] = {env->intern (env, "throw"), error_symbol, error_data};
+        return env->funcall (env, Flist, 3, list_args);
+      }
     }
 }
 
@@ -58,6 +74,7 @@ int emacs_module_init (struct emacs_runtime *ert)
   Qnil = env->intern (env, "nil");
   Qt = env->intern (env, "t");
   bind_function (env, "modt-error-signal", env->make_function (env, 0, 0, Fmodt_error_signal, NULL));
+  bind_function (env, "modt-error-throw", env->make_function (env, 0, 0, Fmodt_error_throw, NULL));
   bind_function (env, "modt-error-funcall", env->make_function (env, 1, 1, Fmodt_error_funcall, NULL));
   provide (env, "modt-error");
   return 0;
