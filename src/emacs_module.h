@@ -65,6 +65,16 @@ typedef emacs_value (*emacs_subr)(emacs_env *env,
 /* Function prototype for module user-pointer finalizers */
 typedef void (*emacs_finalizer_function)(void*) EMACS_NOEXCEPT;
 
+/* Possible Emacs function call outcomes. */
+enum emacs_funcall_exit {
+  /* Function has returned normally. */
+  emacs_funcall_exit_return = 0,
+  /* Function has signaled an error using `signal'. */
+  emacs_funcall_exit_signal = 1,
+  /* Function has exit using `throw'. */
+  emacs_funcall_exit_throw = 2,
+};
+
 struct emacs_env_25 {
   /*
    * Structure size (for version checking)
@@ -88,17 +98,21 @@ struct emacs_env_25 {
    * Error handling
    */
 
-  bool (*error_check)(emacs_env *env);
+  enum emacs_funcall_exit (*error_check)(emacs_env *env);
 
   void (*error_clear)(emacs_env *env);
 
-  bool (*error_get)(emacs_env *env,
-                    emacs_value *error_symbol_out,
-                    emacs_value *error_data_out);
+  enum emacs_funcall_exit (*error_get)(emacs_env *env,
+                                       emacs_value *error_symbol_out,
+                                       emacs_value *error_data_out);
 
   void (*error_signal)(emacs_env *env,
                        emacs_value error_symbol,
                        emacs_value error_data);
+
+  void (*error_throw)(emacs_env *env,
+                      emacs_value tag,
+                      emacs_value value);
 
   /*
    * Function registration

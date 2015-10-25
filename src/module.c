@@ -109,17 +109,18 @@ static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_stor
 }
 
 struct emacs_env_private {
-  bool pending_error;
+  enum emacs_funcall_exit pending_error;
   struct emacs_value_tag error_symbol, error_data;
   struct emacs_value_storage storage;
 };
 
 void syms_of_module (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
-static bool module_error_check (emacs_env *env);
+static enum emacs_funcall_exit module_error_check (emacs_env *env);
 static void module_error_clear (emacs_env *env);
-static bool module_error_get (emacs_env *emv, emacs_value *restrict sym, emacs_value *restrict data);
+static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data);
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
+static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value value);
 static bool module_is_not_nil (emacs_env *env, emacs_value value);
 static bool module_eq (emacs_env *env, emacs_value a, emacs_value b);
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
@@ -213,7 +214,7 @@ static inline Lisp_Object value_to_lisp (emacs_value v)
 static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
 {
   struct emacs_env_private *const p = env->private_members;
-  if (p->pending_error) return NULL;
+  if (p->pending_error != emacs_funcall_exit_return) return NULL;
   return allocate_emacs_value (env, &p->storage, o);
 }
 
@@ -228,12 +229,13 @@ struct emacs_runtime_private {
 
 static emacs_env* module_get_environment (struct emacs_runtime *ert)
 {
+  check_main_thread ();
   return &ert->private_members->environment.pub;
 }
 
 static void initialize_environment (struct env_storage *env)
 {
-  env->priv.pending_error = false;
+  env->priv.pending_error = emacs_funcall_exit_return;
   initialize_storage (&env->priv.storage);
   env->pub.size            = sizeof env->pub;
   env->pub.module_id       = next_module_id++;
@@ -246,6 +248,7 @@ static void initialize_environment (struct env_storage *env)
   env->pub.error_clear     = module_error_clear;
   env->pub.error_get       = module_error_get;
   env->pub.error_signal    = module_error_signal;
+  env->pub.error_throw     = module_error_throw;
   env->pub.make_fixnum     = module_make_fixnum;
   env->pub.fixnum_to_int   = module_fixnum_to_int;
   env->pub.make_float      = module_make_float;
@@ -315,32 +318,43 @@ static void module_free_global_ref (emacs_env *env,
     }
 }
 
-static bool module_error_check (emacs_env *env)
+static enum emacs_funcall_exit module_error_check (emacs_env *env)
 {
   return env->private_members->pending_error;
 }
 
 static void module_error_clear (emacs_env *env)
 {
-  env->private_members->pending_error = false;
+  env->private_members->pending_error = emacs_funcall_exit_return;
 }
 
-static bool module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
+static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
 {
   struct emacs_env_private *const p = env->private_members;
-  if (! p->pending_error) return false;
-  *sym = &p->error_symbol;
-  *data = &p->error_data;
-  return true;
+  if (p->pending_error != emacs_funcall_exit_return)
+    {
+      *sym = &p->error_symbol;
+      *data = &p->error_data;
+    }
+  return p->pending_error;
 }
 
 static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data)
 {
   struct emacs_env_private *const p = env->private_members;
-  eassert (! p->pending_error);
-  p->pending_error = true;
+  eassert (p->pending_error == emacs_funcall_exit_return);
+  p->pending_error = emacs_funcall_exit_signal;
   p->error_symbol.v = sym;
   p->error_data.v = data;
+}
+
+static void module_error_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value)
+{
+  struct emacs_env_private *const p = env->private_members;
+  eassert (p->pending_error == emacs_funcall_exit_return);
+  p->pending_error = emacs_funcall_exit_throw;
+  p->error_symbol.v = tag;
+  p->error_data.v = value;
 }
 
 /*
@@ -348,7 +362,14 @@ static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object 
  */
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
+  check_main_thread ();
   module_error_signal_1 (env, value_to_lisp (sym), value_to_lisp (data));
+}
+
+static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value value)
+{
+  check_main_thread ();
+  module_error_throw_1 (env, value_to_lisp (tag), value_to_lisp (value));
 }
 
 static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value)
@@ -369,11 +390,12 @@ static void module_handle_signal (emacs_env *const env, const Lisp_Object err)
 
 static void module_handle_throw (emacs_env *const env, const Lisp_Object tag_val)
 {
-  module_error_signal_1 (env, Qno_catch, list2 (XCAR (tag_val), XCDR (tag_val)));
+  module_error_throw_1 (env, XCAR (tag_val), XCDR (tag_val));
 }
 
 static bool module_is_not_nil (emacs_env *env, emacs_value value)
 {
+  check_main_thread ();
   return ! NILP (value_to_lisp (value));
 }
 
@@ -636,12 +658,28 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
   struct module_fun_env *envptr = (struct module_fun_env*) XSAVE_POINTER (envobj, 0);
   emacs_value ret = envptr->subr (&env.pub, len, args, envptr->data);
   xfree (args);
-  finalize_environment (&env);
-  if (env.priv.pending_error)
-    xsignal (value_to_lisp (&env.priv.error_symbol), value_to_lisp (&env.priv.error_data));
-  if (ret == NULL)
-    xsignal0 (Qinvalid_module_call);
-  return value_to_lisp (ret);
+
+  switch (env.priv.pending_error)
+    {
+    case emacs_funcall_exit_return:
+      finalize_environment (&env);
+      if (ret == NULL) xsignal0 (Qinvalid_module_call);
+      return value_to_lisp (ret);
+    case emacs_funcall_exit_signal:
+      {
+        const Lisp_Object symbol = value_to_lisp (&env.priv.error_symbol);
+        const Lisp_Object data = value_to_lisp (&env.priv.error_data);
+        finalize_environment (&env);
+        xsignal (symbol, data);
+      }
+    case emacs_funcall_exit_throw:
+      {
+        const Lisp_Object tag = value_to_lisp (&env.priv.error_symbol);
+        const Lisp_Object value = value_to_lisp (&env.priv.error_data);
+        finalize_environment (&env);
+        Fthrow (tag, value);
+      }
+    }
 }
 
 DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,

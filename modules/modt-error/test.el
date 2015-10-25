@@ -8,6 +8,13 @@
 (ert-deftest modt-error-signal-test ()
   (should-error (modt-error-signal)))
 
+(ert-deftest modt-error-throw-test ()
+  (should (equal
+           (catch 'tag
+             (modt-error-throw)
+             (ert-fail "expected throw"))
+           65)))
+
 (ert-deftest modt-error-funcall-normal ()
   (should (equal (modt-error-funcall (lambda () 23))
                  23)))
@@ -18,4 +25,4 @@
 
 (ert-deftest modt-error-funcall-throw ()
   (should (equal (modt-error-funcall (lambda () (throw 'tag 32)))
-                 '(signal no-catch (tag 32)))))
+                 '(throw tag 32))))
