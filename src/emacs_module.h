@@ -45,6 +45,10 @@ EMACS_EXTERN_C_BEGIN
 typedef struct emacs_env_25 emacs_env;
 typedef struct emacs_value_tag* emacs_value;
 
+enum emacs_arity {
+  emacs_variadic_function = -2
+};
+
 /* Struct passed to a module init function (emacs_module_init) */
 struct emacs_runtime {
   size_t size;
