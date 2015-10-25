@@ -600,8 +600,6 @@ static emacs_value module_make_function (emacs_env *env,
     xsignal2 (Qinvalid_arity, make_number (min_arity), make_number (max_arity));
 
   Lisp_Object envobj;
-  Lisp_Object Qrest = intern ("&rest");
-  Lisp_Object Qarglist = intern ("arglist");
   Lisp_Object Qmodule_call = intern ("module-call");
 
   /* XXX: This should need to be freed when envobj is GC'd */
@@ -610,16 +608,15 @@ static emacs_value module_make_function (emacs_env *env,
   envptr->max_arity = max_arity;
   envptr->subr = subr;
   envptr->data = data;
-  envobj = make_save_ptr ((void*) envptr);
+  envobj = make_save_ptr (envptr);
 
-  Lisp_Object form = list2 (Qfunction,
-                            list3 (Qlambda,
-                                   list2 (Qrest, Qarglist),
-                                   list3 (Qmodule_call,
-                                          envobj,
-                                          Qarglist)));
+  Lisp_Object ret = list3 (Qlambda,
+                           list2 (Qand_rest, Qargs),
+                           list3 (Qmodule_call,
+                                  envobj,
+                                  Qargs));
 
-  return lisp_to_value (env, Feval (form, Qnil));
+  return lisp_to_value (env, ret);
 }
 
 static emacs_value module_funcall (emacs_env *env,
