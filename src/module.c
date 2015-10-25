@@ -552,6 +552,7 @@ void module_set_user_ptr_finalizer (emacs_env *env,
 
 struct module_fun_env
 {
+  int min_arity, max_arity;
   emacs_subr subr;
   void *data;
 };
@@ -578,6 +579,11 @@ static emacs_value module_make_function (emacs_env *env,
   check_main_thread();
   MODULE_HANDLE_SIGNALS;
 
+  if (min_arity < 0 ||
+      (max_arity >= 0 && max_arity < min_arity) ||
+      (max_arity < 0 && max_arity != emacs_variadic_function))
+    xsignal2 (Qinvalid_arity, make_number (min_arity), make_number (max_arity));
+
   Lisp_Object envobj;
   Lisp_Object Qrest = intern ("&rest");
   Lisp_Object Qarglist = intern ("arglist");
@@ -585,6 +591,8 @@ static emacs_value module_make_function (emacs_env *env,
 
   /* XXX: This should need to be freed when envobj is GC'd */
   struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
+  envptr->min_arity = min_arity;
+  envptr->max_arity = max_arity;
   envptr->subr = subr;
   envptr->data = data;
   envobj = make_save_ptr ((void*) envptr);
@@ -639,10 +647,15 @@ DATAPTR is the data pointer passed to make_function.
 ARGLIST is a list of argument passed to SUBRPTR. */)
   (Lisp_Object envobj, Lisp_Object arglist)
 {
+  const struct module_fun_env *const envptr =
+    (const struct module_fun_env *) XSAVE_POINTER (envobj, 0);
+  const int len = XINT (Flength (arglist));
+  if (len < envptr->min_arity || (envptr->max_arity >= 0 && len > envptr->max_arity))
+    xsignal2 (Qwrong_number_of_arguments, envobj, make_number (len));
+
   struct env_storage env;
   initialize_environment (&env);
 
-  int len = XINT (Flength (arglist));
   emacs_value *args = xzalloc (len * sizeof (*args));
   int i;
 
@@ -653,7 +666,6 @@ ARGLIST is a list of argument passed to SUBRPTR. */)
       arglist = XCDR (arglist);
     }
 
-  struct module_fun_env *envptr = (struct module_fun_env*) XSAVE_POINTER (envobj, 0);
   emacs_value ret = envptr->subr (&env.pub, len, args, envptr->data);
   xfree (args);
 
@@ -758,6 +770,12 @@ void syms_of_module (void)
         listn (CONSTYPE_PURE, 2, Qinvalid_module_call, Qerror));
   Fput (Qinvalid_module_call, Qerror_message,
         build_pure_c_string ("Invalid module call"));
+
+  DEFSYM (Qinvalid_arity, "invalid-arity");
+  Fput (Qinvalid_arity, Qerror_conditions,
+        listn (CONSTYPE_PURE, 2, Qinvalid_arity, Qerror));
+  Fput (Qinvalid_arity, Qerror_message,
+        build_pure_c_string ("Invalid function arity"));
 
   initialize_storage (&global_storage);
 
