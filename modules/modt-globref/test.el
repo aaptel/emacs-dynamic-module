@@ -12,10 +12,6 @@
 
 (ert-deftest modt-globref-make-test ()
   (let ((mod-str (modt-globref-make))
-        (ref-str (multiply-string "abcdefghijklmnopqrstuvwxyz" 100))
-        (mod-id (module-last-loaded-id)))
-
-    (should (> mod-id 0))
-    (should (= (module-global-refs-count mod-id) 1))
-    (should (string= ref-str mod-str))
-    (should (eq mod-str (car (gethash mod-id module-refs-hash))))))
+        (ref-str (multiply-string "abcdefghijklmnopqrstuvwxyz" 100)))
+    (garbage-collect) ;; XXX: not enough to really test but it's something..
+    (should (string= ref-str mod-str))))
