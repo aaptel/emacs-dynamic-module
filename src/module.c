@@ -334,24 +334,37 @@ emacs_value module_make_user_ptr (emacs_env *env,
   return lisp_to_value (make_user_ptr (env->module_id, fin, ptr));
 }
 
-
 void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
-  return XUSER_PTR (value_to_lisp (uptr))->p;
+  const Lisp_Object lisp = value_to_lisp (uptr);
+  if (! USER_PTRP (lisp))
+    {
+      module_wrong_type (env, Quser_ptr, lisp);
+      return NULL;
+    }
+  return XUSER_PTR (lisp)->p;
 }
 
 void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
 {
   check_main_thread ();
-  XUSER_PTR (value_to_lisp (uptr))->p = ptr;
+  const Lisp_Object lisp = value_to_lisp (uptr);
+  if (! USER_PTRP (lisp)) module_wrong_type (env, Quser_ptr, lisp);
+  XUSER_PTR (lisp)->p = ptr;
 }
 
 
 emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
-  return XUSER_PTR (value_to_lisp (uptr))->finalizer;
+  const Lisp_Object lisp = value_to_lisp (uptr);
+  if (! USER_PTRP (lisp))
+    {
+      module_wrong_type (env, Quser_ptr, lisp);
+      return NULL;
+    }
+  return XUSER_PTR (lisp)->finalizer;
 }
 
 void module_set_user_ptr_finalizer (emacs_env *env,
@@ -359,7 +372,9 @@ void module_set_user_ptr_finalizer (emacs_env *env,
                                     emacs_finalizer_function fin)
 {
   check_main_thread ();
-  XUSER_PTR (value_to_lisp (uptr))->finalizer = fin;
+  const Lisp_Object lisp = value_to_lisp (uptr);
+  if (! USER_PTRP (lisp)) module_wrong_type (env, Quser_ptr, lisp);
+  XUSER_PTR (lisp)->finalizer = fin;
 }
 
 struct module_fun_env
