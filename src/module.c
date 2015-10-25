@@ -575,6 +575,9 @@ struct module_fun_env
   void *data;
 };
 
+/* Holds the function definition of `module-call'. */
+static Lisp_Object module_call_func;
+
 /*
  * A module function is lambda function that calls `module-call',
  * passing the function pointer of the module function along with the
@@ -603,7 +606,6 @@ static emacs_value module_make_function (emacs_env *env,
     xsignal2 (Qinvalid_arity, make_number (min_arity), make_number (max_arity));
 
   Lisp_Object envobj;
-  Lisp_Object Qmodule_call = intern ("module-call");
 
   /* XXX: This should need to be freed when envobj is GC'd */
   struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
@@ -615,7 +617,7 @@ static emacs_value module_make_function (emacs_env *env,
 
   Lisp_Object ret = list3 (Qlambda,
                            list2 (Qand_rest, Qargs),
-                           list3 (Qmodule_call,
+                           list3 (module_call_func,
                                   envobj,
                                   Qargs));
 
@@ -797,6 +799,16 @@ void syms_of_module (void)
 
   initialize_storage (&global_storage);
 
-  defsubr (&Smodule_call);
+  /* Unintern `module-refs-hash' because it is internal-only and Lisp
+     code or modules should not access it. */
+  Funintern (Qmodule_refs_hash, Qnil);
+
   defsubr (&Smodule_load);
+
+  /* Don't call defsubr on `module-call' because that would intern it,
+     but `module-call' is an internal function that users cannot
+     meaningfully use.  Instead, assign its definition to a private
+     variable. */
+  XSETPVECTYPE (&Smodule_call, PVEC_SUBR);
+  XSETSUBR (module_call_func, &Smodule_call);
 }
