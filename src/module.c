@@ -24,7 +24,10 @@
 #include "dynlib.h"
 #include "coding.h"
 
-#if defined(HAVE_PTHREAD)
+#if defined(HAVE_THREADS_H)
+#include <threads.h>
+static thrd_t main_thread;
+#elif defined(HAVE_PTHREAD)
 #include <pthread.h>
 static pthread_t main_thread;
 #elif defined(WINDOWSNT)
@@ -459,7 +462,9 @@ static emacs_value module_funcall (emacs_env *env,
 
 static void check_main_thread ()
 {
-#if defined(HAVE_PTHREAD)
+#if defined(HAVE_THREADS_H)
+  eassert (thrd_equal (thdr_current (), main_thread);
+#elif defined(HAVE_PTHREAD)
   eassert (pthread_equal (pthread_self (), main_thread));
 #elif defined(WINDOWSNT)
   /* CompareObjectHandles would be perfect, but is only available in
@@ -534,7 +539,9 @@ void syms_of_module (void)
 {
   /* It is not guaranteed that dynamic initializers run in the main thread,
      therefore we detect the main thread here. */
-#if defined(HAVE_PTHREAD)
+#if defined(HAVE_THREADS_H)
+  main_thread = thrd_current ();
+#elif defined(HAVE_PTHREAD)
   main_thread = pthread_self ();
 #elif defined(WINDOWSNT)
   /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
