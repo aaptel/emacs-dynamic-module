@@ -45,18 +45,6 @@ EMACS_EXTERN_C_BEGIN
 typedef struct emacs_env_25 emacs_env;
 typedef struct emacs_value_tag* emacs_value;
 
-enum emacs_type {
-  EMACS_FIXNUM,
-  EMACS_SYMBOL,
-  EMACS_FLOAT,
-  EMACS_STRING,
-  EMACS_CONS,
-  EMACS_VECTOR,
-  EMACS_HASHTABLE,
-
-  EMACS_OTHER = 255,
-};
-
 /* Struct passed to a module init function (emacs_module_init) */
 struct emacs_runtime {
   size_t size;
@@ -148,10 +136,12 @@ struct emacs_env_25 {
    * Type conversion
    */
 
-  enum emacs_type (*type_of)(emacs_env *env,
-                             emacs_value value);
+  emacs_value (*type_of)(emacs_env *env,
+                         emacs_value value);
 
   bool (*is_not_nil)(emacs_env *env, emacs_value value);
+
+  bool (*eq)(emacs_env *env, emacs_value a, emacs_value b);
 
   int64_t (*fixnum_to_int)(emacs_env *env,
                            emacs_value value);
