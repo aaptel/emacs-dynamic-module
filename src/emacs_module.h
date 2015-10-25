@@ -45,22 +45,11 @@ EMACS_EXTERN_C_BEGIN
 typedef struct emacs_env_25 emacs_env;
 typedef struct emacs_value_tag* emacs_value;
 
-enum emacs_type {
-  EMACS_FIXNUM,
-  EMACS_SYMBOL,
-  EMACS_FLOAT,
-  EMACS_STRING,
-  EMACS_CONS,
-  EMACS_VECTOR,
-  EMACS_HASHTABLE,
-
-  EMACS_OTHER = 255,
-};
-
 /* Struct passed to a module init function (emacs_module_init) */
 struct emacs_runtime {
   size_t size;
   emacs_env* (*get_environment)(struct emacs_runtime *ert);
+  struct emacs_runtime_private *private_members;
 };
 
 
@@ -147,8 +136,12 @@ struct emacs_env_25 {
    * Type conversion
    */
 
-  enum emacs_type (*type_of)(emacs_env *env,
-                             emacs_value value);
+  emacs_value (*type_of)(emacs_env *env,
+                         emacs_value value);
+
+  bool (*is_not_nil)(emacs_env *env, emacs_value value);
+
+  bool (*eq)(emacs_env *env, emacs_value a, emacs_value b);
 
   int64_t (*fixnum_to_int)(emacs_env *env,
                            emacs_value value);
@@ -187,7 +180,6 @@ struct emacs_env_25 {
   emacs_value (*make_string)(emacs_env *env,
                              const char *contents, size_t length);
 
-
   /*
    * Embedded pointer type
    */
@@ -202,6 +194,8 @@ struct emacs_env_25 {
   void (*set_user_ptr_finalizer)(emacs_env *env,
                                  emacs_value uptr,
                                  emacs_finalizer_function fin);
+
+  struct emacs_env_private *private_members;
 };
 
 EMACS_EXTERN_C_END

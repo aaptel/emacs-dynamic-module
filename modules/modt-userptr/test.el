@@ -9,11 +9,9 @@
   (let* ((n 42)
          (v (modt-userptr-make n))
          (r (modt-userptr-get v)))
-    
+
     (should (eq (type-of v) 'user-ptr))
     (should (integerp r))
     (should (= r n))))
 
 ;; TODO: try to test finalizer
-
-

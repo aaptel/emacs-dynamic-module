@@ -3089,25 +3089,15 @@ struct handler
 
 /* Fill in the components of c, and put it on the list.  */
 #define PUSH_HANDLER(c, tag_ch_val, handlertype)	\
-  if (handlerlist->nextfree)				\
-    (c) = handlerlist->nextfree;			\
-  else							\
-    {							\
-      (c) = xmalloc (sizeof (struct handler));		\
-      (c)->nextfree = NULL;				\
-      handlerlist->nextfree = (c);			\
-    }							\
-  (c)->type = (handlertype);				\
-  (c)->tag_or_ch = (tag_ch_val);			\
-  (c)->val = Qnil;					\
-  (c)->next = handlerlist;				\
-  (c)->lisp_eval_depth = lisp_eval_depth;		\
-  (c)->pdlcount = SPECPDL_INDEX ();			\
-  (c)->poll_suppress_count = poll_suppress_count;	\
-  (c)->interrupt_input_blocked = interrupt_input_blocked;\
-  (c)->byte_stack = byte_stack_list;			\
-  handlerlist = (c);
+  push_handler(&(c), (tag_ch_val), (handlertype))
 
+extern void push_handler (struct handler **c, Lisp_Object tag_ch_val,
+                          enum handlertype handlertype);
+
+/* Like push_handler, but don't signal if the handler could not be
+   allocated.  Instead return false in that case. */
+extern bool push_handler_nosignal (struct handler **c, Lisp_Object tag_ch_val,
+                                   enum handlertype handlertype);
 
 extern Lisp_Object memory_signal_data;
 
@@ -3795,9 +3785,6 @@ extern Lisp_Object call5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Li
 extern Lisp_Object call6 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object call7 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
-extern Lisp_Object catch_all_n
-    (Lisp_Object (*) (ptrdiff_t, Lisp_Object *), ptrdiff_t, Lisp_Object *,
-     Lisp_Object (*) (Lisp_Object, Lisp_Object, ptrdiff_t, Lisp_Object *));
 extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_condition_case (Lisp_Object (*) (void), Lisp_Object, Lisp_Object (*) (Lisp_Object));
 extern Lisp_Object internal_condition_case_1 (Lisp_Object (*) (Lisp_Object), Lisp_Object, Lisp_Object, Lisp_Object (*) (Lisp_Object));
