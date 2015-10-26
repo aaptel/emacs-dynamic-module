@@ -2185,15 +2185,11 @@ XSAVE_OBJECT (Lisp_Object obj, int n)
 }
 
 #ifdef HAVE_MODULES
-#define USER_PTR_ID_BITS 10 /* must be <= 15 (spacer size) */
-#define USER_PTR_ID_MAX ((1 << USER_PTR_ID_BITS) - 1)
-typedef unsigned user_ptr_id_t;
 struct Lisp_User_Ptr
 {
   ENUM_BF (Lisp_Misc_Type) type : 16;	     /* = Lisp_Misc_User_Ptr */
   bool_bf gcmarkbit : 1;
-  unsigned spacer : 15 - USER_PTR_ID_BITS;
-  unsigned id : USER_PTR_ID_BITS;
+  unsigned spacer : 15;
 
   void (*finalizer) (void*);
   void *p;
@@ -3352,7 +3348,8 @@ Lisp_Object make_hash_table (struct hash_table_test, Lisp_Object, Lisp_Object,
 ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, EMACS_UINT *);
 ptrdiff_t hash_put (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object,
 		    EMACS_UINT);
-extern struct hash_table_test hashtest_eql, hashtest_equal;
+void hash_remove_from_table (struct Lisp_Hash_Table *, Lisp_Object);
+extern struct hash_table_test hashtest_eq, hashtest_eql, hashtest_equal;
 extern void validate_subarray (Lisp_Object, Lisp_Object, Lisp_Object,
 			       ptrdiff_t, ptrdiff_t *, ptrdiff_t *);
 extern Lisp_Object substring_both (Lisp_Object, ptrdiff_t, ptrdiff_t,
@@ -3824,7 +3821,7 @@ extern bool let_shadows_global_binding_p (Lisp_Object symbol);
 
 #ifdef HAVE_MODULES
 /* Defined in alloc.c.  */
-extern Lisp_Object make_user_ptr (size_t id, void (*finalizer) (void*), void *p);
+extern Lisp_Object make_user_ptr (void (*finalizer) (void*), void *p);
 
 /* Defined in module.c.  */
 extern void syms_of_module (void);
