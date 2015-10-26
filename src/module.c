@@ -164,6 +164,7 @@ void module_set_user_ptr_finalizer (emacs_env *env,
                                     emacs_value uptr,
                                     emacs_finalizer_function fin);
 
+static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data);
 static void module_handle_signal (emacs_env *env, Lisp_Object err);
 static void module_handle_throw (emacs_env *env, Lisp_Object tag_val);
 
@@ -275,7 +276,7 @@ static void finalize_environment (struct env_storage *env)
 
 /*
  * To make global refs (GC-protected global values) we keep a hash
- * that maps module-id to a list of their global values.
+ * that maps global Lisp objects to reference counts.
  */
 
 static emacs_value module_make_global_ref (emacs_env *env,
@@ -283,20 +284,28 @@ static emacs_value module_make_global_ref (emacs_env *env,
 {
   check_main_thread ();
   MODULE_HANDLE_SIGNALS;
+  eassert (HASH_TABLE_P (Vmodule_refs_hash));
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
-  Lisp_Object mid = make_number (env->private_members->module_id);
   Lisp_Object new_obj = value_to_lisp (ref);
   EMACS_UINT hashcode;
-  ptrdiff_t i = hash_lookup (h, mid, &hashcode);
+  ptrdiff_t i = hash_lookup (h, new_obj, &hashcode);
 
   if (i >= 0)
     {
-      Lisp_Object v = HASH_VALUE (h, i);
-      set_hash_value_slot (h, i, Fcons (new_obj, v));
+      Lisp_Object value = HASH_VALUE (h, i);
+      eassert (NATNUMP (value));
+      const EMACS_UINT refcount = XFASTINT (value);
+      if (refcount >= MOST_POSITIVE_FIXNUM)
+        {
+          module_error_signal_1 (env, Qoverflow_error, Qnil);
+          return NULL;
+        }
+      XSETFASTINT (value, refcount + 1);
+      set_hash_value_slot (h, i, value);
     }
   else
     {
-      hash_put (h, mid, Fcons (new_obj, Qnil), hashcode);
+      hash_put (h, new_obj, make_natnum (1), hashcode);
     }
 
   return allocate_emacs_value (env, &global_storage, new_obj);
@@ -307,16 +316,27 @@ static void module_free_global_ref (emacs_env *env,
 {
   check_main_thread ();
   MODULE_HANDLE_SIGNALS_VOID;
+  eassert (HASH_TABLE_P (Vmodule_refs_hash));
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
-  Lisp_Object mid = make_number (env->private_members->module_id);
+  Lisp_Object obj = value_to_lisp (ref);
   EMACS_UINT hashcode;
-  ptrdiff_t i = hash_lookup (h, mid, &hashcode);
+  ptrdiff_t i = hash_lookup (h, obj, &hashcode);
 
   if (i >= 0)
     {
-      set_hash_value_slot (h, i,
-                           Fdelq (value_to_lisp (ref),
-                                  HASH_VALUE (h, i)));
+      Lisp_Object value = HASH_VALUE (h, i);
+      eassert (NATNUMP (value));
+      const EMACS_UINT refcount = XFASTINT (value);
+      eassert (refcount > 0);
+      if (refcount > 1)
+        {
+          XSETFASTINT (value, refcount - 1);
+          set_hash_value_slot (h, i, value);
+        }
+      else
+        {
+          hash_remove_from_table (h, value);
+        }
     }
 }
 
@@ -774,7 +794,7 @@ void syms_of_module (void)
   DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
 	       doc: /* Module global referrence table.  */);
 
-  Vmodule_refs_hash = make_hash_table (hashtest_eql, make_number (DEFAULT_HASH_SIZE),
+  Vmodule_refs_hash = make_hash_table (hashtest_eq, make_number (DEFAULT_HASH_SIZE),
                                        make_float (DEFAULT_REHASH_SIZE),
                                        make_float (DEFAULT_REHASH_THRESHOLD),
                                        Qnil);

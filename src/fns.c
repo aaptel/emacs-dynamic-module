@@ -3628,8 +3628,7 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
 			 Low-level Functions
  ***********************************************************************/
 
-static struct hash_table_test hashtest_eq;
-struct hash_table_test hashtest_eql, hashtest_equal;
+struct hash_table_test hashtest_eq, hashtest_eql, hashtest_equal;
 
 /* Compare KEY1 which has hash code HASH1 and KEY2 with hash code
    HASH2 in hash table H using `eql'.  Value is true if KEY1 and
@@ -4000,7 +3999,7 @@ hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
 
 /* Remove the entry matching KEY from hash table H, if there is one.  */
 
-static void
+void
 hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
 {
   EMACS_UINT hash_code;
