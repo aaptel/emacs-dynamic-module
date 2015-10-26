@@ -1996,8 +1996,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	case Lisp_Misc_User_Ptr:
 	  {
 	    print_c_string ("#<user-ptr ", printcharfun);
-	    int i = sprintf (buf, "module-id=%u ptr=%p finalizer=%p",
-			     XUSER_PTR (obj)->id,
+	    int i = sprintf (buf, "ptr=%p finalizer=%p",
 			     XUSER_PTR (obj)->p,
 			     XUSER_PTR (obj)->finalizer);
 	    strout (buf, i, i, printcharfun);

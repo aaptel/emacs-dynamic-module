@@ -3685,16 +3685,13 @@ make_event_array (ptrdiff_t nargs, Lisp_Object *args)
 #ifdef HAVE_MODULES
 /* Create a new module user ptr object. */
 Lisp_Object
-make_user_ptr (size_t id, void (*finalizer) (void*), void *p)
+make_user_ptr (void (*finalizer) (void*), void *p)
 {
   Lisp_Object obj;
   struct Lisp_User_Ptr *uptr;
 
-  eassert (id <= USER_PTR_ID_MAX);
-
   obj = allocate_misc (Lisp_Misc_User_Ptr);
   uptr = XUSER_PTR (obj);
-  uptr->id = id;
   uptr->finalizer = finalizer;
   uptr->p = p;
   return obj;

@@ -110,7 +110,6 @@ static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_stor
 }
 
 struct emacs_env_private {
-  int32_t module_id;
   enum emacs_funcall_exit pending_error;
   struct emacs_value_tag error_symbol, error_data;
   struct emacs_value_storage storage;
@@ -204,11 +203,6 @@ static void module_reset_handlerlist(const int *dummy)
   do {                                                                         \
   } while (0)
 
-/*
- * Each instance of emacs_env get its own id from a simple counter
- */
-static int32_t next_module_id = 1;
-
 static inline Lisp_Object value_to_lisp (emacs_value v)
 {
   return v->v;
@@ -240,7 +234,6 @@ static void initialize_environment (struct env_storage *env)
 {
   env->priv.pending_error = emacs_funcall_exit_return;
   initialize_storage (&env->priv.storage);
-  env->priv.module_id      = next_module_id++;
   env->pub.size            = sizeof env->pub;
   env->pub.make_global_ref = module_make_global_ref;
   env->pub.free_global_ref = module_free_global_ref;
@@ -543,7 +536,7 @@ emacs_value module_make_user_ptr (emacs_env *env,
                                   void *ptr)
 {
   check_main_thread ();
-  return lisp_to_value (env, make_user_ptr (env->private_members->module_id, fin, ptr));
+  return lisp_to_value (env, make_user_ptr (fin, ptr));
 }
 
 void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)

@@ -2185,15 +2185,11 @@ XSAVE_OBJECT (Lisp_Object obj, int n)
 }
 
 #ifdef HAVE_MODULES
-#define USER_PTR_ID_BITS 10 /* must be <= 15 (spacer size) */
-#define USER_PTR_ID_MAX ((1 << USER_PTR_ID_BITS) - 1)
-typedef unsigned user_ptr_id_t;
 struct Lisp_User_Ptr
 {
   ENUM_BF (Lisp_Misc_Type) type : 16;	     /* = Lisp_Misc_User_Ptr */
   bool_bf gcmarkbit : 1;
-  unsigned spacer : 15 - USER_PTR_ID_BITS;
-  unsigned id : USER_PTR_ID_BITS;
+  unsigned spacer : 15;
 
   void (*finalizer) (void*);
   void *p;
@@ -3825,7 +3821,7 @@ extern bool let_shadows_global_binding_p (Lisp_Object symbol);
 
 #ifdef HAVE_MODULES
 /* Defined in alloc.c.  */
-extern Lisp_Object make_user_ptr (size_t id, void (*finalizer) (void*), void *p);
+extern Lisp_Object make_user_ptr (void (*finalizer) (void*), void *p);
 
 /* Defined in module.c.  */
 extern void syms_of_module (void);
