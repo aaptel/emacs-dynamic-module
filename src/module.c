@@ -38,7 +38,10 @@ enum {
 #endif
 };
 
-#if defined(HAVE_PTHREAD)
+#if defined(HAVE_THREADS_H)
+#include <threads.h>
+static thrd_t main_thread;
+#elif defined(HAVE_PTHREAD)
 #include <pthread.h>
 static pthread_t main_thread;
 #elif defined(WINDOWSNT)
@@ -573,6 +576,9 @@ struct module_fun_env
   void *data;
 };
 
+/* Holds the function definition of `module-call'. */
+static Lisp_Object module_call_func;
+
 /*
  * A module function is lambda function that calls `module-call',
  * passing the function pointer of the module function along with the
@@ -601,7 +607,6 @@ static emacs_value module_make_function (emacs_env *env,
     xsignal2 (Qinvalid_arity, make_number (min_arity), make_number (max_arity));
 
   Lisp_Object envobj;
-  Lisp_Object Qmodule_call = intern ("module-call");
 
   /* XXX: This should need to be freed when envobj is GC'd */
   struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
@@ -613,7 +618,7 @@ static emacs_value module_make_function (emacs_env *env,
 
   Lisp_Object ret = list3 (Qlambda,
                            list2 (Qand_rest, Qargs),
-                           list3 (Qmodule_call,
+                           list3 (module_call_func,
                                   envobj,
                                   Qargs));
 
@@ -642,7 +647,9 @@ static emacs_value module_funcall (emacs_env *env,
 
 static void check_main_thread ()
 {
-#if defined(HAVE_PTHREAD)
+#if defined(HAVE_THREADS_H)
+  eassert (thrd_equal (thdr_current (), main_thread);
+#elif defined(HAVE_PTHREAD)
   eassert (pthread_equal (pthread_self (), main_thread));
 #elif defined(WINDOWSNT)
   /* CompareObjectHandles would be perfect, but is only available in
@@ -655,9 +662,8 @@ static void check_main_thread ()
 
 DEFUN ("module-call", Fmodule_call, Smodule_call, 2, 2, 0,
        doc: /* Internal function to call a module function.
-SUBRPTR is the module function pointer (emacs_subr prototype) to call.
-DATAPTR is the data pointer passed to make_function.
-ARGLIST is a list of argument passed to SUBRPTR. */)
+ENVOBJ is a save pointer to a module_fun_env structure.
+ARGLIST is a list of arguments passed to SUBRPTR. */)
   (Lisp_Object envobj, Lisp_Object arglist)
 {
   const struct module_fun_env *const envptr =
@@ -751,7 +757,9 @@ void syms_of_module (void)
 {
   /* It is not guaranteed that dynamic initializers run in the main thread,
      therefore we detect the main thread here. */
-#if defined(HAVE_PTHREAD)
+#if defined(HAVE_THREADS_H)
+  main_thread = thrd_current ();
+#elif defined(HAVE_PTHREAD)
   main_thread = pthread_self ();
 #elif defined(WINDOWSNT)
   /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
@@ -792,6 +800,16 @@ void syms_of_module (void)
 
   initialize_storage (&global_storage);
 
-  defsubr (&Smodule_call);
+  /* Unintern `module-refs-hash' because it is internal-only and Lisp
+     code or modules should not access it. */
+  Funintern (Qmodule_refs_hash, Qnil);
+
   defsubr (&Smodule_load);
+
+  /* Don't call defsubr on `module-call' because that would intern it,
+     but `module-call' is an internal function that users cannot
+     meaningfully use.  Instead, assign its definition to a private
+     variable. */
+  XSETPVECTYPE (&Smodule_call, PVEC_SUBR);
+  XSETSUBR (module_call_func, &Smodule_call);
 }

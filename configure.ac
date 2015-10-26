@@ -2174,6 +2174,9 @@ LIBS="$LIBS_SYSTEM $LIBS"
 dnl FIXME replace main with a function we actually want from this library.
 AC_CHECK_LIB(Xbsd, main, LD_SWITCH_X_SITE="$LD_SWITCH_X_SITE -lXbsd")
 
+dnl Check for C11 threads.
+AC_CHECK_HEADERS_ONCE(threads.h)
+
 dnl Check for the POSIX thread library.
 LIB_PTHREAD=
 AC_CHECK_HEADERS_ONCE(pthread.h)
