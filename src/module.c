@@ -589,6 +589,21 @@ struct module_fun_env
   void *data;
 };
 
+static Lisp_Object module_format_fun_env (const struct module_fun_env *const env)
+{
+  const char *path, *sym;
+  if (dynlib_addr (env->subr, &path, &sym))
+    {
+      AUTO_STRING (format, "#<module function %s from %s>");
+      return CALLN (Fformat, format, build_string (sym), build_string (path));
+    }
+  else
+    {
+      AUTO_STRING (format, "#<module function at %#x>");
+      return CALLN (Fformat, format, make_number ((intptr_t) env->subr));
+    }
+}
+
 /* Holds the function definition of `module-call'. */
 static Lisp_Object module_call_func;
 
@@ -683,7 +698,7 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
     (const struct module_fun_env *) XSAVE_POINTER (envobj, 0);
   const int len = XINT (Flength (arglist));
   if (len < envptr->min_arity || (envptr->max_arity >= 0 && len > envptr->max_arity))
-    xsignal2 (Qwrong_number_of_arguments, envobj, make_number (len));
+    xsignal2 (Qwrong_number_of_arguments, module_format_fun_env (envptr), make_number (len));
 
   struct env_storage env;
   initialize_environment (&env);
@@ -705,7 +720,7 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
     {
     case emacs_funcall_exit_return:
       finalize_environment (&env);
-      if (ret == NULL) xsignal0 (Qinvalid_module_call);
+      if (ret == NULL) xsignal1 (Qinvalid_module_call, module_format_fun_env (envptr));
       return value_to_lisp (ret);
     case emacs_funcall_exit_signal:
       {

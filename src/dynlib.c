@@ -28,6 +28,11 @@ void * dynlib_sym (dynlib_handle_ptr h, const char * sym)
   return GetProcAddress ((HMODULE) h, sym);
 }
 
+bool dynlib_addr (void *ptr, const char **path, const char **sym)
+{
+  return false;  /* not implemented */
+}
+
 const char * dynlib_error (void)
 {
   /* TODO: use GetLastError(), FormatMessage(), ... */
@@ -55,6 +60,20 @@ dynlib_handle_ptr dynlib_open (const char * path)
 void * dynlib_sym (dynlib_handle_ptr h, const char * sym)
 {
   return dlsym (h, sym);
+}
+
+bool dynlib_addr (void *ptr, const char **path, const char **sym)
+{
+#ifdef HAVE_DLADDR
+  Dl_info info;
+  if (dladdr (ptr, &info) != 0 && info.dli_fname != NULL && info.dli_sname != NULL)
+    {
+      *path = info.dli_fname;
+      *sym = info.dli_sname;
+      return true;
+    }
+#endif
+  return false;
 }
 
 const char * dynlib_error (void)
