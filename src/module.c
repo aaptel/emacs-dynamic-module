@@ -958,21 +958,6 @@ static Lisp_Object module_format_fun_env (const struct module_fun_env *const env
 
 void syms_of_module (void)
 {
-  /* It is not guaranteed that dynamic initializers run in the main thread,
-     therefore we detect the main thread here. */
-#if defined(HAVE_THREADS_H)
-  main_thread = thrd_current ();
-#elif defined(HAVE_PTHREAD)
-  main_thread = pthread_self ();
-#elif defined(WINDOWSNT)
-  /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
-  if (! DuplicateHandle (GetCurrentProcess(), GetCurrentThread(),
-                         GetCurrentProcess(), &main_thread,
-                         SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION,
-                         FALSE, 0))
-    emacs_abort ();
-#endif
-
   DEFSYM (Qmodule_refs_hash, "module-refs-hash");
   DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
 	       doc: /* Module global referrence table.  */);
@@ -1015,4 +1000,25 @@ void syms_of_module (void)
      variable. */
   XSETPVECTYPE (&Smodule_call, PVEC_SUBR);
   XSETSUBR (module_call_func, &Smodule_call);
+}
+
+/* Unlike syms_of_module, this initializer is called even from an
+ * initialized (dumped) Emacs. */
+
+void module_init (void)
+{
+  /* It is not guaranteed that dynamic initializers run in the main thread,
+     therefore we detect the main thread here. */
+#if defined(HAVE_THREADS_H)
+  main_thread = thrd_current ();
+#elif defined(HAVE_PTHREAD)
+  main_thread = pthread_self ();
+#elif defined(WINDOWSNT)
+  /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
+  if (! DuplicateHandle (GetCurrentProcess(), GetCurrentThread(),
+                         GetCurrentProcess(), &main_thread,
+                         SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION,
+                         FALSE, 0))
+    emacs_abort ();
+#endif
 }

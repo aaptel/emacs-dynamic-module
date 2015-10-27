@@ -775,6 +775,10 @@ main (int argc, char **argv)
 
   atexit (close_output_streams);
 
+#ifdef HAVE_MODULES
+  module_init ();
+#endif
+
   sort_args (argc, argv);
   argc = 0;
   while (argv[argc]) argc++;
