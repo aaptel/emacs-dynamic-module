@@ -3,8 +3,8 @@ ROOT = ../..
 
 CC      = gcc
 LD      = gcc
-CFLAGS  = -fsanitize=address -ggdb3 -Wall
-LDFLAGS = -fsanitize=address
+CFLAGS  = -ggdb3 -Wall
+LDFLAGS =
 
 all: modt-error.so modt-error.doc
 
