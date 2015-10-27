@@ -43,6 +43,8 @@ EMACS_EXTERN_C_BEGIN
 
 /* Current environement */
 typedef struct emacs_env_25 emacs_env;
+
+/* Opaque structure pointer representing an Emacs Lisp value */
 typedef struct emacs_value_tag* emacs_value;
 
 enum emacs_arity {
@@ -51,9 +53,14 @@ enum emacs_arity {
 
 /* Struct passed to a module init function (emacs_module_init) */
 struct emacs_runtime {
+  /* Structure size (for version checking) */
   size_t size;
-  emacs_env* (*get_environment)(struct emacs_runtime *ert);
+
+  /* Private data; users should not touch this */
   struct emacs_runtime_private *private_members;
+
+  /* Returns an environment pointer. */
+  emacs_env* (*get_environment)(struct emacs_runtime *ert);
 };
 
 
@@ -85,6 +92,9 @@ struct emacs_env_25 {
    */
 
   size_t size;
+
+  /* Private data; users should not touch this */
+  struct emacs_env_private *private_members;
 
   /*
    * Memory management
@@ -197,8 +207,6 @@ struct emacs_env_25 {
   void (*set_user_ptr_finalizer)(emacs_env *env,
                                  emacs_value uptr,
                                  void (*fin)(void *) EMACS_NOEXCEPT);
-
-  struct emacs_env_private *private_members;
 };
 
 EMACS_EXTERN_C_END
