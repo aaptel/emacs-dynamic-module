@@ -29,7 +29,11 @@
 #include "coding.h"
 #include "verify.h"
 
+
+/* Feature tests */
+
 enum {
+  /* 1 if we have __attribute__((cleanup(...))), 0 otherwise */
   module_has_cleanup =
 #ifdef HAVE_VAR_ATTRIBUTE_CLEANUP
   1
@@ -38,6 +42,8 @@ enum {
 #endif
 };
 
+/* Handle to the main thread.  Used to verify that modules call us in
+   the right thread. */
 #if defined(HAVE_THREADS_H)
 #include <threads.h>
 static thrd_t main_thread;
@@ -51,82 +57,20 @@ static pthread_t main_thread;
 static HANDLE main_thread;
 #endif
 
-struct emacs_value_tag { Lisp_Object v; };
+
+/* Implementation of runtime and environment functions */
 
-static void module_out_of_memory (emacs_env *env);
-
-enum { value_frame_size = 512 };
-
-struct emacs_value_frame {
-  struct emacs_value_tag objects[value_frame_size];
-  size_t offset;
-  struct emacs_value_frame *next;
-};
-
-static struct emacs_value_storage {
-  struct emacs_value_frame initial;
-  struct emacs_value_frame *current;
-} global_storage;
-
-static void initialize_frame (struct emacs_value_frame *frame)
-{
-  frame->offset = 0;
-  frame->next = NULL;
-}
-
-static void initialize_storage (struct emacs_value_storage *storage)
-{
-  initialize_frame(&storage->initial);
-  storage->current = &storage->initial;
-}
-
-static void finalize_storage (struct emacs_value_storage *storage)
-{
-  for (struct emacs_value_frame *frame = &storage->initial; frame->next; frame = frame->next)
-    free (frame->next);
-}
-
-static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_storage *storage,
-                                         Lisp_Object obj)
-{
-  eassert (storage->current);
-  eassert (storage->current->offset < value_frame_size);
-  eassert (! storage->current->next);
-  if (storage->current->offset == value_frame_size - 1)
-    {
-      storage->current->next = malloc (sizeof *storage->current->next);
-      if (! storage->current->next)
-        {
-          module_out_of_memory (env);
-          return NULL;
-        }
-      initialize_frame (storage->current->next);
-      storage->current = storage->current->next;
-    }
-  const emacs_value value = storage->current->objects + storage->current->offset;
-  value->v = obj;
-  ++storage->current->offset;
-  return value;
-}
-
-struct emacs_env_private {
-  enum emacs_funcall_exit pending_error;
-  struct emacs_value_tag error_symbol, error_data;
-  struct emacs_value_storage storage;
-};
-
-void syms_of_module (void);
 static emacs_env* module_get_environment (struct emacs_runtime *ert);
+
+static emacs_value module_make_global_ref (emacs_env *env,
+                                           emacs_value ref);
+static void module_free_global_ref (emacs_env *env,
+                                    emacs_value ref);
 static enum emacs_funcall_exit module_error_check (emacs_env *env);
 static void module_error_clear (emacs_env *env);
 static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data);
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
 static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value value);
-static bool module_is_not_nil (emacs_env *env, emacs_value value);
-static bool module_eq (emacs_env *env, emacs_value a, emacs_value b);
-static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
-static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
-static emacs_value module_intern (emacs_env *env, const char *name);
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
@@ -136,49 +80,192 @@ static emacs_value module_funcall (emacs_env *env,
                                    emacs_value fun,
                                    int nargs,
                                    emacs_value args[]);
-static emacs_value module_make_global_ref (emacs_env *env,
-                                           emacs_value ref);
-static void module_free_global_ref (emacs_env *env,
-                                    emacs_value ref);
-
-static emacs_value module_make_string (emacs_env *env, const char *str, size_t lenght);
+static emacs_value module_intern (emacs_env *env, const char *name);
+static emacs_value module_type_of (emacs_env *env, emacs_value value);
+static bool module_is_not_nil (emacs_env *env, emacs_value value);
+static bool module_eq (emacs_env *env, emacs_value a, emacs_value b);
+static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
+static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
+static emacs_value module_make_float (emacs_env *env, double d);
+static double module_float_to_c_double (emacs_env *env, emacs_value f);
 static bool module_copy_string_contents (emacs_env *env,
                                          emacs_value value,
                                          char *buffer,
                                          size_t* length);
-static emacs_value module_type_of (emacs_env *env, emacs_value value);
-static emacs_value module_make_float (emacs_env *env, double d);
-static double module_float_to_c_double (emacs_env *env, emacs_value f);
-static void check_main_thread ();
+static emacs_value module_make_string (emacs_env *env, const char *str, size_t lenght);
+static emacs_value module_make_user_ptr (emacs_env *env,
+                                         emacs_finalizer_function fin,
+                                         void *ptr);
+static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr);
+static void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr);
+static emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr);
+static void module_set_user_ptr_finalizer (emacs_env *env,
+                                           emacs_value uptr,
+                                           emacs_finalizer_function fin);
 
-emacs_value module_make_user_ptr (emacs_env *env,
-                                  emacs_finalizer_function fin,
-                                  void *ptr);
+
+/* Helper functions */
 
-void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr);
-void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr);
+/* If checking is enabled, abort if the current thread is not the
+   Emacs main thread. */
+static void check_main_thread (void);
 
-emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr);
-void module_set_user_ptr_finalizer (emacs_env *env,
-                                    emacs_value uptr,
-                                    emacs_finalizer_function fin);
-
+/* Internal versions of `module_error_signal' and `module_error_throw'. */
 static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data);
+static void module_error_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value);
+
+/* Module version of `wrong_type_argument'. */
+static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value);
+
+/* Signal an out-of-memory condition to the caller. */
+static void module_out_of_memory (emacs_env *env);
+
+
+/* Value conversion */
+
+/* Converts an `emacs_value' to the corresponding internal object.
+   Never fails. */
+static Lisp_Object value_to_lisp (emacs_value v);
+
+/* Converts an internal object to an `emacs_value'.  Allocates storage
+   from the environment; returns NULL if allocation fails. */
+static emacs_value lisp_to_value (emacs_env *env, Lisp_Object o);
+
+
+/* Memory management */
+
+/* An `emacs_value' is just a pointer to a structure holding an
+   internal Lisp object. */
+struct emacs_value_tag { Lisp_Object v; };
+
+/* Local value objects use a simple fixed-sized block allocation
+   scheme without explicit deallocation.  All local values are
+   deallocated when the lifetime of their environment ends.  We keep
+   track of a current frame from which new values are allocated,
+   appending further dynamically-allocated frames if necessary. */
+
+enum { value_frame_size = 512 };
+
+/* A block from which `emacs_value' object can be allocated. */
+struct emacs_value_frame {
+  /* Storage for values */
+  struct emacs_value_tag objects[value_frame_size];
+
+  /* Index of the next free value in `objects' */
+  size_t offset;
+
+  /* Pointer to next frame, if any */
+  struct emacs_value_frame *next;
+};
+
+/* Must be called for each frame before it can be used for
+   allocation. */
+static void initialize_frame (struct emacs_value_frame *frame);
+
+/* A structure that holds an initial frame (so that the first local
+   values require no dynamic allocation) and keeps track of the
+   current frame. */
+static struct emacs_value_storage {
+  struct emacs_value_frame initial;
+  struct emacs_value_frame *current;
+} global_storage;
+
+/* Must be called for any storage object before it can be used for
+   allocation. */
+static void initialize_storage (struct emacs_value_storage *storage);
+
+/* Must be called for any initialized storage object before its
+   lifetime ends.  Frees all dynamically-allocated frames. */
+static void finalize_storage (struct emacs_value_storage *storage);
+
+/* Allocates a new value from STORAGE and stores OBJ in it.  Returns
+   NULL if allocations fails and uses ENV for error reporting. */
+static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_storage *storage,
+                                         Lisp_Object obj);
+
+
+/* Private runtime and environment members */
+
+/* The private part of an environment stores the current error state
+   and holds the `emacs_value' objects allocated during the lifetime
+   of the environment. */
+struct emacs_env_private {
+  enum emacs_funcall_exit pending_error;
+
+  /* Dedicated storage for error symbol and data so that we always
+     have storage available for them, even in an out-of-memory
+     situation. */
+  struct emacs_value_tag error_symbol, error_data;
+
+  struct emacs_value_storage storage;
+};
+
+/* Combines public and private parts in one structure.  This structure
+   is used whenever an environment is created. */
+struct env_storage {
+  emacs_env pub;
+  struct emacs_env_private priv;
+};
+
+/* Must be called before the environment can be used. */
+static void initialize_environment (struct env_storage *env);
+
+/* Must be called before the lifetime of the environment object
+   ends. */
+static void finalize_environment (struct env_storage *env);
+
+/* The private parts of an `emacs_runtime' object contain the initial
+   environment. */
+struct emacs_runtime_private {
+  struct env_storage environment;
+};
+
+
+/* Convenience macros for error handling */
+
+/* Emacs uses setjmp(3) and longjmp(3) for non-local exits, but we
+   can't allow module frames to be skipped because they are in general
+   not prepared for long jumps (e.g. the behavior in C++ is undefined
+   if objects with nontrivial destructors would be skipped).
+   Therefore we catch all non-local exits.  There are two kinds of
+   non-local exits: `signal' and `throw'.  The macros in this section
+   can be used to catch both.  We use macros so that we don't have to
+   write lots of additional variants of `internal_condition_case'
+   etc. and don't have to worry about passing information to the
+   handler functions. */
+
+/* Called on `signal'.  ERR will be a cons cell (SYMBOL . DATA), which
+   gets stored in the environment.  Sets the pending error flag. */
 static void module_handle_signal (emacs_env *env, Lisp_Object err);
+
+/* Called on `throw'.  TAG_VAL will be a cons cell (TAG . VALUE),
+   which gets stored in the environment.  Sets the pending error
+   flag. */
 static void module_handle_throw (emacs_env *env, Lisp_Object tag_val);
 
-static void module_reset_handlerlist(const int *dummy)
-{
-  handlerlist = handlerlist->next;
-}
+/* Must be called after setting up a handler immediately before
+   returning from the function.  See the comments in lisp.h and the
+   code in eval.c for details.  The macros below arrange for this
+   function to be called automatically.  DUMMY is ignored. */
+static void module_reset_handlerlist (const int *dummy);
 
+/* Place this macro at the beginning of a function returning a number
+   or a pointer to handle signals.  The function must have an ENV
+   parameter.  The function will return 0 (or NULL) if a signal is
+   caught. */
 #define MODULE_HANDLE_SIGNALS MODULE_HANDLE_SIGNALS_RETURN(0)
 
+/* Place this macro at the beginning of a function returning void to
+   handle signals.  The function must have an ENV parameter. */
 #define MODULE_HANDLE_SIGNALS_VOID MODULE_HANDLE_SIGNALS_RETURN()
 
 #define MODULE_HANDLE_SIGNALS_RETURN(retval)                                   \
   MODULE_SETJMP(CONDITION_CASE, module_handle_signal, retval)
 
+/* Place this macro at the beginning of a function returning a pointer
+   to handle non-local exits via `throw'.  The function must have an
+   ENV parameter.  The function will return NULL if a `throw' is
+   caught. */
 #define MODULE_HANDLE_THROW                                                    \
   MODULE_SETJMP(CATCHER_ALL, module_handle_throw, NULL)
 
@@ -190,81 +277,59 @@ static void module_reset_handlerlist(const int *dummy)
 #define MODULE_SETJMP_1(handlertype, handlerfunc, retval, c, dummy)            \
   eassert(!module_error_check(env));                                           \
   struct handler *c;                                                           \
+  /* It is very important that pushing the handler doesn't itself raise a      \
+     signal. */                                                                \
   if (!push_handler_nosignal(&c, Qt, handlertype)) {                           \
     module_out_of_memory(env);                                                 \
     return retval;                                                             \
   }                                                                            \
   verify(module_has_cleanup);                                                  \
+  /* We can install the cleanup only after the handler has been pushed.  Use   \
+     __attribute__((cleanup)) to avoid error-prone manual cleanup. */          \
   const int dummy __attribute__((cleanup(module_reset_handlerlist)));          \
   if (sys_setjmp(c->jmp)) {                                                    \
     (handlerfunc)(env, c->val);                                                \
     return retval;                                                             \
   }                                                                            \
+  /* Force the macro to be followed by a semicolon. */                         \
   do {                                                                         \
   } while (0)
 
-static inline Lisp_Object value_to_lisp (emacs_value v)
-{
-  return v->v;
-}
+
+/* Function environments */
 
-static inline emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
-{
-  struct emacs_env_private *const p = env->private_members;
-  if (p->pending_error != emacs_funcall_exit_return) return NULL;
-  return allocate_emacs_value (env, &p->storage, o);
-}
+/* A function environment is an auxiliary structure used by
+   `module_make_function' to store information about a module
+   function.  It is stored in a save pointer and retrieved by
+   `module-call'.  Its members correspond to the arguments given to
+   `module_make_function'. */
 
-struct env_storage {
-  emacs_env pub;
-  struct emacs_env_private priv;
+struct module_fun_env
+{
+  int min_arity, max_arity;
+  emacs_subr subr;
+  void *data;
 };
 
-struct emacs_runtime_private {
-  struct env_storage environment;
-};
+/* Returns a string object that contains a user-friendly
+   representation of the function environment. */
+static Lisp_Object module_format_fun_env (const struct module_fun_env *env);
+
+/* Holds the function definition of `module-call'.  `module-call' is
+   uninterned because user code couldn't meaningfully use it, so we
+   have to keep its definition around somewhere else. */
+static Lisp_Object module_call_func;
+
+
+/* Implementation of runtime and environment functions */
+
+/* We catch signals and throws only if the code can actually signal or
+   throw. */
 
 static emacs_env* module_get_environment (struct emacs_runtime *ert)
 {
   check_main_thread ();
   return &ert->private_members->environment.pub;
-}
-
-static void initialize_environment (struct env_storage *env)
-{
-  env->priv.pending_error = emacs_funcall_exit_return;
-  initialize_storage (&env->priv.storage);
-  env->pub.size            = sizeof env->pub;
-  env->pub.make_global_ref = module_make_global_ref;
-  env->pub.free_global_ref = module_free_global_ref;
-  env->pub.type_of         = module_type_of;
-  env->pub.is_not_nil      = module_is_not_nil;
-  env->pub.eq              = module_eq;
-  env->pub.error_check     = module_error_check;
-  env->pub.error_clear     = module_error_clear;
-  env->pub.error_get       = module_error_get;
-  env->pub.error_signal    = module_error_signal;
-  env->pub.error_throw     = module_error_throw;
-  env->pub.make_fixnum     = module_make_fixnum;
-  env->pub.fixnum_to_int   = module_fixnum_to_int;
-  env->pub.make_float      = module_make_float;
-  env->pub.float_to_c_double = module_float_to_c_double;
-  env->pub.intern          = module_intern;
-  env->pub.make_function   = module_make_function;
-  env->pub.funcall         = module_funcall;
-  env->pub.make_string     = module_make_string;
-  env->pub.copy_string_contents = module_copy_string_contents;
-  env->pub.make_user_ptr = module_make_user_ptr;
-  env->pub.get_user_ptr_ptr = module_get_user_ptr_ptr;
-  env->pub.set_user_ptr_ptr = module_set_user_ptr_ptr;
-  env->pub.get_user_ptr_finalizer = module_get_user_ptr_finalizer;
-  env->pub.set_user_ptr_finalizer = module_set_user_ptr_finalizer;
-  env->pub.private_members = &env->priv;
-}
-
-static void finalize_environment (struct env_storage *env)
-{
-  finalize_storage (&env->priv.storage);
 }
 
 /*
@@ -308,6 +373,7 @@ static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref)
 {
   check_main_thread ();
+  /* TODO: This probably never signals. */
   MODULE_HANDLE_SIGNALS_VOID;
   eassert (HASH_TABLE_P (Vmodule_refs_hash));
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
@@ -354,24 +420,6 @@ static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sy
   return p->pending_error;
 }
 
-static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data)
-{
-  struct emacs_env_private *const p = env->private_members;
-  eassert (p->pending_error == emacs_funcall_exit_return);
-  p->pending_error = emacs_funcall_exit_signal;
-  p->error_symbol.v = sym;
-  p->error_data.v = data;
-}
-
-static void module_error_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value)
-{
-  struct emacs_env_private *const p = env->private_members;
-  eassert (p->pending_error == emacs_funcall_exit_return);
-  p->pending_error = emacs_funcall_exit_throw;
-  p->error_symbol.v = tag;
-  p->error_data.v = value;
-}
-
 /*
  * Like for `signal', DATA must be a list
  */
@@ -387,25 +435,83 @@ static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value val
   module_error_throw_1 (env, value_to_lisp (tag), value_to_lisp (value));
 }
 
-static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value)
+/*
+ * A module function is lambda function that calls `module-call',
+ * passing the function pointer of the module function along with the
+ * module emacs_env pointer as arguments.
+ *
+ *   (function
+ *    (lambda
+ *     (&rest arglist)
+ *     (module-call
+ *      envobj
+ *      arglist)))
+ *
+ */
+static emacs_value module_make_function (emacs_env *env,
+                                         int min_arity,
+                                         int max_arity,
+                                         emacs_subr subr,
+                                         void *data)
 {
-  module_error_signal_1 (env, Qwrong_type_argument, list2 (predicate, value));
+  check_main_thread ();
+  MODULE_HANDLE_SIGNALS;
+
+  if (min_arity < 0 ||
+      (max_arity >= 0 && max_arity < min_arity) ||
+      (max_arity < 0 && max_arity != emacs_variadic_function))
+    xsignal2 (Qinvalid_arity, make_number (min_arity), make_number (max_arity));
+
+  Lisp_Object envobj;
+
+  /* XXX: This should need to be freed when envobj is GC'd */
+  struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
+  envptr->min_arity = min_arity;
+  envptr->max_arity = max_arity;
+  envptr->subr = subr;
+  envptr->data = data;
+  envobj = make_save_ptr (envptr);
+
+  Lisp_Object ret = list3 (Qlambda,
+                           list2 (Qand_rest, Qargs),
+                           list3 (module_call_func,
+                                  envobj,
+                                  Qargs));
+
+  return lisp_to_value (env, ret);
 }
 
-static void module_out_of_memory (emacs_env *env)
+static emacs_value module_funcall (emacs_env *env,
+                                   emacs_value fun,
+                                   int nargs,
+                                   emacs_value args[])
 {
-  // TODO: Reimplement this so it works even if memory-signal-data has been modified.
-  module_error_signal_1 (env, XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
+  check_main_thread ();
+  MODULE_HANDLE_SIGNALS;
+  MODULE_HANDLE_THROW;
+
+  /*
+   *  Make a new Lisp_Object array starting with the function as the
+   *  first arg, because that's what Ffuncall takes
+   */
+  Lisp_Object newargs[nargs + 1];
+  newargs[0] = value_to_lisp (fun);
+  for (int i = 0; i < nargs; i++)
+    newargs[1 + i] = value_to_lisp (args[i]);
+  return lisp_to_value (env, Ffuncall (nargs + 1, newargs));
 }
 
-static void module_handle_signal (emacs_env *const env, const Lisp_Object err)
+static emacs_value module_intern (emacs_env *env, const char *name)
 {
-  module_error_signal_1 (env, XCAR (err), XCDR (err));
+  check_main_thread ();
+  MODULE_HANDLE_SIGNALS;
+  return lisp_to_value (env, intern (name));
 }
 
-static void module_handle_throw (emacs_env *const env, const Lisp_Object tag_val)
+static emacs_value module_type_of (emacs_env *env, emacs_value value)
 {
-  module_error_throw_1 (env, XCAR (tag_val), XCDR (tag_val));
+  check_main_thread ();
+  return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
 }
 
 static bool module_is_not_nil (emacs_env *env, emacs_value value)
@@ -418,6 +524,20 @@ static bool module_eq (emacs_env *env, emacs_value a, emacs_value b)
 {
   check_main_thread ();
   return EQ (value_to_lisp (a), value_to_lisp (b));
+}
+
+static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
+{
+  verify (INT64_MIN <= MOST_NEGATIVE_FIXNUM);
+  verify (INT64_MAX >= MOST_POSITIVE_FIXNUM);
+  check_main_thread ();
+  const Lisp_Object l = value_to_lisp (n);
+  if (! INTEGERP (l))
+    {
+      module_wrong_type (env, Qintegerp, l);
+      return 0;
+    }
+  return XINT (l);
 }
 
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
@@ -436,27 +556,6 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
   return lisp_to_value (env, make_number (n));
 }
 
-static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
-{
-  verify(INT64_MIN <= MOST_NEGATIVE_FIXNUM);
-  verify(INT64_MAX >= MOST_POSITIVE_FIXNUM);
-  check_main_thread ();
-  const Lisp_Object l = value_to_lisp (n);
-  if (! INTEGERP (l))
-    {
-      module_wrong_type (env, Qintegerp, l);
-      return 0;
-    }
-  return XINT (l);
-}
-
-static emacs_value module_make_float (emacs_env *env, double d)
-{
-  check_main_thread ();
-  MODULE_HANDLE_SIGNALS;
-  return lisp_to_value (env, make_float (d));
-}
-
 static double module_float_to_c_double (emacs_env *env, emacs_value f)
 {
   check_main_thread ();
@@ -469,24 +568,11 @@ static double module_float_to_c_double (emacs_env *env, emacs_value f)
   return XFLOAT_DATA (lisp);
 }
 
-static emacs_value module_intern (emacs_env *env, const char *name)
+static emacs_value module_make_float (emacs_env *env, double d)
 {
   check_main_thread ();
   MODULE_HANDLE_SIGNALS;
-  return lisp_to_value (env, intern (name));
-}
-
-static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
-{
-  check_main_thread ();
-  MODULE_HANDLE_SIGNALS;
-  if (length > PTRDIFF_MAX)
-    {
-      module_error_signal_1 (env, Qoverflow_error, Qnil);
-      return NULL;
-    }
-  /* Assume STR is utf8 encoded */
-  return lisp_to_value (env, make_string (str, length));
+  return lisp_to_value (env, make_float (d));
 }
 
 static bool module_copy_string_contents (emacs_env *env,
@@ -525,21 +611,28 @@ static bool module_copy_string_contents (emacs_env *env,
   return true;
 }
 
-static emacs_value module_type_of (emacs_env *env, emacs_value value)
+static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
   check_main_thread ();
-  return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
+  MODULE_HANDLE_SIGNALS;
+  if (length > PTRDIFF_MAX)
+    {
+      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      return NULL;
+    }
+  /* Assume STR is utf8 encoded */
+  return lisp_to_value (env, make_string (str, length));
 }
 
-emacs_value module_make_user_ptr (emacs_env *env,
-                                  emacs_finalizer_function fin,
-                                  void *ptr)
+static emacs_value module_make_user_ptr (emacs_env *env,
+                                         emacs_finalizer_function fin,
+                                         void *ptr)
 {
   check_main_thread ();
   return lisp_to_value (env, make_user_ptr (fin, ptr));
 }
 
-void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
+static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
   const Lisp_Object lisp = value_to_lisp (uptr);
@@ -551,7 +644,7 @@ void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
   return XUSER_PTR (lisp)->p;
 }
 
-void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
+static void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
 {
   check_main_thread ();
   const Lisp_Object lisp = value_to_lisp (uptr);
@@ -559,8 +652,7 @@ void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
   XUSER_PTR (lisp)->p = ptr;
 }
 
-
-emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
+static emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
   const Lisp_Object lisp = value_to_lisp (uptr);
@@ -572,9 +664,9 @@ emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_va
   return XUSER_PTR (lisp)->finalizer;
 }
 
-void module_set_user_ptr_finalizer (emacs_env *env,
-                                    emacs_value uptr,
-                                    emacs_finalizer_function fin)
+static void module_set_user_ptr_finalizer (emacs_env *env,
+                                           emacs_value uptr,
+                                           emacs_finalizer_function fin)
 {
   check_main_thread ();
   const Lisp_Object lisp = value_to_lisp (uptr);
@@ -582,110 +674,49 @@ void module_set_user_ptr_finalizer (emacs_env *env,
   XUSER_PTR (lisp)->finalizer = fin;
 }
 
-struct module_fun_env
-{
-  int min_arity, max_arity;
-  emacs_subr subr;
-  void *data;
-};
+
+/* Subroutines */
 
-static Lisp_Object module_format_fun_env (const struct module_fun_env *const env)
+DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
+       doc: /* Load module FILE.  */)
+  (Lisp_Object file)
 {
-  const char *path, *sym;
-  if (dynlib_addr (env->subr, &path, &sym))
-    {
-      AUTO_STRING (format, "#<module function %s from %s>");
-      return CALLN (Fformat, format, build_string (sym), build_string (path));
+  dynlib_handle_ptr handle;
+  emacs_init_function module_init;
+  void *gpl_sym;
+  Lisp_Object doc_name, args[2];
+
+  CHECK_STRING (file);
+  handle = dynlib_open (SDATA (file));
+  if (!handle)
+    error ("Cannot load file %s", SDATA (file));
+
+  gpl_sym = dynlib_sym (handle, "plugin_is_GPL_compatible");
+  if (!gpl_sym)
+    error ("Module %s is not GPL compatible", SDATA (file));
+
+  module_init = (emacs_init_function) dynlib_sym (handle, "emacs_module_init");
+  if (!module_init)
+    error ("Module %s does not have an init function.", SDATA (file));
+
+  struct {
+    struct emacs_runtime pub;
+    struct emacs_runtime_private priv;
+  } runtime = {
+    .pub = {
+      .size = sizeof runtime.pub,
+      .get_environment = module_get_environment,
+      .private_members = &runtime.priv
     }
-  else
-    {
-      AUTO_STRING (format, "#<module function at %#x>");
-      return CALLN (Fformat, format, make_number ((intptr_t) env->subr));
-    }
-}
+  };
+  initialize_environment (&runtime.priv.environment);
+  int r = module_init (&runtime.pub);
+  finalize_environment (&runtime.priv.environment);
 
-/* Holds the function definition of `module-call'. */
-static Lisp_Object module_call_func;
+  if (r != 0)
+    xsignal2 (Qmodule_load_failed, file, make_number (r));
 
-/*
- * A module function is lambda function that calls `module-call',
- * passing the function pointer of the module function along with the
- * module emacs_env pointer as arguments.
- *
- *   (function
- *    (lambda
- *     (&rest arglist)
- *     (module-call
- *      envobj
- *      arglist)))
- *
- */
-static emacs_value module_make_function (emacs_env *env,
-                                         int min_arity,
-                                         int max_arity,
-                                         emacs_subr subr,
-                                         void *data)
-{
-  check_main_thread();
-  MODULE_HANDLE_SIGNALS;
-
-  if (min_arity < 0 ||
-      (max_arity >= 0 && max_arity < min_arity) ||
-      (max_arity < 0 && max_arity != emacs_variadic_function))
-    xsignal2 (Qinvalid_arity, make_number (min_arity), make_number (max_arity));
-
-  Lisp_Object envobj;
-
-  /* XXX: This should need to be freed when envobj is GC'd */
-  struct module_fun_env *envptr = xzalloc (sizeof (*envptr));
-  envptr->min_arity = min_arity;
-  envptr->max_arity = max_arity;
-  envptr->subr = subr;
-  envptr->data = data;
-  envobj = make_save_ptr (envptr);
-
-  Lisp_Object ret = list3 (Qlambda,
-                           list2 (Qand_rest, Qargs),
-                           list3 (module_call_func,
-                                  envobj,
-                                  Qargs));
-
-  return lisp_to_value (env, ret);
-}
-
-static emacs_value module_funcall (emacs_env *env,
-                                   emacs_value fun,
-                                   int nargs,
-                                   emacs_value args[])
-{
-  check_main_thread();
-  MODULE_HANDLE_SIGNALS;
-  MODULE_HANDLE_THROW;
-
-  /*
-   *  Make a new Lisp_Object array starting with the function as the
-   *  first arg, because that's what Ffuncall takes
-   */
-  Lisp_Object newargs[nargs + 1];
-  newargs[0] = value_to_lisp (fun);
-  for (int i = 0; i < nargs; i++)
-    newargs[1 + i] = value_to_lisp (args[i]);
-  return lisp_to_value (env, Ffuncall (nargs + 1, newargs));
-}
-
-static void check_main_thread ()
-{
-#if defined(HAVE_THREADS_H)
-  eassert (thrd_equal (thdr_current (), main_thread);
-#elif defined(HAVE_PTHREAD)
-  eassert (pthread_equal (pthread_self (), main_thread));
-#elif defined(WINDOWSNT)
-  /* CompareObjectHandles would be perfect, but is only available in
-     Windows 10.  Also check whether the thread is still running to
-     protect against thread identifier reuse. */
-  eassert (GetCurrentThreadID () == GetThreadID (main_thread) &&
-           WaitForSingleObject (main_thread, 0) == WAIT_TIMEOUT);
-#endif
+  return Qt;
 }
 
 DEFUN ("module-call", Fmodule_call, Smodule_call, 2, 2, 0,
@@ -739,47 +770,191 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
     }
 }
 
-DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
-       doc: /* Load module FILE.  */)
-  (Lisp_Object file)
+
+/* Helper functions */
+
+static void check_main_thread (void)
 {
-  dynlib_handle_ptr handle;
-  emacs_init_function module_init;
-  void *gpl_sym;
-  Lisp_Object doc_name, args[2];
-
-  CHECK_STRING (file);
-  handle = dynlib_open (SDATA (file));
-  if (!handle)
-    error ("Cannot load file %s", SDATA (file));
-
-  gpl_sym = dynlib_sym (handle, "plugin_is_GPL_compatible");
-  if (!gpl_sym)
-    error ("Module %s is not GPL compatible", SDATA (file));
-
-  module_init = (emacs_init_function) dynlib_sym (handle, "emacs_module_init");
-  if (!module_init)
-    error ("Module %s does not have an init function.", SDATA (file));
-
-  struct {
-    struct emacs_runtime pub;
-    struct emacs_runtime_private priv;
-  } runtime = {
-    .pub = {
-      .size = sizeof runtime.pub,
-      .get_environment = module_get_environment,
-      .private_members = &runtime.priv
-    }
-  };
-  initialize_environment (&runtime.priv.environment);
-  int r = module_init (&runtime.pub);
-  finalize_environment (&runtime.priv.environment);
-
-  if (r != 0)
-    xsignal2 (Qmodule_load_failed, file, make_number (r));
-
-  return Qt;
+#if defined(HAVE_THREADS_H)
+  eassert (thrd_equal (thdr_current (), main_thread);
+#elif defined(HAVE_PTHREAD)
+  eassert (pthread_equal (pthread_self (), main_thread));
+#elif defined(WINDOWSNT)
+  /* CompareObjectHandles would be perfect, but is only available in
+     Windows 10.  Also check whether the thread is still running to
+     protect against thread identifier reuse. */
+  eassert (GetCurrentThreadID () == GetThreadID (main_thread) &&
+           WaitForSingleObject (main_thread, 0) == WAIT_TIMEOUT);
+#endif
 }
+
+static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data)
+{
+  struct emacs_env_private *const p = env->private_members;
+  eassert (p->pending_error == emacs_funcall_exit_return);
+  p->pending_error = emacs_funcall_exit_signal;
+  p->error_symbol.v = sym;
+  p->error_data.v = data;
+}
+
+static void module_error_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value)
+{
+  struct emacs_env_private *const p = env->private_members;
+  eassert (p->pending_error == emacs_funcall_exit_return);
+  p->pending_error = emacs_funcall_exit_throw;
+  p->error_symbol.v = tag;
+  p->error_data.v = value;
+}
+
+static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value)
+{
+  module_error_signal_1 (env, Qwrong_type_argument, list2 (predicate, value));
+}
+
+static void module_out_of_memory (emacs_env *env)
+{
+  // TODO: Reimplement this so it works even if memory-signal-data has been modified.
+  module_error_signal_1 (env, XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
+}
+
+
+/* Value conversion */
+
+static Lisp_Object value_to_lisp (emacs_value v)
+{
+  return v->v;
+}
+
+static emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
+{
+  struct emacs_env_private *const p = env->private_members;
+  if (p->pending_error != emacs_funcall_exit_return) return NULL;
+  return allocate_emacs_value (env, &p->storage, o);
+}
+
+
+/* Memory management */
+
+static void initialize_frame (struct emacs_value_frame *frame)
+{
+  frame->offset = 0;
+  frame->next = NULL;
+}
+
+static void initialize_storage (struct emacs_value_storage *storage)
+{
+  initialize_frame (&storage->initial);
+  storage->current = &storage->initial;
+}
+
+static void finalize_storage (struct emacs_value_storage *storage)
+{
+  for (struct emacs_value_frame *frame = &storage->initial; frame->next != NULL; frame = frame->next)
+    free (frame->next);
+}
+
+static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_storage *storage,
+                                         Lisp_Object obj)
+{
+  eassert (storage->current);
+  eassert (storage->current->offset < value_frame_size);
+  eassert (! storage->current->next);
+  if (storage->current->offset == value_frame_size - 1)
+    {
+      storage->current->next = malloc (sizeof *storage->current->next);
+      if (! storage->current->next)
+        {
+          module_out_of_memory (env);
+          return NULL;
+        }
+      initialize_frame (storage->current->next);
+      storage->current = storage->current->next;
+    }
+  const emacs_value value = storage->current->objects + storage->current->offset;
+  value->v = obj;
+  ++storage->current->offset;
+  return value;
+}
+
+
+/* Environment lifetime management */
+
+static void initialize_environment (struct env_storage *env)
+{
+  env->priv.pending_error = emacs_funcall_exit_return;
+  initialize_storage (&env->priv.storage);
+  env->pub.size            = sizeof env->pub;
+  env->pub.private_members = &env->priv;
+  env->pub.make_global_ref = module_make_global_ref;
+  env->pub.free_global_ref = module_free_global_ref;
+  env->pub.error_check     = module_error_check;
+  env->pub.error_clear     = module_error_clear;
+  env->pub.error_get       = module_error_get;
+  env->pub.error_signal    = module_error_signal;
+  env->pub.error_throw     = module_error_throw;
+  env->pub.make_function   = module_make_function;
+  env->pub.funcall         = module_funcall;
+  env->pub.intern          = module_intern;
+  env->pub.type_of         = module_type_of;
+  env->pub.is_not_nil      = module_is_not_nil;
+  env->pub.eq              = module_eq;
+  env->pub.fixnum_to_int   = module_fixnum_to_int;
+  env->pub.make_fixnum     = module_make_fixnum;
+  env->pub.float_to_c_double = module_float_to_c_double;
+  env->pub.make_float      = module_make_float;
+  env->pub.copy_string_contents = module_copy_string_contents;
+  env->pub.make_string     = module_make_string;
+  env->pub.make_user_ptr = module_make_user_ptr;
+  env->pub.get_user_ptr_ptr = module_get_user_ptr_ptr;
+  env->pub.set_user_ptr_ptr = module_set_user_ptr_ptr;
+  env->pub.get_user_ptr_finalizer = module_get_user_ptr_finalizer;
+  env->pub.set_user_ptr_finalizer = module_set_user_ptr_finalizer;
+}
+
+static void finalize_environment (struct env_storage *env)
+{
+  finalize_storage (&env->priv.storage);
+}
+
+
+/* Error handling */
+
+static void module_reset_handlerlist(const int *dummy)
+{
+  handlerlist = handlerlist->next;
+}
+
+static void module_handle_signal (emacs_env *const env, const Lisp_Object err)
+{
+  module_error_signal_1 (env, XCAR (err), XCDR (err));
+}
+
+static void module_handle_throw (emacs_env *const env, const Lisp_Object tag_val)
+{
+  module_error_throw_1 (env, XCAR (tag_val), XCDR (tag_val));
+}
+
+
+/* Function environments */
+
+static Lisp_Object module_format_fun_env (const struct module_fun_env *const env)
+{
+  /* Try to print a function name if possible. */
+  const char *path, *sym;
+  if (dynlib_addr (env->subr, &path, &sym))
+    {
+      AUTO_STRING (format, "#<module function %s from %s>");
+      return CALLN (Fformat, format, build_string (sym), build_string (path));
+    }
+  else
+    {
+      AUTO_STRING (format, "#<module function at %#x>");
+      return CALLN (Fformat, format, make_number ((intptr_t) env->subr));
+    }
+}
+
+
+/* Segment initializer */
 
 void syms_of_module (void)
 {
