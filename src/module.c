@@ -689,7 +689,7 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   CHECK_STRING (file);
   handle = dynlib_open (SDATA (file));
   if (!handle)
-    error ("Cannot load file %s", SDATA (file));
+    error ("Cannot load file %s: %s", SDATA (file), dynlib_error ());
 
   gpl_sym = dynlib_sym (handle, "plugin_is_GPL_compatible");
   if (!gpl_sym)
