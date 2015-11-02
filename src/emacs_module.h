@@ -207,6 +207,21 @@ struct emacs_env_25 {
   void (*set_user_ptr_finalizer)(emacs_env *env,
                                  emacs_value uptr,
                                  void (*fin)(void *) EMACS_NOEXCEPT);
+
+  /*
+   * Vector functions
+   */
+  emacs_value (*vec_get) (emacs_env *env,
+			  emacs_value vec,
+			  size_t i);
+
+  void (*vec_set) (emacs_env *env,
+		   emacs_value vec,
+		   size_t i,
+		   emacs_value val);
+
+  size_t (*vec_size) (emacs_env *env,
+		      emacs_value vec);
 };
 
 EMACS_EXTERN_C_END
