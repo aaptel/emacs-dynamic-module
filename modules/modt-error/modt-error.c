@@ -4,21 +4,18 @@
 
 int plugin_is_GPL_compatible;
 
-static emacs_value Qnil;
-static emacs_value Qt;
-
 static emacs_value Fmodt_error_signal (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
   assert (env->error_check (env) == emacs_funcall_exit_return);
   env->error_signal (env, env->intern (env, "error"), env->make_fixnum (env, 56));
-  return Qt;
+  return env->intern (env, "t");
 }
 
 static emacs_value Fmodt_error_throw (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
   assert (env->error_check (env) == emacs_funcall_exit_return);
   env->error_throw (env, env->intern (env, "tag"), env->make_fixnum (env, 65));
-  return Qt;
+  return env->intern (env, "t");
 }
 
 static emacs_value Fmodt_error_funcall (emacs_env *env, int nargs, emacs_value args[], void* data)
@@ -47,7 +44,7 @@ static emacs_value Fmodt_error_funcall (emacs_env *env, int nargs, emacs_value a
       }
     }
   /* never reached */
-  return Qnil;
+  return env->intern (env, "nil");;
 }
 
 /* Binds NAME to FUN */
@@ -73,8 +70,7 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  Qnil = env->intern (env, "nil");
-  Qt = env->intern (env, "t");
+
   bind_function (env, "modt-error-signal", env->make_function (env, 0, 0, Fmodt_error_signal, NULL));
   bind_function (env, "modt-error-throw", env->make_function (env, 0, 0, Fmodt_error_throw, NULL));
   bind_function (env, "modt-error-funcall", env->make_function (env, 1, 1, Fmodt_error_funcall, NULL));

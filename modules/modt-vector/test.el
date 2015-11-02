@@ -11,13 +11,7 @@
       (let* ((v-ref (make-vector 2 e))
              (eq-ref (eq (aref v-ref 0) (aref v-ref 1)))
              (v-test (make-vector s nil)))
-        
+
         (should (eq (modt-vector-fill v-test e) t))
         (should (eq (modt-vector-eq v-test e) eq-ref))))))
-
-
-        
-        
-             
-
 
