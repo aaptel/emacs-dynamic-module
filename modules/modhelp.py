@@ -7,9 +7,6 @@ import re
 
 EMACS = os.path.join('..', 'src', 'emacs')
 
-def test_module(modulepath):
-        return r == 0
-
 def find_modules():
     modpaths = []
     for (dirname, dirs, files) in os.walk('.'):
