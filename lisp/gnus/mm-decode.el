@@ -855,7 +855,7 @@ external if displayed external."
 				      (concat
 				       "using external program \""
 				       (format method filename) "\"")
-				    (format
+				    (gnus-format-message
 				     "by calling `%s' on the contents)" method))
 				  "? "))))))
 	    (if external
@@ -1419,7 +1419,7 @@ Return t if meta tag is added or replaced."
 	(goto-char (point-min))
 	(if (re-search-forward "\
 <meta\\s-+http-equiv=[\"']?content-type[\"']?\\s-+content=[\"']\
-text/\\(\\sw+\\)\\(?:\;\\s-*charset=\\([^\"'>]+\\)\\)?[^>]*>" nil t)
+text/\\(\\sw+\\)\\(?:;\\s-*charset=\\([^\"'>]+\\)\\)?[^>]*>" nil t)
 	    (if (and (not force-charset)
 		     (match-beginning 2)
 		     (string-match "\\`html\\'" (match-string 1)))

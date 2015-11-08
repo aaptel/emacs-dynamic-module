@@ -218,7 +218,7 @@ return a Lisp form that does the assignment.
 The first arg in ARGLIST (the one that receives VAL) receives an expression
 which can do arbitrary things, whereas the other arguments are all guaranteed
 to be pure and copyable.  Example use:
-  (gv-define-setter aref (v a i) `(aset ,a ,i ,v))"
+  (gv-define-setter aref (v a i) \\=`(aset ,a ,i ,v))"
   (declare (indent 2) (debug (&define name sexp body)))
   `(gv-define-expander ,name
      (lambda (do &rest args)
@@ -233,13 +233,13 @@ turned into calls of the form (SETTER ARGS... VAL).
 
 If FIX-RETURN is non-nil, then SETTER is not assumed to return VAL and
 instead the assignment is turned into something equivalent to
-  \(let ((temp VAL))
+  (let ((temp VAL))
     (SETTER ARGS... temp)
     temp)
 so as to preserve the semantics of `setf'."
   (declare (debug (sexp (&or symbolp lambda-expr) &optional sexp)))
   (when (eq 'lambda (car-safe setter))
-    (message "Use ‘gv-define-setter’ or name %s's setter function" name))
+    (message "Use `gv-define-setter' or name %s's setter function" name))
   `(gv-define-setter ,name (val &rest args)
      ,(if fix-return
           `(macroexp-let2 nil v val

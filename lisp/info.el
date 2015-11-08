@@ -2114,14 +2114,14 @@ If DIRECTION is `backward', search in the reverse direction."
 		   search-whitespace-regexp)))
 	  (Info-search
 	   (cond
-	    (isearch-word
+	    (isearch-regexp-function
 	     ;; Lax version of word search
 	     (let ((lax (not (or isearch-nonincremental
 				 (eq (length string)
 				     (length (isearch--state-string
 					      (car isearch-cmds))))))))
-	       (if (functionp isearch-word)
-		   (funcall isearch-word string lax)
+	       (if (functionp isearch-regexp-function)
+		   (funcall isearch-regexp-function string lax)
 		 (word-search-regexp string lax))))
 	    (isearch-regexp string)
 	    (t (regexp-quote string)))
@@ -3460,7 +3460,7 @@ MATCHES is a list of index matches found by `Info-index'.")
 	(when (equal (car (nth 0 nodeinfo)) (or filename Info-current-file))
 	  (insert
 	   (format "* %-20s %s.\n"
-		   (format-message "*Index for ‘%s’*::" (cdr (nth 0 nodeinfo)))
+		   (format "*Index for ‘%s’*::" (cdr (nth 0 nodeinfo)))
 		   (cdr (nth 0 nodeinfo)))))))))
 
 (defun Info-virtual-index (topic)
@@ -3496,7 +3496,7 @@ search results."
 	(Info-goto-node orignode)
 	(message "")))
     (Info-find-node Info-current-file
-                    (format-message "*Index for ‘%s’*" topic))))
+                    (format "*Index for ‘%s’*" topic))))
 
 (add-to-list 'Info-virtual-files
 	     '("\\`\\*Apropos\\*\\'"
@@ -3635,7 +3635,7 @@ Build a menu of the possible matches."
 	(setq nodes (cdr nodes)))
       (if nodes
 	  (Info-find-node Info-apropos-file (car (car nodes)))
-	(setq nodename (format-message "Index for ‘%s’" string))
+	(setq nodename (format "Index for ‘%s’" string))
 	(push (list nodename string (Info-apropos-matches string))
 	      Info-apropos-nodes)
 	(Info-find-node Info-apropos-file nodename)))))
@@ -3838,7 +3838,7 @@ START is a regular expression which will match the
     beginning of the tokens delimited string.
 ALL is a regular expression with a single
     parenthesized subpattern which is the token to be
-    returned.  E.g. `{\(.*\)}' would return any string
+    returned.  E.g. `{(.*)}' would return any string
     enclosed in braces around POS.
 ERRORSTRING optional fourth argument, controls action on no match:
     nil: return nil
@@ -4720,28 +4720,28 @@ first line or header line, and for breadcrumb links.")
       ;; Fontify titles
       (goto-char (point-min))
       (when (and font-lock-mode not-fontified-p)
-        (while (and (re-search-forward "\n\\([^ \t\n].+\\)\n\\(\\*\\*+\\|==+\\|--+\\|\\.\\.+\\)$"
-                                       nil t)
-                    ;; Only consider it as an underlined title if the ASCII
-                    ;; underline has the same size as the text.  A typical
-                    ;; counter example is when a continuation "..." is alone
-                    ;; on a line.
-                    (= (string-width (match-string 1))
-                       (string-width (match-string 2))))
-          (let* ((c (preceding-char))
-                 (face
-                  (cond ((= c ?*) 'info-title-1)
-                        ((= c ?=) 'info-title-2)
-                        ((= c ?-) 'info-title-3)
-                        (t        'info-title-4))))
-            (put-text-property (match-beginning 1) (match-end 1)
-                               'font-lock-face face))
-          ;; This is a serious problem for trying to handle multiple
-          ;; frame types at once.  We want this text to be invisible
-          ;; on frames that can display the font above.
-          (when (memq (framep (selected-frame)) '(x pc w32 ns))
-            (add-text-properties (1- (match-beginning 2)) (match-end 2)
-                                 '(invisible t front-sticky nil rear-nonsticky t)))))
+        (while (re-search-forward "\n\\([^ \t\n].+\\)\n\\(\\*\\*+\\|==+\\|--+\\|\\.\\.+\\)$"
+                                  nil t)
+          ;; Only consider it as an underlined title if the ASCII
+          ;; underline has the same size as the text.  A typical
+          ;; counter example is when a continuation "..." is alone
+          ;; on a line.
+          (when (= (string-width (match-string 1))
+                   (string-width (match-string 2)))
+            (let* ((c (preceding-char))
+                   (face
+                    (cond ((= c ?*) 'info-title-1)
+                          ((= c ?=) 'info-title-2)
+                          ((= c ?-) 'info-title-3)
+                          (t        'info-title-4))))
+              (put-text-property (match-beginning 1) (match-end 1)
+                                 'font-lock-face face))
+            ;; This is a serious problem for trying to handle multiple
+            ;; frame types at once.  We want this text to be invisible
+            ;; on frames that can display the font above.
+            (when (memq (framep (selected-frame)) '(x pc w32 ns))
+              (add-text-properties (1- (match-beginning 2)) (match-end 2)
+                                   '(invisible t front-sticky nil rear-nonsticky t))))))
 
       ;; Fontify cross references
       (goto-char (point-min))

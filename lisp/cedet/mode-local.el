@@ -50,7 +50,7 @@
 
 (require 'find-func)
 ;; For find-function-regexp-alist. It is tempting to replace this
-;; ‘require‘ by (defvar find-function-regexp-alist) and
+;; ‘require’ by (defvar find-function-regexp-alist) and
 ;; with-eval-after-load, but model-local.el is typically loaded when a
 ;; semantic autoload is invoked, and something in semantic loads
 ;; find-func.el before mode-local.el, so the eval-after-load is lost.
@@ -604,7 +604,7 @@ PROMPT, INITIAL, HIST, and DEFAULT are the same as for `completing-read'."
 ;;
 (defun overload-docstring-extension (overload)
   "Return the doc string that augments the description of OVERLOAD."
-  (let ((doc "\n\This function can be overloaded\
+  (let ((doc "\nThis function can be overloaded\
  with `define-mode-local-override'.")
         (sym (overload-obsoleted-by overload)))
     (when sym
@@ -637,21 +637,30 @@ SYMBOL is a function that can be overridden."
   (when (get symbol 'mode-local-overload)
     (let ((default (or (intern-soft (format "%s-default" (symbol-name symbol)))
 		       symbol))
-	  (override (and
-		     (boundp 'describe-function-orig-buffer) ;; added in Emacs 25
-		     describe-function-orig-buffer
-		     (with-current-buffer describe-function-orig-buffer
-		       (fetch-overload symbol)))))
+	  (override (with-current-buffer describe-function-orig-buffer
+                      (fetch-overload symbol)))
+          modes)
+
       (insert (overload-docstring-extension symbol) "\n\n")
-      (insert (substitute-command-keys (format "default function: `%s'\n" default)))
-      (when (and (boundp 'describe-function-orig-buffer) ;; added in Emacs 25
-		 describe-function-orig-buffer)
-	(if override
-	    (insert (substitute-command-keys
-		     (format "\noverride in buffer '%s': `%s'\n"
-			     describe-function-orig-buffer override)))
-	  (insert (substitute-command-keys (format "\nno override in buffer '%s'\n"
-						   describe-function-orig-buffer)))))
+      (insert (format-message "default function: `%s'\n" default))
+      (if override
+	  (insert (format-message "\noverride in buffer `%s': `%s'\n"
+				  describe-function-orig-buffer override))
+	(insert (format-message "\nno override in buffer `%s'\n"
+				describe-function-orig-buffer)))
+
+      (mapatoms
+       (lambda (sym) (when (get sym 'mode-local-symbol-table) (push sym modes)))
+       obarray)
+
+      (dolist (mode modes)
+	(let* ((major-mode mode)
+	       (override (fetch-overload symbol)))
+
+	  (when override
+	    (insert (format-message "\noverride in mode `%s': `%s'\n"
+				    major-mode override))
+            )))
       )))
 
 (add-hook 'help-fns-describe-function-functions 'describe-mode-local-overload)
@@ -668,7 +677,7 @@ SYMBOL is a function that can be overridden."
     result))
 
 (defun xref-mode-local-overload (symbol)
-  "For ‘elisp-xref-find-def-functions’; add overloads for SYMBOL."
+  "For `elisp-xref-find-def-functions'; add overloads for SYMBOL."
   ;; Current buffer is the buffer where xref-find-definitions was invoked.
   (when (get symbol 'mode-local-overload)
     (let* ((symbol-file (find-lisp-object-file-name symbol (symbol-function symbol)))
@@ -729,11 +738,11 @@ SYMBOL is a function that can be overridden."
 
 (defconst xref-mode-local-find-overloadable-regexp
   "(\\(\\(define-overloadable-function\\)\\|\\(define-overload\\)\\) +%s"
-  "Regexp used by ‘xref-find-definitions’ when searching for a
+  "Regexp used by `xref-find-definitions' when searching for a
   mode-local overloadable function definition.")
 
 (defun xref-mode-local-find-override (meta-name)
-  "Function used by ‘xref-find-definitions’ when searching for an
+  "Function used by `xref-find-definitions' when searching for an
   override of a mode-local overloadable function.
 META-NAME is a cons (OVERLOADABLE-SYMBOL . MAJOR-MODE)."
   (let* ((override (car meta-name))
@@ -751,9 +760,9 @@ META-NAME is a cons (OVERLOADABLE-SYMBOL . MAJOR-MODE)."
 (defun mode-local-print-binding (symbol)
   "Print the SYMBOL binding."
   (let ((value (symbol-value symbol)))
-    (princ (format-message "\n     ‘%s’ value is\n       " symbol))
+    (princ (format-message "\n     `%s' value is\n       " symbol))
     (if (and value (symbolp value))
-        (princ (format-message "‘%s’" value))
+        (princ (format-message "`%s'" value))
       (let ((pt (point)))
         (pp value)
         (save-excursion
@@ -811,7 +820,7 @@ META-NAME is a cons (OVERLOADABLE-SYMBOL . MAJOR-MODE)."
       )
      ((symbolp buffer-or-mode)
       (setq mode buffer-or-mode)
-      (princ (format-message "‘%s’\n" buffer-or-mode))
+      (princ (format-message "`%s'\n" buffer-or-mode))
       )
      ((signal 'wrong-type-argument
               (list 'buffer-or-mode buffer-or-mode))))
@@ -821,7 +830,7 @@ META-NAME is a cons (OVERLOADABLE-SYMBOL . MAJOR-MODE)."
     (while mode
       (setq table (get mode 'mode-local-symbol-table))
       (when table
-        (princ (format-message "\n- From ‘%s’\n" mode))
+        (princ (format-message "\n- From `%s'\n" mode))
         (mode-local-print-bindings table))
       (setq mode (get-mode-local-parent mode)))))
 

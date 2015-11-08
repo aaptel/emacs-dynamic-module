@@ -337,8 +337,8 @@ and the face `eldoc-highlight-function-argument', if they are to have any
 effect.
 
 Major modes should modify this variable using `add-function', for example:
-  (add-function :before-until (local 'eldoc-documentation-function)
-                #'foo-mode-eldoc-function)
+  (add-function :before-until (local \\='eldoc-documentation-function)
+                #\\='foo-mode-eldoc-function)
 so that the global documentation function (i.e. the default value of the
 variable) is taken into account if the major mode specific function does not
 return any documentation.")
@@ -410,6 +410,7 @@ return any documentation.")
 
 ;; Prime the command list.
 (eldoc-add-command-completions
+ "back-to-indentation"
  "backward-" "beginning-of-" "delete-other-windows" "delete-window"
  "down-list" "end-of-" "exchange-point-and-mark" "forward-" "goto-"
  "handle-select-window" "indent-for-tab-command" "left-" "mark-page"

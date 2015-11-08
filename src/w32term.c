@@ -24,37 +24,27 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "w32term.h"
 
-#include "systty.h"
-#include "systime.h"
-
 #include <ctype.h>
 #include <errno.h>
 #include <sys/stat.h>
+#ifdef CYGWIN
+#include <fcntl.h>	/* for O_RDWR */
+#endif
 #include <imm.h>
 
-#include "charset.h"
-#include "character.h"
 #include "coding.h"
-#include "ccl.h"
 #include "frame.h"
-#include "dispextern.h"
 #include "fontset.h"
 #include "termhooks.h"
 #include "termopts.h"
 #include "termchar.h"
-#include "disptab.h"
 #include "buffer.h"
 #include "window.h"
 #include "keyboard.h"
-#include "intervals.h"
-#include "process.h"
-#include "atimer.h"
-#include "keymap.h"
-#include "menu.h"
+#include "menu.h"	/* for w32_menu_show */
 
 #ifdef WINDOWSNT
 #include "w32.h"	/* for filename_from_utf16, filename_from_ansi */
-#include "w32heap.h"
 #endif
 
 #ifndef WINDOWSNT
@@ -65,6 +55,10 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "font.h"
 #include "w32font.h"
+
+#if 0	/* TODO: stipple */
+#include "bitmaps/gray.xbm"
+#endif
 
 /* Fringe bitmaps.  */
 
@@ -1596,7 +1590,9 @@ w32_setup_relief_color (struct frame *f, struct relief *relief, double factor,
   unsigned long mask = GCForeground;
   COLORREF pixel;
   COLORREF background = di->relief_background;
+#if 0
   struct w32_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+#endif
 
   /* TODO: Free colors (if using palette)? */
 
@@ -4350,8 +4346,6 @@ w32_horizontal_scroll_bar_handle_click (struct scroll_bar *bar, W32Msg *msg,
 	if (dragging)
 	  {
 	    SCROLLINFO si;
-	    int start = bar->start;
-	    int end = bar->end;
 
 	    si.cbSize = sizeof (si);
 	    si.fMask = SIF_POS;
@@ -4507,18 +4501,6 @@ x_scroll_bar_clear (struct frame *f)
 
         ReleaseDC (window, hdc);
       }
-}
-
-static void
-set_frame_param (struct frame *f, Lisp_Object prop, Lisp_Object val)
-{
-  register Lisp_Object old_alist_elt;
-
-  old_alist_elt = Fassq (prop, f->param_alist);
-  if (EQ (old_alist_elt, Qnil))
-    fset_param_alist (f, Fcons (Fcons (prop, val), f->param_alist));
-  else
-    Fsetcdr (old_alist_elt, val);
 }
 
 /* The main W32 event-reading loop - w32_read_socket.  */
@@ -5159,7 +5141,7 @@ w32_read_socket (struct terminal *terminal,
 	  if (f && !FRAME_ICONIFIED_P (f) && msg.msg.wParam != SIZE_MINIMIZED)
 	    {
 	      RECT rect;
-	      int rows, columns, width, height, text_width, text_height;
+	      int /* rows, columns, */ width, height, text_width, text_height;
 
 	      if (GetClientRect (msg.msg.hwnd, &rect)
 		  /* GetClientRect evidently returns (0, 0, 0, 0) if
@@ -5931,16 +5913,49 @@ x_calc_absolute_position (struct frame *f)
       top_bottom_borders_height = 32;
     }
 
+  /* With multiple monitors, we can legitimately get negative
+     coordinates (for monitors above or to the left of the primary
+     monitor).  Find the display origin to ensure negative positions
+     are computed correctly (Bug#21173).  */
+  int display_left = 0;
+  int display_top = 0;
+  if (flags & (XNegative | YNegative))
+    {
+      Lisp_Object list;
+
+      list = Fw32_display_monitor_attributes_list (Qnil);
+      while (CONSP (list))
+        {
+          Lisp_Object attributes = CAR(list);
+          Lisp_Object geometry;
+          Lisp_Object monitor_left, monitor_top;
+
+          list = CDR(list);
+
+          geometry = Fassoc (Qgeometry, attributes);
+          if (!NILP (geometry))
+            {
+              monitor_left = Fnth (make_number (1), geometry);
+              monitor_top  = Fnth (make_number (2), geometry);
+
+              display_left = min (display_left, XINT (monitor_left));
+              display_top  = min (display_top,  XINT (monitor_top));
+            }
+        }
+    }
+
   /* Treat negative positions as relative to the rightmost bottommost
      position that fits on the screen.  */
   if (flags & XNegative)
     f->left_pos = (x_display_pixel_width (FRAME_DISPLAY_INFO (f))
+                   + display_left
 		   - FRAME_PIXEL_WIDTH (f)
 		   + f->left_pos
 		   - (left_right_borders_width - 1));
 
   if (flags & YNegative)
     f->top_pos = (x_display_pixel_height (FRAME_DISPLAY_INFO (f))
+                  + display_top
 		  - FRAME_PIXEL_HEIGHT (f)
 		  + f->top_pos
 		  - (top_bottom_borders_height - 1));
@@ -6176,6 +6191,13 @@ x_set_window_size (struct frame *f, bool change_gravity,
 
   if (pixelwidth > 0 || pixelheight > 0)
     {
+      frame_size_history_add
+	(f, Qx_set_window_size_1, width, height,
+	 list2 (Fcons (make_number (pixelwidth),
+		       make_number (pixelheight)),
+		Fcons (make_number (rect.right - rect.left),
+		       make_number (rect.bottom - rect.top))));
+
       my_set_window_pos (FRAME_W32_WINDOW (f), NULL,
 			 0, 0,
 			 rect.right - rect.left,
@@ -6202,8 +6224,6 @@ x_set_window_size (struct frame *f, bool change_gravity,
     }
 
   unblock_input ();
-
-  do_pending_window_change (0);
 }
 
 /* Mouse warping.  */

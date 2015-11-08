@@ -31,12 +31,8 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "xterm.h"	/* for all of the X includes */
-#include "dispextern.h"	/* frame.h seems to want this */
 #include "frame.h"	/* Need this to get the X window of selected_frame */
 #include "blockinput.h"
-#include "character.h"
-#include "buffer.h"
-#include "process.h"
 #include "termhooks.h"
 #include "keyboard.h"
 
@@ -316,7 +312,7 @@ x_own_selection (Lisp_Object selection_name, Lisp_Object selection_value,
   x_catch_errors (display);
   XSetSelectionOwner (display, selection_atom, selecting_window, timestamp);
   x_check_errors (display, "Can't set selection: %s");
-  x_uncatch_errors ();
+  x_uncatch_errors_after_check ();
   unblock_input ();
 
   /* Now update the local cache */
@@ -1179,7 +1175,7 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   XConvertSelection (display, selection_atom, type_atom, target_property,
 		     requestor_window, requestor_time);
   x_check_errors (display, "Can't convert selection: %s");
-  x_uncatch_errors ();
+  x_uncatch_errors_after_check ();
 
   /* Prepare to block until the reply has been read.  */
   reading_selection_window = requestor_window;
@@ -1915,7 +1911,7 @@ DEFUN ("x-own-selection-internal", Fx_own_selection_internal,
        Sx_own_selection_internal, 2, 3, 0,
        doc: /* Assert an X selection of type SELECTION and value VALUE.
 SELECTION is a symbol, typically `PRIMARY', `SECONDARY', or `CLIPBOARD'.
-\(Those are literal upper-case symbol names, since that's what X expects.)
+(Those are literal upper-case symbol names, since that's what X expects.)
 VALUE is typically a string, or a cons of two markers, but may be
 anything that the functions on `selection-converter-alist' know about.
 
@@ -1944,7 +1940,7 @@ DEFUN ("x-get-selection-internal", Fx_get_selection_internal,
        Sx_get_selection_internal, 2, 4, 0,
        doc: /* Return text selected from some X window.
 SELECTION-SYMBOL is typically `PRIMARY', `SECONDARY', or `CLIPBOARD'.
-\(Those are literal upper-case symbol names, since that's what X expects.)
+(Those are literal upper-case symbol names, since that's what X expects.)
 TARGET-TYPE is the type of data desired, typically `STRING'.
 
 TIME-STAMP is the time to use in the XConvertSelection call for foreign
@@ -2048,7 +2044,7 @@ DEFUN ("x-selection-owner-p", Fx_selection_owner_p, Sx_selection_owner_p,
        doc: /* Whether the current Emacs process owns the given X Selection.
 The arg should be the name of the selection in question, typically one of
 the symbols `PRIMARY', `SECONDARY', or `CLIPBOARD'.
-\(Those are literal upper-case symbol names, since that's what X expects.)
+(Those are literal upper-case symbol names, since that's what X expects.)
 For convenience, the symbol nil is the same as `PRIMARY',
 and t is the same as `SECONDARY'.
 
@@ -2271,7 +2267,7 @@ x_fill_property_data (Display *dpy, Lisp_Object data, void *ret, int format)
     {
       Lisp_Object o = XCAR (iter);
 
-      if (INTEGERP (o) || FLOATP (o) || CONSP (o))
+      if (NUMBERP (o) || CONSP (o))
         {
           if (CONSP (o)
 	      && RANGED_INTEGERP (X_LONG_MIN >> 16, XCAR (o), X_LONG_MAX >> 16)
@@ -2364,7 +2360,7 @@ If the value is 0 or the atom is not known, return the empty string.  */)
   x_catch_errors (dpy);
   name = atom ? XGetAtomName (dpy, atom) : empty;
   had_errors_p = x_had_errors_p (dpy);
-  x_uncatch_errors ();
+  x_uncatch_errors_after_check ();
 
   if (!had_errors_p)
     ret = build_string (name);
@@ -2547,7 +2543,7 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
       else
         error ("DEST as a string must be one of PointerWindow or InputFocus");
     }
-  else if (INTEGERP (dest) || FLOATP (dest) || CONSP (dest))
+  else if (NUMBERP (dest) || CONSP (dest))
     CONS_TO_INTEGER (dest, Window, wdest);
   else
     error ("DEST must be a frame, nil, string, number or cons");
@@ -2623,7 +2619,7 @@ and the local selection value (whatever was given to
 `x-own-selection-internal').
 
 The function should return the value to send to the X server
-\(typically a string).  A return value of nil
+(typically a string).  A return value of nil
 means that the conversion could not be done.
 A return value which is the symbol `NULL'
 means that a side-effect was executed,
@@ -2632,10 +2628,10 @@ and there is no meaningful selection value.  */);
 
   DEFVAR_LISP ("x-lost-selection-functions", Vx_lost_selection_functions,
 	       doc: /* A list of functions to be called when Emacs loses an X selection.
-\(This happens when some other X client makes its own selection
+(This happens when some other X client makes its own selection
 or when a Lisp program explicitly clears the selection.)
 The functions are called with one argument, the selection type
-\(a symbol, typically `PRIMARY', `SECONDARY', or `CLIPBOARD').  */);
+(a symbol, typically `PRIMARY', `SECONDARY', or `CLIPBOARD').  */);
   Vx_lost_selection_functions = Qnil;
 
   DEFVAR_LISP ("x-sent-selection-functions", Vx_sent_selection_functions,

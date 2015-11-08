@@ -388,7 +388,7 @@ It consists of pairs (REGEXP . DICTIONARY).  If REGEXP is found
 in the message headers, `ispell-local-dictionary' will be set to
 DICTIONARY if `ispell-local-dictionary' is not buffer-local.
 E.g. you may use the following value:
-  '((\"^Newsgroups:[ \\t]*de\\\\.\" . \"deutsch8\")
+   ((\"^Newsgroups:[ \\t]*de\\\\.\" . \"deutsch8\")
     (\"^To:[^\\n,]+\\\\.de[ \\t\\n,>]\" . \"deutsch8\"))"
   :type '(repeat (cons regexp string))
   :group 'ispell)
@@ -484,7 +484,7 @@ The function must take one string argument and return a string."
   "When non-nil ispell uses framepop to display choices in a dedicated frame.
 You can set this variable to dynamically use framepop if you are in a
 window system by evaluating the following on startup to set this variable:
-  (and window-system (condition-case () (require 'framepop) (error nil)))"
+  (and window-system (condition-case () (require \\='framepop) (error nil)))"
   :type 'boolean
   :group 'ispell)
 
@@ -699,8 +699,8 @@ re-start Emacs."
 
 Each element of this list is also a list:
 
-\(DICTIONARY-NAME CASECHARS NOT-CASECHARS OTHERCHARS MANY-OTHERCHARS-P
-        ISPELL-ARGS EXTENDED-CHARACTER-MODE CHARACTER-SET\)
+ (DICTIONARY-NAME CASECHARS NOT-CASECHARS OTHERCHARS MANY-OTHERCHARS-P
+        ISPELL-ARGS EXTENDED-CHARACTER-MODE CHARACTER-SET)
 
 DICTIONARY-NAME is a possible string value of variable `ispell-dictionary',
 nil means the default dictionary.
@@ -747,7 +747,7 @@ when the language uses non-ASCII characters.
 Note that with \"ispell\" as the speller, the CASECHARS and
 OTHERCHARS slots of the alist should contain the same character
 set as casechars and otherchars in the LANGUAGE.aff file \(e.g.,
-english.aff\).  Aspell and Hunspell don't have this limitation.")
+english.aff).  Aspell and Hunspell don't have this limitation.")
 
 (defvar ispell-really-aspell nil
   "Non-nil if we can use Aspell extensions.")
@@ -2024,7 +2024,7 @@ in a window allowing you to choose one.
 
 If optional argument FOLLOWING is non-nil or if `ispell-following-word'
 is non-nil when called interactively, then the following word
-\(rather than preceding\) is checked when the cursor is not over a word.
+\(rather than preceding) is checked when the cursor is not over a word.
 When the optional argument QUIETLY is non-nil or `ispell-quietly' is non-nil
 when called interactively, non-corrective messages are suppressed.
 
@@ -2044,7 +2044,7 @@ Return values:
 nil           word is correct or spelling is accepted.
 0             word is inserted into buffer-local definitions.
 \"word\"        word corrected from word list.
-\(\"word\" arg\)  word is hand entered.
+\(\"word\" arg)  word is hand entered.
 quit          spell session exited."
   (interactive (list ispell-following-word ispell-quietly current-prefix-arg t))
   (cond
@@ -2162,7 +2162,7 @@ quit          spell session exited."
   "Return the word for spell-checking according to ispell syntax.
 If optional argument FOLLOWING is non-nil or if `ispell-following-word'
 is non-nil when called interactively, then the following word
-\(rather than preceding\) is checked when the cursor is not over a word.
+\(rather than preceding) is checked when the cursor is not over a word.
 Optional second argument contains otherchars that can be included in word
 many times (see the doc string of `ispell-dictionary-alist' for details
 about otherchars).
@@ -2297,7 +2297,8 @@ Global `ispell-quit' set to start location to continue spell session."
 		(insert "\n\t"))
 	      (insert (car guess) "    ")
 	      (setq guess (cdr guess)))
-	    (insert "\nUse option `i' to accept this spelling and put it in your private dictionary.\n")))
+	    (insert (substitute-command-keys
+		     "\nUse option `i' to accept this spelling and put it in your private dictionary.\n"))))
       (while choices
 	(when (> (+ 7 (current-column)
 		    (length (car choices))

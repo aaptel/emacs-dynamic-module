@@ -294,7 +294,7 @@ in hexl format.
 
 A sample format:
 
-  HEX ADDR: 0001 0203 0405 0607 0809 0a0b 0c0d 0e0f     ASCII-TEXT
+  HEX ADDR: 0011 2233 4455 6677 8899 aabb ccdd eeff     ASCII-TEXT
   --------  ---- ---- ---- ---- ---- ---- ---- ----  ----------------
   00000000: 5468 6973 2069 7320 6865 786c 2d6d 6f64  This is hexl-mod
   00000010: 652e 2020 4561 6368 206c 696e 6520 7265  e.  Each line re
@@ -406,7 +406,7 @@ You can use \\[hexl-find-file] to visit a file in Hexl mode.
 
 
 (defun hexl-isearch-search-function ()
-  (if (and (not isearch-regexp) (not isearch-word))
+  (if (and (not isearch-regexp) (not isearch-regexp-function))
       (lambda (string &optional bound noerror count)
 	(funcall
 	 (if isearch-forward 're-search-forward 're-search-backward)

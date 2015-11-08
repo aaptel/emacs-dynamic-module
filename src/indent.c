@@ -26,10 +26,8 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "category.h"
 #include "composite.h"
 #include "indent.h"
-#include "keyboard.h"
 #include "frame.h"
 #include "window.h"
-#include "termchar.h"
 #include "disptab.h"
 #include "intervals.h"
 #include "dispextern.h"
@@ -485,7 +483,9 @@ check_display_width (ptrdiff_t pos, ptrdiff_t col, ptrdiff_t *endpos)
 	 : MOST_POSITIVE_FIXNUM);
 
       if ((prop = Fplist_get (plist, QCwidth),
-	   RANGED_INTEGERP (0, prop, INT_MAX)))
+	   RANGED_INTEGERP (0, prop, INT_MAX))
+	  || (prop = Fplist_get (plist, QCrelative_width),
+	      RANGED_INTEGERP (0, prop, INT_MAX)))
 	width = XINT (prop);
       else if (FLOATP (prop) && 0 <= XFLOAT_DATA (prop)
 	       && XFLOAT_DATA (prop) <= INT_MAX)
@@ -504,6 +504,18 @@ check_display_width (ptrdiff_t pos, ptrdiff_t col, ptrdiff_t *endpos)
 	    *endpos = OVERLAY_POSITION (OVERLAY_END (overlay));
 	  else
 	    get_property_and_range (pos, Qdisplay, &val, &start, endpos, Qnil);
+
+	  /* For :relative-width, we need to multiply by the column
+	     width of the character at POS, if it is greater than 1.  */
+	  if (!NILP (Fplist_get (plist, QCrelative_width))
+	      && !NILP (BVAR (current_buffer, enable_multibyte_characters)))
+	    {
+	      int b, wd;
+	      unsigned char *p = BYTE_POS_ADDR (CHAR_TO_BYTE (pos));
+
+	      MULTIBYTE_BYTES_WIDTH (p, buffer_display_table (), b, wd);
+	      width *= wd;
+	    }
 	  return width;
 	}
     }
@@ -2068,7 +2080,11 @@ whether or not it is currently displayed in some window.  */)
 	}
       else
 	it_overshoot_count =
-	  !(it.method == GET_FROM_IMAGE || it.method == GET_FROM_STRETCH);
+	  (!(it.method == GET_FROM_IMAGE
+	     || it.method == GET_FROM_STRETCH)
+	    /* We will overshoot if lines are truncated and PT lies
+	       beyond the right margin of the window.  */
+	    || it.line_wrap == TRUNCATE);
 
       if (start_x_given)
 	{
@@ -2195,7 +2211,27 @@ whether or not it is currently displayed in some window.  */)
 	 was originally hscrolled, the goal column is interpreted as
 	 an addition to the hscroll amount.  */
       if (lcols_given)
-	move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X);
+	{
+	  move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X);
+	  /* If we find ourselves in the middle of an overlay string
+	     which includes a newline after current string position,
+	     we need to move by lines until we get out of the string,
+	     and then reposition point at the requested X coordinate;
+	     if we don't, the cursor will be placed just after the
+	     string, which might not be the requested column.  */
+	  if (nlines > 0 && it.area == TEXT_AREA)
+	    {
+	      while (it.method == GET_FROM_STRING
+		     && !it.string_from_display_prop_p
+		     && memchr (SSDATA (it.string) + IT_STRING_BYTEPOS (it),
+				'\n',
+				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))
+		{
+		  move_it_by_lines (&it, 1);
+		  move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X);
+		}
+	    }
+	}
 
       SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
       bidi_unshelve_cache (itdata, 0);

@@ -355,7 +355,7 @@ With argument, display info only for the selected version."
 		   (while (re-search-forward
 			   (if (member file '("NEWS.18" "NEWS.1-17"))
 			       "Changes in \\(?:Emacs\\|version\\)?[ \t]*\\([0-9]+\\(?:\\.[0-9]+\\)?\\)"
-			     "^\* [^0-9\n]*\\([0-9]+\\.[0-9]+\\)") nil t)
+			     "^\\* [^0-9\n]*\\([0-9]+\\.[0-9]+\\)") nil t)
 		     (setq res (cons (match-string-no-properties 1) res)))))
 	       (cons "NEWS"
 		     (directory-files data-directory nil
@@ -392,7 +392,7 @@ With argument, display info only for the selected version."
       (when (re-search-forward
 	     (concat (if (< vn 19)
 			 "Changes in Emacs[ \t]*"
-		       "^\* [^0-9\n]*") version "$")
+		       "^\\* [^0-9\n]*") version "$")
 	     nil t)
 	(beginning-of-line)
 	(narrow-to-region
@@ -402,7 +402,7 @@ With argument, display info only for the selected version."
 			     (re-search-forward
 			      (if (< vn 19)
 				  "Changes in \\(?:Emacs\\|version\\)?[ \t]*\\([0-9]+\\(?:\\.[0-9]+\\)?\\)"
-				"^\* [^0-9\n]*\\([0-9]+\\.[0-9]+\\)") nil t))
+				"^\\* [^0-9\n]*\\([0-9]+\\.[0-9]+\\)") nil t))
 		       (equal (match-string-no-properties 1) version)))
 	   (or res (goto-char (point-max)))
 	   (beginning-of-line)
@@ -964,12 +964,12 @@ documentation for the major and minor modes of that buffer."
 	(let* ((mode major-mode)
 	       (file-name (find-lisp-object-file-name mode nil)))
 	  (when file-name
-	    (princ (format-message " defined in ‘%s’"
+	    (princ (format-message " defined in `%s'"
                                    (file-name-nondirectory file-name)))
 	    ;; Make a hyperlink to the library.
 	    (with-current-buffer standard-output
 	      (save-excursion
-		(re-search-backward (substitute-command-keys "‘\\([^‘’]+\\)’")
+		(re-search-backward (substitute-command-keys "`\\([^`']+\\)'")
                                     nil t)
 		(help-xref-button 1 'help-function-def mode file-name)))))
 	(princ ":\n")
@@ -1041,7 +1041,7 @@ is currently activated with completion."
   (let ((minor-mode (lookup-minor-mode-from-indicator indicator)))
     (if minor-mode
 	(describe-minor-mode-from-symbol minor-mode)
-      (error "Cannot find minor mode for ‘%s’" indicator))))
+      (error "Cannot find minor mode for `%s'" indicator))))
 
 (defun lookup-minor-mode-from-indicator (indicator)
   "Return a minor mode symbol from its indicator on the mode line."
@@ -1352,8 +1352,8 @@ the help window if the current value of the user option
 
 (defun help--docstring-quote (string)
   "Return a doc string that represents STRING.
-The result, when formatted by ‘substitute-command-keys’, should equal STRING."
-  (replace-regexp-in-string "['\\`]" "\\\\=\\&" string))
+The result, when formatted by `substitute-command-keys', should equal STRING."
+  (replace-regexp-in-string "['\\`‘’]" "\\\\=\\&" string))
 
 ;; The following functions used to be in help-fns.el, which is not preloaded.
 ;; But for various reasons, they are more widely needed, so they were
@@ -1394,9 +1394,10 @@ ARGLIST can also be t or a string of the form \"(FUN ARG1 ARG2 ...)\"."
 	    (if (string-match "\n?\n\\'" docstring)
 		(if (< (- (match-end 0) (match-beginning 0)) 2) "\n" "")
 	      "\n\n")
-	    (if (and (stringp arglist)
-		     (string-match "\\`([^ ]+\\(.*\\))\\'" arglist))
-		(concat "(fn" (match-string 1 arglist) ")")
+	    (if (stringp arglist)
+                (if (string-match "\\`[^ ]+\\(.*\\))\\'" arglist)
+                    (concat "(fn" (match-string 1 arglist) ")")
+                  (error "Unrecognized usage format"))
 	      (help--make-usage-docstring 'fn arglist)))))
 
 (defun help-function-arglist (def &optional preserve-names)

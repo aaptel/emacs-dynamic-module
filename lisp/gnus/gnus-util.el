@@ -1486,7 +1486,7 @@ sure of changing the value of `foo'."
 (defvar gnus-directory-sep-char-regexp "/"
   "The regexp of directory separator character.
 If you find some problem with the directory separator character, try
-\"[/\\\\\]\" for some systems.")
+\"[/\\\\]\" for some systems.")
 
 (defun gnus-url-unhex (x)
   (if (> x ?9)
@@ -1974,10 +1974,10 @@ to case differences."
 	       (string-equal (downcase str1) (downcase prefix))
 	     (string-equal str1 prefix))))))
 
-(if (fboundp 'format-message)
-    (defalias 'gnus-format-message 'format-message)
-  ;; for Emacs < 25, and XEmacs, don't worry about quote translation.
-  (defalias 'gnus-format-message 'format))
+(defalias 'gnus-format-message
+  (if (fboundp 'format-message) 'format-message
+    ;; for Emacs < 25, and XEmacs, don't worry about quote translation.
+    'format))
 
 ;; Simple check: can be a macro but this way, although slow, it's really clear.
 ;; We don't use `bound-and-true-p' because it's not in XEmacs.

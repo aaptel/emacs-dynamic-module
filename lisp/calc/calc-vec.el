@@ -3,7 +3,6 @@
 ;; Copyright (C) 1990-1993, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
-;; Maintainer: Jay Belanger <jay.p.belanger@gmail.com>
 
 ;; This file is part of GNU Emacs.
 
@@ -1618,13 +1617,13 @@ of two matrices is a matrix."
 	    (if (not (or (equal math-expr-data math-rb-close)
 			 (equal math-expr-data ")")
 			 (eq math-exp-token 'end)))
-		(throw 'syntax "Expected ‘]’")))
+		(throw 'syntax "Expected `]'")))
 	(if (equal math-expr-data ";")
 	    (let ((math-exp-keep-spaces space-sep))
 	      (setq vals (cons 'vec (math-read-matrix (list vals))))))
 	(if (not (or (equal math-expr-data math-rb-close)
 		     (eq math-exp-token 'end)))
-	    (throw 'syntax "Expected ‘]’")))
+	    (throw 'syntax "Expected `]'")))
       (or (eq math-exp-token 'end)
 	  (math-read-token))
       vals)))

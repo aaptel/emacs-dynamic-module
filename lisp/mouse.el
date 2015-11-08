@@ -146,7 +146,7 @@ items `Turn Off' and `Help'."
 	  (describe-minor-mode-completion-table-for-indicator))))
   (let* ((minor-mode (lookup-minor-mode-from-indicator indicator))
          (mm-fun (or (get minor-mode :minor-mode-function) minor-mode)))
-    (unless minor-mode (error "Cannot find minor mode for ‘%s’" indicator))
+    (unless minor-mode (error "Cannot find minor mode for `%s'" indicator))
     (let* ((map (cdr-safe (assq minor-mode minor-mode-map-alist)))
            (menu (and (keymapp map) (lookup-key map [menu-bar]))))
       (setq menu
@@ -1111,12 +1111,12 @@ This does not delete the region; it acts like \\[kill-ring-save]."
     ;; Delete, but make the undo-list entry share with the kill ring.
     ;; First, delete just one char, so in case buffer is being modified
     ;; for the first time, the undo list records that fact.
-    (let (before-change-functions after-change-functions)
+    (let ((inhibit-modification-hooks t))
       (delete-region beg
 		     (+ beg (if (> end beg) 1 -1))))
     (let ((buffer-undo-list buffer-undo-list))
       ;; Undo that deletion--but don't change the undo list!
-      (let (before-change-functions after-change-functions)
+      (let ((inhibit-modification-hooks t))
 	(primitive-undo 1 buffer-undo-list))
       ;; Now delete the rest of the specified region,
       ;; but don't record it.

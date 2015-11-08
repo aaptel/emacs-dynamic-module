@@ -76,7 +76,7 @@ to the minibuffer that reads the string to replace, or invoke replacements
 from Isearch by using a key sequence like `C-s C-s M-%'." "24.3")
 
 (defcustom query-replace-from-to-separator
-  (propertize (if (char-displayable-p ?\u2192) " \u2192 " " -> ")
+  (propertize (if (char-displayable-p ?→) " → " " -> ")
               'face 'minibuffer-prompt)
   "String that separates FROM and TO in the history of replacement pairs."
   ;; Avoids error when attempt to autoload char-displayable-p fails
@@ -209,9 +209,9 @@ wants to replace FROM with TO."
              (let ((match (match-string 3 from)))
                (cond
                 ((string= match "\\n")
-                 (message "Note: ‘\\n’ here doesn't match a newline; to do that, type C-q C-j instead"))
+                 (message "Note: `\\n' here doesn't match a newline; to do that, type C-q C-j instead"))
                 ((string= match "\\t")
-                 (message "Note: ‘\\t’ here doesn't match a tab; to do that, just type TAB")))
+                 (message "Note: `\\t' here doesn't match a tab; to do that, just type TAB")))
                (sit-for 2)))
         (if (not to)
             from
@@ -1140,7 +1140,7 @@ To return to ordinary Occur mode, use \\[occur-cease-edit]."
 	    (goto-char m)
 	    (recenter line)
 	    (if readonly
-		(message "Buffer ‘%s’ is read only." buf)
+		(message "Buffer `%s' is read only." buf)
 	      (delete-region (line-beginning-position) (line-end-position))
 	      (insert text))
 	    (move-to-column col)))))))
@@ -1496,7 +1496,7 @@ See also `multi-occur'."
 		     ;; it is longer than window-width.
 		     (if (> (+ (length regexp) 42) (window-width))
 			 "" (format-message
-                             " for ‘%s’" (query-replace-descr regexp)))))
+                             " for `%s'" (query-replace-descr regexp)))))
 	  (setq occur-revert-arguments (list regexp nlines bufs))
           (if (= count 0)
               (kill-buffer occur-buf)
@@ -2013,7 +2013,7 @@ It is called with three arguments, as if it were
   ;; outside of this function because then another I-search
   ;; used after `recursive-edit' might override them.
   (let* ((isearch-regexp regexp-flag)
-	 (isearch-word (or delimited-flag
+	 (isearch-regexp-function (or delimited-flag
                            (and replace-character-fold
                                 (not regexp-flag)
                                 #'character-fold-to-regexp)))
@@ -2046,7 +2046,7 @@ It is called with three arguments, as if it were
   (if query-replace-lazy-highlight
       (let ((isearch-string search-string)
 	    (isearch-regexp regexp-flag)
-	    (isearch-word delimited-flag)
+	    (isearch-regexp-function delimited-flag)
 	    (isearch-lax-whitespace
 	     replace-lax-whitespace)
 	    (isearch-regexp-lax-whitespace

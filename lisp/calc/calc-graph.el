@@ -3,7 +3,6 @@
 ;; Copyright (C) 1990-1993, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
-;; Maintainer: Jay Belanger <jay.p.belanger@gmail.com>
 
 ;; This file is part of GNU Emacs.
 
@@ -958,7 +957,7 @@ This \"dumb\" driver will be present in Gnuplot 3.0."
 	  (define-key calc-dumb-map "\C-c\C-c" 'exit-recursive-edit)))
     (use-local-map calc-dumb-map)
     (setq truncate-lines t)
-    (message "Type ‘q’ or ‘C-c C-c’ to return to Calc")
+    (message "Type `q' or `C-c C-c' to return to Calc")
     (recursive-edit)
     (bury-buffer "*Gnuplot Trail*")))
 

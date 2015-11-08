@@ -1684,7 +1684,7 @@ non-default settings would be \"LPT1\" to \"LPT3\" for parallel printers, or
 for a shared network printer.  You can also set it to a name of a file, in
 which case the output gets appended to that file.  \(Note that `ps-print'
 package already has facilities for printing to a file, so you might as well use
-them instead of changing the setting of this variable.\)  If you want to
+them instead of changing the setting of this variable.)  If you want to
 silently discard the printed output, set this to \"NUL\".
 
 Set to t, if the utility given by `ps-lpr-command' needs an empty printer name.
@@ -1953,7 +1953,7 @@ If you set option `ps-selected-pages', first the pages are
 filtered by option `ps-selected-pages' and then by `ps-even-or-odd-pages'.
 For example, if we have:
 
-   (setq ps-selected-pages '(1 4 (6 . 10) (12 . 16) 20))
+   (setq ps-selected-pages \\='(1 4 (6 . 10) (12 . 16) 20))
 
 Combining with `ps-even-or-odd-pages' and option `ps-n-up-printing', we have:
 
@@ -2249,9 +2249,9 @@ X, Y, XSCALE, YSCALE and ROTATION may be a floating point number, an integer
 number or a string.  If it is a string, the string should contain PostScript
 programming that returns a float or integer value.
 
-For example, if you wish to print an EPS image on all pages do:
+For example, if you wish to print an EPS image on all pages use:
 
-   '((\"~/images/EPS-image.ps\"))"
+   ((\"~/images/EPS-image.ps\"))"
   :type '(repeat
 	  (list
 	   (file   :tag "EPS File")
@@ -2300,9 +2300,9 @@ X, Y, FONTSIZE, GRAY and ROTATION may be a floating point number, an integer
 number or a string.  If it is a string, the string should contain PostScript
 programming that returns a float or integer value.
 
-For example, if you wish to print text \"Preliminary\" on all pages do:
+For example, if you wish to print text \"Preliminary\" on all pages use:
 
-   '((\"Preliminary\"))"
+   ((\"Preliminary\"))"
   :type '(repeat
 	  (list
 	   (string :tag "Text")
@@ -3172,7 +3172,7 @@ This variable is used only when `ps-print-color-p' is set to `black-white'."
       font-lock-variable-name-face
       font-lock-keyword-face
       font-lock-warning-face))
-  "A list of the \(non-bold\) faces that should be printed in bold font.
+  "A list of the (non-bold) faces that should be printed in bold font.
 This applies to generating PostScript."
   :type '(repeat face)
   :version "20"
@@ -3185,7 +3185,7 @@ This applies to generating PostScript."
       font-lock-string-face
       font-lock-comment-face
       font-lock-warning-face))
-  "A list of the \(non-italic\) faces that should be printed in italic font.
+  "A list of the (non-italic) faces that should be printed in italic font.
 This applies to generating PostScript."
   :type '(repeat face)
   :version "20"
@@ -3196,7 +3196,7 @@ This applies to generating PostScript."
     '(font-lock-function-name-face
       font-lock-constant-face
       font-lock-warning-face))
-  "A list of the \(non-underlined\) faces that should be printed underlined.
+  "A list of the (non-underlined) faces that should be printed underlined.
 This applies to generating PostScript."
   :type '(repeat face)
   :version "20"

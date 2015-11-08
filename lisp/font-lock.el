@@ -538,12 +538,13 @@ and what they do:
  dollar-sign character.  Hash characters in other contexts will still
  follow whatever the syntax table says about the hash character.
 
- (\"\\\\('\\\\).\\\\('\\\\)\"
+ (\"\\\\(\\='\\\\).\\\\(\\='\\\\)\"
   (1 \"\\\"\")
   (2 \"\\\"\"))
 
- gives a pair single-quotes, which surround a single character, a SYNTAX of
- \"\\\"\" (meaning string quote syntax).  Single-quote characters in other
+ gives a pair of apostrophes, which surround a single character, a
+ SYNTAX of \"\\\"\" (meaning string quote syntax).  Apostrophes in other
+
  contexts will not be affected.
 
 This is normally set via `font-lock-defaults'.")
@@ -554,21 +555,6 @@ This is normally set via `font-lock-defaults'.")
   "Non-nil means use this syntax table for fontifying.
 If this is nil, the major mode's syntax table is used.
 This is normally set via `font-lock-defaults'.")
-
-(defvar font-lock-beginning-of-syntax-function nil
-  "Non-nil means use this function to move back outside all constructs.
-When called with no args it should move point backward to a place which
-is not in a string or comment and not within any bracket-pairs (or else,
-a place such that any bracket-pairs outside it can be ignored for Emacs
-syntax analysis and fontification).
-
-If this is nil, Font Lock uses `syntax-begin-function' to move back
-outside of any comment, string, or sexp.  This variable is semi-obsolete;
-we recommend setting `syntax-begin-function' instead.
-
-This is normally set via `font-lock-defaults'.")
-(make-obsolete-variable 'font-lock-beginning-of-syntax-function
-                        'syntax-begin-function "23.3" 'set)
 
 (defvar font-lock-mark-block-function nil
   "Non-nil means use this function to mark a block of text.
@@ -683,9 +669,9 @@ end of the current highlighting list.
 
 For example:
 
- (font-lock-add-keywords 'c-mode
-  '((\"\\\\\\=<\\\\(FIXME\\\\):\" 1 'font-lock-warning-face prepend)
-    (\"\\\\\\=<\\\\(and\\\\|or\\\\|not\\\\)\\\\\\=>\" . 'font-lock-keyword-face)))
+ (font-lock-add-keywords \\='c-mode
+  \\='((\"\\\\\\=<\\\\(FIXME\\\\):\" 1 \\='font-lock-warning-face prepend)
+    (\"\\\\\\=<\\\\(and\\\\|or\\\\|not\\\\)\\\\\\=>\" . \\='font-lock-keyword-face)))
 
 adds two fontification patterns for C mode, to fontify `FIXME:' words, even in
 comments, and to fontify `and', `or' and `not' words as keywords.
@@ -1051,7 +1037,7 @@ The region it returns may start or end in the middle of a line.")
    ;; Of course, this function doesn't do all of the above in all situations
    ;; (e.g. depending on whether jit-lock is in use) and it can't guess what
    ;; the caller wants.
-   (interactive-only "use ‘font-lock-ensure’ or ‘font-lock-flush’ instead."))
+   (interactive-only "use `font-lock-ensure' or `font-lock-flush' instead."))
   (interactive "p")
   (font-lock-set-defaults)
   (let ((font-lock-verbose (or font-lock-verbose interactively)))
@@ -1180,7 +1166,9 @@ Put first the functions more likely to cause a change and cheaper to compute.")
   (let ((changed nil))
     (goto-char font-lock-beg)
     (unless (bolp)
-      (setq changed t font-lock-beg (line-beginning-position)))
+      (setq changed t font-lock-beg
+            (let ((inhibit-field-text-motion t))
+              (line-beginning-position))))
     (goto-char font-lock-end)
     (unless (bolp)
       (unless (eq font-lock-end
@@ -1346,7 +1334,7 @@ no ARG is given and `font-lock-mark-block-function' is nil.
 If `font-lock-mark-block-function' non-nil and no ARG is given, it is used to
 delimit the region to fontify."
   (interactive "P")
-  (let ((inhibit-point-motion-hooks t) font-lock-beginning-of-syntax-function
+  (let ((inhibit-point-motion-hooks t)
 	deactivate-mark)
     ;; Make sure we have the right `font-lock-keywords' etc.
     (if (not font-lock-mode) (font-lock-set-defaults))
@@ -1764,11 +1752,10 @@ If SYNTACTIC-KEYWORDS is non-nil, it means these keywords are used for
 	  (cons t (cons keywords
 			(mapcar #'font-lock-compile-keyword keywords))))
     (if (and (not syntactic-keywords)
-	     (let ((beg-function
-		    (or font-lock-beginning-of-syntax-function
-			syntax-begin-function)))
+	     (let ((beg-function syntax-begin-function))
 	       (or (eq beg-function 'beginning-of-defun)
-		   (get beg-function 'font-lock-syntax-paren-check)))
+                   (if (symbolp beg-function)
+                       (get beg-function 'font-lock-syntax-paren-check))))
 	     (not beginning-of-defun-function))
 	;; Try to detect when a string or comment contains something that
 	;; looks like a defun and would thus confuse font-lock.
@@ -1889,17 +1876,14 @@ Sets various variables using `font-lock-defaults' and
 			      (list (car selem))
 			    (mapcar 'identity (car selem))))
 	      (modify-syntax-entry char syntax font-lock-syntax-table)))))
-      ;; Syntax function for syntactic fontification?
-      (if (nth 4 defaults)
-	(set (make-local-variable 'font-lock-beginning-of-syntax-function)
-               (nth 4 defaults))
-        (kill-local-variable 'font-lock-beginning-of-syntax-function))
+      ;; (nth 4 defaults) used to hold `font-lock-beginning-of-syntax-function',
+      ;; but that was removed in 25.1, so if it's a cons cell, we assume that
+      ;; it's part of the variable alist.
       ;; Variable alist?
-      (dolist (x (nthcdr 5 defaults))
+      (dolist (x (nthcdr (if (consp (nth 4 defaults)) 4 5) defaults))
 	(set (make-local-variable (car x)) (cdr x)))
       ;; Set up `font-lock-keywords' last because its value might depend
-      ;; on other settings (e.g. font-lock-compile-keywords uses
-      ;; font-lock-beginning-of-syntax-function).
+      ;; on other settings.
       (set (make-local-variable 'font-lock-keywords)
 	   (font-lock-eval-keywords keywords))
       ;; Local fontification?

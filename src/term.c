@@ -44,8 +44,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 #include "blockinput.h"
 #include "syssignal.h"
-#include "systty.h"
-#include "intervals.h"
 #ifdef MSDOS
 #include "msdos.h"
 static int been_here = -1;
@@ -56,10 +54,6 @@ static int been_here = -1;
 #endif
 
 #include "cm.h"
-#ifdef HAVE_X_WINDOWS
-#include "xterm.h"
-#endif
-
 #include "menu.h"
 
 /* The name of the default console device.  */
@@ -543,10 +537,10 @@ encode_terminal_code (struct glyph *src, int src_len,
   required = src_len;
   required *= MAX_MULTIBYTE_LENGTH;
   if (encode_terminal_src_size < required)
-    {
-      encode_terminal_src = xrealloc (encode_terminal_src, required);
-      encode_terminal_src_size = required;
-    }
+    encode_terminal_src = xpalloc (encode_terminal_src,
+				   &encode_terminal_src_size,
+				   required - encode_terminal_src_size,
+				   -1, sizeof *encode_terminal_src);
 
   charset_list = coding_charset_list (coding);
 
@@ -3117,6 +3111,7 @@ tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
   Lisp_Object selectface;
   int first_item = 0;
   int col, row;
+  Lisp_Object prev_inhibit_redisplay = Vinhibit_redisplay;
   USE_SAFE_ALLOCA;
 
   /* Don't allow non-positive x0 and y0, lest the menu will wrap
@@ -3158,6 +3153,11 @@ tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
       menu->text[0][7] = '\0';
       buffers_num_deleted = 1;
     }
+
+  /* Inhibit redisplay for as long as the menu is active, to avoid
+     messing the screen if some timer calls sit-for or a similar
+     function.  */
+  Vinhibit_redisplay = Qt;
 
   /* Force update of the current frame, so that the desired and the
      current matrices are identical.  */
@@ -3349,6 +3349,7 @@ tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
   if (!kbd_buffer_events_waiting ())
     clear_input_pending ();
   SAFE_FREE ();
+  Vinhibit_redisplay = prev_inhibit_redisplay;
   return result;
 }
 

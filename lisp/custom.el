@@ -155,15 +155,14 @@ set to nil, as the value is no longer rogue."
     (unless (memq :group args)
       (custom-add-to-group (custom-current-group) symbol 'custom-variable))
     (while args
-      (let ((arg (car args)))
-	(setq args (cdr args))
-	(unless (symbolp arg)
+      (let ((keyword (pop args)))
+	(unless (symbolp keyword)
 	  (error "Junk in args %S" args))
-	(let ((keyword arg)
-	      (value (car args)))
-	  (unless args
-	    (error "Keyword %s is missing an argument" keyword))
-	  (setq args (cdr args))
+        (unless args
+          (error "Keyword %s is missing an argument" keyword))
+	(let ((value (pop args)))
+          ;; Can't use `pcase' because it is loaded after `custom.el'
+          ;; during bootstrap.  See `loadup.el'.
 	  (cond ((eq keyword :initialize)
 		 (setq initialize value))
 		((eq keyword :set)
@@ -548,13 +547,13 @@ VALUE should be a list of symbols.  For each symbol in that list,
 this specifies that SYMBOL should be set after the specified symbol,
 if both appear in constructs like `custom-set-variables'."
   (unless (listp value)
-    (error "Invalid custom dependency ‘%s’" value))
+    (error "Invalid custom dependency `%s'" value))
   (let* ((deps (get symbol 'custom-dependencies))
 	 (new-deps deps))
     (while value
       (let ((dep (car value)))
 	(unless (symbolp dep)
-	  (error "Invalid custom dependency ‘%s’" dep))
+	  (error "Invalid custom dependency `%s'" dep))
 	(unless (memq dep new-deps)
 	  (setq new-deps (cons dep new-deps)))
 	(setq value (cdr value))))
@@ -830,7 +829,7 @@ to the front of this list.")
 (defsubst custom-check-theme (theme)
   "Check whether THEME is valid, and signal an error if it is not."
   (unless (custom-theme-p theme)
-    (error "Unknown theme ‘%s’" theme)))
+    (error "Unknown theme `%s'" theme)))
 
 (defun custom-push-theme (prop symbol theme mode &optional value)
   "Record VALUE for face or variable SYMBOL in custom theme THEME.
@@ -1043,7 +1042,7 @@ list, in which A occurs before B if B was defined with a
     (when elt
       (cond
        ((eq (car elt) 'dependant)
-	(error "Circular custom dependency on ‘%s’" sym))
+	(error "Circular custom dependency on `%s'" sym))
        ((car elt)
 	(setcar elt 'dependant)
 	(dolist (dep (get sym 'custom-dependencies))
@@ -1120,7 +1119,7 @@ directory first---see `custom-theme-load-path'."
   :group 'customize
   :version "22.1")
 
-(defcustom custom-theme-load-path (list 'custom-theme-directory t)
+(defvar custom-theme-load-path (list 'custom-theme-directory t)
   "List of directories to search for custom theme files.
 When loading custom themes (e.g. in `customize-themes' and
 `load-theme'), Emacs searches for theme files in the specified
@@ -1132,13 +1131,11 @@ order.  Each element in the list should be one of the following:
 - a directory name (a string).
 
 Each theme file is named THEME-theme.el, where THEME is the theme
-name."
-  :type '(repeat (choice (const :tag "custom-theme-directory"
-				custom-theme-directory)
-			 (const :tag "Built-in theme directory" t)
-			 directory))
-  :group 'customize
-  :version "24.1")
+name.
+
+This variable is designed for use in lisp code (including
+external packages).  For manual user customizations, use
+`custom-theme-directory' instead.")
 
 (defvar custom--inhibit-theme-enable nil
   "Whether the custom-theme-set-* functions act immediately.
@@ -1201,7 +1198,7 @@ Return t if THEME was successfully loaded, nil otherwise."
 				     (custom-available-themes))))
     nil nil))
   (unless (custom-theme-name-valid-p theme)
-    (error "Invalid theme name ‘%s’" theme))
+    (error "Invalid theme name `%s'" theme))
   ;; If THEME is already enabled, re-enable it after loading, even if
   ;; NO-ENABLE is t.
   (if no-enable
@@ -1214,13 +1211,11 @@ Return t if THEME was successfully loaded, nil otherwise."
     (put theme 'theme-documentation nil))
   (let ((fn (locate-file (concat (symbol-name theme) "-theme.el")
 			 (custom-theme--load-path)
-			 '("" "c")))
-	hash)
+			 '("" "c"))))
     (unless fn
-      (error "Unable to find theme file for ‘%s’" theme))
+      (error "Unable to find theme file for `%s'" theme))
     (with-temp-buffer
       (insert-file-contents fn)
-      (setq hash (secure-hash 'sha256 (current-buffer)))
       ;; Check file safety with `custom-safe-themes', prompting the
       ;; user if necessary.
       (when (or no-confirm
@@ -1228,8 +1223,9 @@ Return t if THEME was successfully loaded, nil otherwise."
 		(and (memq 'default custom-safe-themes)
 		     (equal (file-name-directory fn)
 			    (expand-file-name "themes/" data-directory)))
-		(member hash custom-safe-themes)
-		(custom-theme-load-confirm hash))
+                (let ((hash (secure-hash 'sha256 (current-buffer))))
+                  (or (member hash custom-safe-themes)
+                      (custom-theme-load-confirm hash))))
 	(let ((custom--inhibit-theme-enable t)
               (buffer-file-name fn))    ;For load-history.
 	  (eval-buffer))

@@ -3,7 +3,6 @@
 ;; Copyright (C) 1990-1993, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
-;; Maintainer: Jay Belanger <jay.p.belanger@gmail.com>
 
 ;; This file is part of GNU Emacs.
 
@@ -1625,10 +1624,10 @@ If COMP or STD is non-nil, put that in the units table instead."
              (format-message
               (concat
                "(**) When in TeX or LaTeX display mode, the TeX specific unit\n"
-               "names will not use the ‘tex’ prefix; the unit name for a\n"
-               "TeX point will be ‘pt’ instead of ‘texpt’, for example.\n"
+               "names will not use the `tex' prefix; the unit name for a\n"
+               "TeX point will be `pt' instead of `texpt', for example.\n"
                "To avoid conflicts, the unit names for pint and parsec will\n"
-               "be ‘pint’ and ‘parsec’ instead of ‘pt’ and ‘pc’."))))
+               "be `pint' and `parsec' instead of `pt' and `pc'."))))
 	  (view-mode)
 	  (message "Formatting units table...done"))
 	(setq math-units-table-buffer-valid t)
@@ -2162,9 +2161,5 @@ If non-nil, return a list consisting of the note and the cents coefficient."
 
 
 (provide 'calc-units)
-
-;; Local variables:
-;; coding: utf-8
-;; End:
 
 ;;; calc-units.el ends here

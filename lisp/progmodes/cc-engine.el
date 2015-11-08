@@ -618,11 +618,12 @@ comment at the start of cc-engine.el for more info."
 (defmacro c-bos-report-error ()
   '(unless noerror
      (setq c-parsing-error
-	   (format "No matching `%s' found for `%s' on line %d"
-		   (elt saved-pos 1)
-		   (elt saved-pos 2)
-		   (1+ (count-lines (point-min)
-				    (c-point 'bol (elt saved-pos 0))))))))
+	   (format-message
+	    "No matching `%s' found for `%s' on line %d"
+	    (elt saved-pos 1)
+	    (elt saved-pos 2)
+	    (1+ (count-lines (point-min)
+			     (c-point 'bol (elt saved-pos 0))))))))
 
 (defun c-beginning-of-statement-1 (&optional lim ignore-labels
 					     noerror comma-delim)
@@ -633,7 +634,7 @@ move into or out of sexps (not even normal expression parentheses).
 
 If point is already at the earliest statement within braces or parens,
 this function doesn't move back into any whitespace preceding it; it
-returns 'same in this case.
+returns `same' in this case.
 
 Stop at statement continuation tokens like \"else\", \"catch\",
 \"finally\" and the \"while\" in \"do ... while\" if the start point
@@ -655,19 +656,19 @@ start of the definition in a \"#define\".  Also stop at start of
 macros before leaving them.
 
 Return:
-'label          if stopped at a label or \"case...:\" or \"default:\";
-'same           if stopped at the beginning of the current statement;
-'up             if stepped to a containing statement;
-'previous       if stepped to a preceding statement;
-'beginning      if stepped from a statement continuation clause to
+`label'         if stopped at a label or \"case...:\" or \"default:\";
+`same'          if stopped at the beginning of the current statement;
+`up'            if stepped to a containing statement;
+`previous'      if stepped to a preceding statement;
+`beginning'     if stepped from a statement continuation clause to
                 its start clause; or
-'macro          if stepped to a macro start.
-Note that 'same and not 'label is returned if stopped at the same
+`macro'         if stepped to a macro start.
+Note that `same' and not `label' is returned if stopped at the same
 label without crossing the colon character.
 
 LIM may be given to limit the search.  If the search hits the limit,
 point will be left at the closest following token, or at the start
-position if that is less ('same is returned in this case).
+position if that is less (`same' is returned in this case).
 
 NOERROR turns off error logging to `c-parsing-error'.
 
@@ -1059,7 +1060,7 @@ comment at the start of cc-engine.el for more info."
 			  (save-excursion
 			    (c-forward-sexp) (point)))
 			 ;; Just gone back over some paren block?
-			 ((looking-at "\\s\(")
+			 ((looking-at "\\s(")
 			  (save-excursion
 			    (goto-char (1+ (c-down-list-backward
 					    before-sws-pos)))
@@ -1232,7 +1233,7 @@ The variable `c-maybe-labelp' is set to the position of the first `:' that
 might start a label (i.e. not part of `::' and not preceded by `?').  If a
 single `?' is found, then `c-maybe-labelp' is cleared.
 
-For AWK, a statement which is terminated by an EOL (not a \; or a }) is
+For AWK, a statement which is terminated by an EOL (not a ; or a }) is
 regarded as having a \"virtual semicolon\" immediately after the last token on
 the line.  If this virtual semicolon is _at_ from, the function recognizes it.
 
@@ -3791,8 +3792,8 @@ comment at the start of cc-engine.el for more info."
 
 (defconst c-jump-syntax-balanced
   (if (memq 'gen-string-delim c-emacs-features)
-      "\\w\\|\\s_\\|\\s\(\\|\\s\)\\|\\s\"\\|\\s|"
-    "\\w\\|\\s_\\|\\s\(\\|\\s\)\\|\\s\""))
+      "\\w\\|\\s_\\|\\s(\\|\\s)\\|\\s\"\\|\\s|"
+    "\\w\\|\\s_\\|\\s(\\|\\s)\\|\\s\""))
 
 (defconst c-jump-syntax-unbalanced
   (if (memq 'gen-string-delim c-emacs-features)
@@ -3959,7 +3960,7 @@ See `c-forward-token-2' for details."
 tokens like \"==\" as single tokens, i.e. all sequences of symbol
 characters are jumped over character by character.  This function is
 for compatibility only; it's only a wrapper over `c-forward-token-2'."
-  (let ((c-nonsymbol-token-regexp "\\s.\\|\\s\(\\|\\s\)"))
+  (let ((c-nonsymbol-token-regexp "\\s."))
     (c-forward-token-2 count balanced limit)))
 
 (defun c-backward-token-1 (&optional count balanced limit)
@@ -3967,7 +3968,7 @@ for compatibility only; it's only a wrapper over `c-forward-token-2'."
 tokens like \"==\" as single tokens, i.e. all sequences of symbol
 characters are jumped over character by character.  This function is
 for compatibility only; it's only a wrapper over `c-backward-token-2'."
-  (let ((c-nonsymbol-token-regexp "\\s.\\|\\s\(\\|\\s\)"))
+  (let ((c-nonsymbol-token-regexp "\\s."))
     (c-backward-token-2 count balanced limit)))
 
 
@@ -7123,7 +7124,7 @@ comment at the start of cc-engine.el for more info."
 		       (setq paren-depth (1- paren-depth))
 		       (forward-char)
 		       t)
-		   (when (if (save-match-data (looking-at "\\s\("))
+		   (when (if (save-match-data (looking-at "\\s("))
 			     (c-safe (c-forward-sexp 1) t)
 			   (goto-char (match-end 1))
 			   t)
@@ -7197,7 +7198,7 @@ comment at the start of cc-engine.el for more info."
 
 	 (setq at-decl-end
 	       (looking-at (cond ((eq context '<>) "[,>]")
-				 (context "[,\)]")
+				 (context "[,)]")
 				 (t "[,;]"))))
 
 	 ;; Now we've collected info about various characteristics of
@@ -7521,7 +7522,7 @@ comment at the start of cc-engine.el for more info."
 	 ;; The closing paren should follow.
 	 (progn
 	   (c-forward-syntactic-ws)
-	   (looking-at "\\s\)"))
+	   (looking-at "\\s)"))
 
 	 ;; There should be a primary expression after it.
 	 (let (pos)
@@ -7918,7 +7919,7 @@ comment at the start of cc-engine.el for more info."
 
 	  (catch 'break
 	    ;; Look for ": superclass-name" or "( category-name )".
-	    (when (looking-at "[:\(]")
+	    (when (looking-at "[:(]")
 	      (setq start-char (char-after))
 	      (forward-char)
 	      (c-forward-syntactic-ws)
@@ -8433,7 +8434,7 @@ comment at the start of cc-engine.el for more info."
 			    ;; Check for `c-opt-block-decls-with-vars-key'
 			    ;; before the first paren.
 			    (c-syntactic-re-search-forward
-			     (concat "[;=\(\[{]\\|\\("
+			     (concat "[;=([{]\\|\\("
 				     c-opt-block-decls-with-vars-key
 				     "\\)")
 			     lim t t t)
@@ -8441,7 +8442,7 @@ comment at the start of cc-engine.el for more info."
 			    (not (eq (char-before) ?_))
 			    ;; Check that the first following paren is
 			    ;; the block.
-			    (c-syntactic-re-search-forward "[;=\(\[{]"
+			    (c-syntactic-re-search-forward "[;=([{]"
 							   lim t t t)
 			    (eq (char-before) ?{)))))))
 	    ;; The declaration doesn't have any of the
@@ -8960,7 +8961,7 @@ comment at the start of cc-engine.el for more info."
 			 (> (point) closest-lim))
 		  (not (bobp))
 		  (progn (backward-char)
-			 (looking-at "[\]\).]\\|\\w\\|\\s_"))
+			 (looking-at "[]).]\\|\\w\\|\\s_"))
 		  (c-safe (forward-char)
 			  (goto-char (scan-sexps (point) -1))))
 

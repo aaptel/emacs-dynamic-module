@@ -1581,7 +1581,7 @@ Go to the history element by the absolute history position HIST-POS."
 (defun comint-within-quotes (beg end)
   "Return t if the number of quotes between BEG and END is odd.
 Quotes are single and double."
-  (let ((countsq (comint-how-many-region "\\(^\\|[^\\\\]\\)\'" beg end))
+  (let ((countsq (comint-how-many-region "\\(^\\|[^\\\\]\\)'" beg end))
 	(countdq (comint-how-many-region "\\(^\\|[^\\\\]\\)\"" beg end)))
     (or (= (mod countsq 2) 1) (= (mod countdq 2) 1))))
 
@@ -2850,7 +2850,7 @@ then the filename reader will only accept a file that exists.
 
 A typical use:
  (interactive (comint-get-source \"Compile file: \" prev-lisp-dir/file
-                                 '(lisp-mode) t))"
+                                 \\='(lisp-mode) t))"
   (let* ((def (comint-source-default prev-dir/file source-modes))
 	 (stringfile (comint-extract-string))
 	 (sfile-p (and stringfile

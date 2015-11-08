@@ -1,4 +1,4 @@
-;;; tex-mode.el --- TeX, LaTeX, and SliTeX mode commands -*- coding: utf-8 -*-
+;;; tex-mode.el --- TeX, LaTeX, and SliTeX mode commands  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1985-1986, 1989, 1992, 1994-1999, 2001-2015 Free
 ;; Software Foundation, Inc.
@@ -135,8 +135,8 @@ If nil, TeX runs with no options.  See the documentation of `tex-command'."
   "TeX commands to use when starting TeX.
 They are shell-quoted and precede the input file name, with a separating space.
 If nil, no commands are used.  See the documentation of `tex-command'."
-  :type '(radio (const :tag "Interactive \(nil\)" nil)
-		(const :tag "Nonstop \(\"\\nonstopmode\\input\"\)"
+  :type '(radio (const :tag "Interactive (nil)" nil)
+		(const :tag "Nonstop (\"\\nonstopmode\\input\")"
 		       "\\nonstopmode\\input")
 		(string :tag "String at your choice"))
   :group 'tex-run
@@ -266,8 +266,8 @@ tex shell terminates.")
 
 (defvar tex-command "tex"
   "Command to run TeX.
-If this string contains an asterisk \(`*'\), that is replaced by the file name;
-otherwise the value of `tex-start-options', the \(shell-quoted\)
+If this string contains an asterisk \(`*'), that is replaced by the file name;
+otherwise the value of `tex-start-options', the \(shell-quoted)
 value of `tex-start-commands', and the file name are added at the end
 with blanks as separators.
 
@@ -368,7 +368,7 @@ An alternative value is \" . \", if you use a font with a narrow period."
 			      (match-end 1))
 			     latex-section-alist))))
 	  (backward-char 1)
-	  (condition-case err
+	  (condition-case nil
 	      (progn
 		;; Using sexps allows some use of matching {...} inside
 		;; titles.
@@ -387,7 +387,7 @@ An alternative value is \" . \", if you use a font with a narrow period."
       (goto-char (point-min))
       (while (search-forward-regexp
 	      "\\\\\\(include\\|input\\|verbatiminput\\|bibliography\\)\
-\[ \t]*{\\([^}\n]+\\)}"
+[ \t]*{\\([^}\n]+\\)}"
 	      nil t)
 	(push (cons (concat "<<" (buffer-substring-no-properties
 				  (match-beginning 2)
@@ -937,7 +937,7 @@ Inherits `shell-mode-map' with a few additions.")
     ,@tex-face-alist)
   "Alist of face and LaTeX font name for facemenu.")
 
-(defun tex-facemenu-add-face-function (face end)
+(defun tex-facemenu-add-face-function (face _end)
   (or (cdr (assq face tex-face-alist))
       (or (and (consp face)
 	       (consp (car face))
@@ -1550,7 +1550,7 @@ Puts point on a blank line between them."
   "\\end{" str "}" > \n)
 
 (define-skeleton latex-insert-item
-  "Insert a \item macro."
+  "Insert an \\item macro."
   nil
   \n "\\item " >)
 
@@ -1982,7 +1982,7 @@ In the tex shell buffer this command behaves like `comint-send-input'."
   (display-buffer (tex-shell-buf))
   (tex-recenter-output-buffer nil))
 
-(defun tex-shell-sentinel (proc msg)
+(defun tex-shell-sentinel (proc _msg)
   (cond ((null (buffer-name (process-buffer proc)))
 	 ;; buffer killed
 	 (set-process-buffer proc nil)
@@ -2762,10 +2762,11 @@ Runs the shell command defined by `tex-show-queue-command'."
     st)
   "Syntax table used while computing indentation.")
 
-(defun latex-indent (&optional arg)
+(defun latex-indent (&optional _arg)
   (if (and (eq (get-text-property (if (and (eobp) (bolp))
                                       (max (point-min) (1- (point)))
-                                    (line-beginning-position)) 'face)
+                                    (line-beginning-position))
+                                  'face)
 	       'tex-verbatim))
       'noindent
     (with-syntax-table tex-latex-indent-syntax-table
@@ -2955,7 +2956,7 @@ There might be text before point."
     ("\\beta" . ?β)
     ("\\gamma" . ?γ)
     ("\\delta" . ?δ)
-    ("\\epsilon" . ?ε)
+    ("\\epsilon" . ?ϵ)
     ("\\zeta" . ?ζ)
     ("\\eta" . ?η)
     ("\\theta" . ?θ)
@@ -3272,7 +3273,8 @@ There might be text before point."
     ("\\prod" . ?∏)
     ("\\propto" . ?∝)
     ("\\qed" . ?∎)
-    ("\\quad" . ? )
+    ("\\qquad" . ?⧢)
+    ("\\quad" . ?␣)
     ("\\rangle" . 10217)            ; Literal ?⟩ breaks indentation.
     ("\\rbrace" . ?})
     ("\\rbrack" . ?\])
@@ -3289,6 +3291,7 @@ There might be text before point."
     ("\\rightthreetimes" . ?⋌)
     ("\\risingdotseq" . ?≓)
     ("\\rtimes" . ?⋊)
+    ("\\times" . ?×)
     ("\\sbs" . ?﹨)
     ("\\searrow" . ?↘)
     ("\\setminus" . ?∖)
@@ -3357,8 +3360,10 @@ There might be text before point."
     ("\\urcorner" . ?⌝)
     ("\\u{i}" . ?ĭ)
     ("\\vDash" . ?⊨)
+    ("\\varepsilon" . ?ε)
     ("\\varprime" . ?′)
     ("\\varpropto" . ?∝)
+    ("\\varrho" . ?ϱ)
     ;; ("\\varsigma" ?ς)		;FIXME: Looks reversed with the non\var.
     ("\\vartriangleleft" . ?⊲)
     ("\\vartriangleright" . ?⊳)
@@ -3372,6 +3377,7 @@ There might be text before point."
     ("\\wr" . ?≀)
     ("\\Bbb{N}" . ?ℕ)			; AMS commands for blackboard bold
     ("\\Bbb{P}" . ?ℙ)			; Also sometimes \mathbb.
+    ("\\Bbb{Q}" . ?ℚ)
     ("\\Bbb{R}" . ?ℝ)
     ("\\Bbb{Z}" . ?ℤ)
     ("--" . ?–)
@@ -3404,16 +3410,25 @@ There might be text before point."
     ("\\textreferencemark" . ?※))
   "A `prettify-symbols-alist' usable for (La)TeX modes.")
 
-(defun tex--prettify-symbols-compose-p (start end _match)
-  (let* ((after-char (char-after end))
-         (after-syntax  (char-syntax after-char)))
-    (not (or
-          ;; Don't compose \alpha@foo.
-          (eq after-syntax ?_)
-          ;; The \alpha in \alpha2 may be composed but of course \alphax may not.
-          (and (eq after-syntax ?w)
-               (or (< after-char ?0)
-                   (> after-char ?9)))))))
+(defun tex--prettify-symbols-compose-p (_start end _match)
+  (or
+   ;; If the matched symbol doesn't end in a word character, then we
+   ;; simply allow composition.  The symbol is probably something like
+   ;; \|, \(, etc.
+   (not (eq ?w (char-syntax (char-before end))))
+   ;; Else we look at what follows the match in order to decide.
+   (let* ((after-char (char-after end))
+          (after-syntax (char-syntax after-char)))
+     (not (or
+           ;; Don't compose \alpha@foo.
+           (eq after-char ?@)
+           ;; The \alpha in \alpha2 or \alpha-\beta may be composed but
+           ;; of course \alphax may not.
+           (and (eq after-syntax ?w)
+                (not (memq after-char
+                           '(?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?+ ?- ?' ?\"))))
+           ;; Don't compose inside verbatim blocks.
+           (eq 2 (nth 7 (syntax-ppss))))))))
 
 (run-hooks 'tex-mode-load-hook)
 

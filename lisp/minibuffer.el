@@ -92,18 +92,21 @@
 ;;; Completion table manipulation
 
 ;; New completion-table operation.
-(defun completion-boundaries (string table pred suffix)
-  "Return the boundaries of the completions returned by TABLE for STRING.
+(defun completion-boundaries (string collection pred suffix)
+  "Return the boundaries of text on which COLLECTION will operate.
 STRING is the string on which completion will be performed.
 SUFFIX is the string after point.
+If COLLECTION is a function, it is called with 3 arguments: STRING,
+PRED, and a cons cell of the form (boundaries . SUFFIX).
+
 The result is of the form (START . END) where START is the position
 in STRING of the beginning of the completion field and END is the position
 in SUFFIX of the end of the completion field.
 E.g. for simple completion tables, the result is always (0 . (length SUFFIX))
 and for file names the result is the positions delimited by
 the closest directory separators."
-  (let ((boundaries (if (functionp table)
-                        (funcall table string pred
+  (let ((boundaries (if (functionp collection)
+                        (funcall collection string pred
                                  (cons 'boundaries suffix)))))
     (if (not (eq (car-safe boundaries) 'boundaries))
         (setq boundaries nil))
@@ -1374,7 +1377,7 @@ appear to be a match."
                      ;; that file.
                      (= (length string) (length compl)))
             (completion--replace beg end compl))))
-    (funcall exit-function))
+      (funcall exit-function))
 
      ((memq minibuffer-completion-confirm '(confirm confirm-after-completion))
       ;; The user is permitted to exit with an input that's rejected
@@ -1391,7 +1394,7 @@ appear to be a match."
 
      (t
       ;; Call do-completion, but ignore errors.
-    (funcall completion-function))))
+      (funcall completion-function))))
 
 (defun completion--try-word-completion (string table predicate point md)
   (let ((comp (completion-try-completion string table predicate point md)))
@@ -1794,7 +1797,7 @@ variables.")
            (if completions "Sole completion" "No completions")))
 
       (let* ((last (last completions))
-             (base-size (cdr last))
+             (base-size (or (cdr last) 0))
              (prefix (unless (zerop base-size) (substring string 0 base-size)))
              (all-md (completion--metadata (buffer-substring-no-properties
                                             start (point))

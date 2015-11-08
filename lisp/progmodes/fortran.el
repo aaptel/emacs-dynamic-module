@@ -244,8 +244,8 @@ line in region."
 (defcustom fortran-column-ruler-fixed
   "0   4 6  10        20        30        40        5\
 0        60        70\n\
-\[   ]|{   |    |    |    |    |    |    |    |    \
-\|    |    |    |    |}\n"
+[   ]|{   |    |    |    |    |    |    |    |    \
+|    |    |    |    |}\n"
   "String displayed above current line by \\[fortran-column-ruler].
 This variable is used in fixed format mode.
 See the variable `fortran-column-ruler-tab' for TAB format mode."
@@ -257,8 +257,8 @@ See the variable `fortran-column-ruler-tab' for TAB format mode."
 (defcustom fortran-column-ruler-tab
   "0       810        20        30        40        5\
 0        60        70\n\
-\[   ]|  { |    |    |    |    |    |    |    |    \
-\|    |    |    |    |}\n"
+[   ]|  { |    |    |    |    |    |    |    |    \
+|    |    |    |    |}\n"
   "String displayed above current line by \\[fortran-column-ruler].
 This variable is used in TAB format mode.
 See the variable `fortran-column-ruler-fixed' for fixed format mode."
@@ -817,15 +817,15 @@ Variables controlling indentation style and extra features:
   Amount of extra indentation for text in full-line comments (default 0).
 `fortran-comment-indent-style'
   How to indent the text in full-line comments. Allowed values are:
-  nil       don't change the indentation
-  fixed     indent to `fortran-comment-line-extra-indent' beyond the
+  nil         don't change the indentation
+  `fixed'     indent to `fortran-comment-line-extra-indent' beyond the
               value of either
                 `fortran-minimum-statement-indent-fixed' (fixed format) or
                 `fortran-minimum-statement-indent-tab' (TAB format),
               depending on the continuation format in use.
-  relative  indent to `fortran-comment-line-extra-indent' beyond the
+  `relative'  indent to `fortran-comment-line-extra-indent' beyond the
               indentation for a line of code.
-  (default 'fixed)
+  (default `fixed')
 `fortran-comment-indent-char'
   Single-character string to be inserted instead of space for
   full-line comment indentation (default \" \").

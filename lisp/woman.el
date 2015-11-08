@@ -786,7 +786,7 @@ without interactive confirmation, if it exists as a topic."
 
 (defvar woman-file-regexp nil
   "Regexp used to select (possibly compressed) man source files, e.g.
-\"\\.\\([0-9lmnt]\\w*\\)\\(\\.\\(g?z\\|bz2\\|xz\\)\\)?\\'\".
+\"\\.\\([0-9lmnt]\\w*\\)\\(\\.\\(g?z\\|bz2\\|xz\\)\\)?\\\\='\".
 Built automatically from the customizable user options
 `woman-uncompressed-file-regexp' and `woman-file-compression-regexp'.")
 
@@ -816,7 +816,7 @@ becoming more common in the GNU world.  For example, the man pages
 in the ncurses package include `toe.1m', `form.3x', etc.
 
 Note: an optional compression regexp will be appended, so this regexp
-MUST NOT end with any kind of string terminator such as $ or \\'."
+MUST NOT end with any kind of string terminator such as $ or \\\\='."
   :type 'regexp
   :set 'set-woman-file-regexp
   :group 'woman-interface)
@@ -826,8 +826,8 @@ MUST NOT end with any kind of string terminator such as $ or \\'."
   "Do not change this unless you are sure you know what you are doing!
 Regexp used to match compressed man file extensions for which
 decompressors are available and handled by auto-compression mode,
-e.g. \"\\\\.\\\\(g?z\\\\|bz2\\\\|xz\\\\)\\\\'\" for `gzip', `bzip2', or `xz'.
-Should begin with \\. and end with \\' and MUST NOT be optional."
+e.g. \"\\\\.\\\\(g?z\\\\|bz2\\\\|xz\\\\)\\\\\\='\" for `gzip', `bzip2', or `xz'.
+Should begin with \\. and end with \\\\=' and MUST NOT be optional."
   ;; Should be compatible with car of
   ;; `jka-compr-file-name-handler-entry', but that is unduly
   ;; complicated, includes an inappropriate extension (.tgz) and is
@@ -2716,7 +2716,7 @@ If DELETE is non-nil then delete from point."
 
 (defsubst woman-unescape (macro)
   "Replace escape sequences in the body of MACRO.
-Replaces || by |, but | by \, where | denotes the internal escape."
+Replaces || by |, but | by \\, where | denotes the internal escape."
   (let (start)
     (while (setq start (string-match woman-unescape-regex macro start))
       (setq macro
@@ -2838,7 +2838,7 @@ special characters."
 (defun woman-strings (&optional to)
   "Process ?roff string requests and escape sequences up to buffer position TO.
 Strings are defined/updated by `.ds xx string' requests and
-interpolated by `\*x' and `\*(xx' escapes."
+interpolated by `\\*x' and `\\*(xx' escapes."
   ;; Add support for .as and .rm?
   (while
       ;; Find .ds requests and \* escapes:
@@ -3549,7 +3549,7 @@ The expression may be an argument in quotes."
 		       (if (> (woman-parse-numeric-value) 0) 1 0))
 		     )))
 	    ))
-;    (if (looking-at "[ \t\nRC\)\"]")	; R, C are tab types
+;    (if (looking-at "[ \t\nRC)\"]")	; R, C are tab types
 ;	()
 ;      (WoMan-warn "Unimplemented numerical operator `%c' in %s"
 ;		  (following-char)
@@ -3583,7 +3583,7 @@ expression in parentheses.  Leaves point after the value."
 		    ;; string-to-number returns 0 if number not parsed.
 		    (string-to-number (match-string 0)))
 		   ((looking-at "\\\\n\\([-+]\\)?\\(?:\
-\\[\\([^]]+\\)\\]\\|\(\\(..\\)\\|\\(.\\)\\)")
+\\[\\([^]]+\\)\\]\\|(\\(..\\)\\|\\(.\\)\\)")
 		    ;; interpolate number register, maybe auto-incremented
 		    (let* ((pm (match-string-no-properties 1))
 			   (name (or (match-string-no-properties 2)
@@ -3719,7 +3719,7 @@ expression in parentheses.  Leaves point after the value."
   "Find and return start of next control line.
 PAT, if non-nil, specifies an additional component of the control
 line regexp to search for, which is appended to the default
-regexp, \"\\(\\\\c\\)?\\n[.']\"."
+regexp, \"\\(\\\\c\\)?\\n[.\\=']\"."
   (let ((pattern (concat "\\(\\\\c\\)?\n[.']" pat))
         to)
     (save-excursion
@@ -3761,7 +3761,7 @@ Round to whole lines, default 1 line.  Format paragraphs upto TO.
 
 (defun woman2-TH (to)
   ".TH n c x v m -- Begin a man page.  Format paragraphs upto TO.
-n is the name of the page in chapter c\; x is extra commentary\;
+n is the name of the page in chapter c; x is extra commentary;
 v alters page foot left; m alters page head center.
 \(Should set prevailing indent and tabs to 5.)"
   (woman-forward-arg 'unquote 'concat)
@@ -3981,7 +3981,7 @@ Optional argument NUMERIC, if non-nil, means the argument is numeric."
     (goto-char from)))
 
 (defun woman-horizontal-line ()
-  "\\l'Nc' -- Draw a horizontal line of length N using character c, default _."
+  "\\l\\='Nc\\=' -- Draw a horizontal line of length N using character c, default _."
   (delete-char -1)
   (delete-char 1)
   (looking-at "\\(.\\)\\(.*\\)\\1")
@@ -4349,7 +4349,7 @@ Format paragraphs upto TO."
 
 (defun woman2-ta (to)
   ".ta Nt ... -- Set tabs, left type, unless t=R(right), C(centered).
-\(Breaks, but should not.)  The tab stops are separated by spaces\;
+\(Breaks, but should not.)  The tab stops are separated by spaces;
 a value preceded by + represents an increment to the previous stop value.
 Format paragraphs upto TO."
   (setq tab-stop-list nil)
@@ -4626,10 +4626,5 @@ logging the message."
      `("" (buffer . ,buf) . ,(bookmark-get-bookmark-record bookmark)))))
 
 (provide 'woman)
-
-
-;; Local Variables:
-;; coding: utf-8
-;; End:
 
 ;;; woman.el ends here

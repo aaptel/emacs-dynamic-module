@@ -82,7 +82,7 @@ and `eshell-stringify-list'.
 
 For example, OPTIONS might look like:
 
-  '((?C  nil         nil multi-column    \"multi-column display\")
+   ((?C  nil         nil multi-column    \"multi-column display\")
     (nil \"help\"      nil nil             \"show this usage display\")
     (?r  \"reverse\"   nil reverse-list    \"reverse order while sorting\")
     :external \"ls\"
@@ -180,7 +180,7 @@ This code doesn't really need to be macro expanded everywhere."
 		(concat usage
 			(format-message "
 This command is implemented in Lisp.  If an unrecognized option is
-passed to this command, the external version ‘%s’
+passed to this command, the external version `%s'
 will be called instead." extcmd)))))
     (throw 'eshell-usage usage)))
 

@@ -155,7 +155,7 @@ list."
 			 (function-item gnus-group-sort-by-rank)
 			 (function :tag "other" nil))))
 
-(defcustom gnus-group-line-format "%M\%S\%p\%P\%5y:%B%(%g%)\n"
+(defcustom gnus-group-line-format "%M\ %S\ %p\ %P\ %5y:%B%(%g%)\n"
   "*Format of group lines.
 It works along the same lines as a normal formatting string,
 with some simple extensions.
@@ -213,7 +213,7 @@ See Info node `(gnus)Formatting Variables'."
   :group 'gnus-group-visual
   :type 'string)
 
-(defcustom gnus-group-mode-line-format "Gnus: %%b {%M\%:%S}"
+(defcustom gnus-group-mode-line-format "Gnus: %%b {%M\ %:%S}"
   "*The format specification for the group mode line.
 It works along the same lines as a normal formatting string,
 with some simple extensions:
@@ -445,7 +445,7 @@ If non-nil, the value should be a string or an alist.  If it is a string,
 e.g. \"nnml:\", in which case `gnus-group-jump-to-group' offers \"Group:
 nnml:\" in the minibuffer prompt.
 
-If it is an alist, it must consist of \(NUMBER .  PROMPT\) pairs, for example:
+If it is an alist, it must consist of \(NUMBER .  PROMPT) pairs, for example:
 \((1 .  \"\") (2 .  \"nnfolder+archive:\")).  The element with number 0 is
 used when no prefix argument is given to `gnus-group-jump-to-group'."
   :version "22.1"
@@ -2174,7 +2174,7 @@ be permanent."
 	  (gnus-group-decoded-name group)))
     (let ((regexp "[][\C-@-\t\v-*,/:-@\\^`{-\C-?]*\
 \\(nn[a-z]+\\(?:\\+[^][\C-@-*,/:-@\\^`{-\C-?]+\\)?:\
-\[^][\C-@-*,./:-@\\^`{-\C-?]+\\(?:\\.[^][\C-@-*,./:-@\\^`{-\C-?]+\\)*\
+[^][\C-@-*,./:-@\\^`{-\C-?]+\\(?:\\.[^][\C-@-*,./:-@\\^`{-\C-?]+\\)*\
 \\|[^][\C-@-*,./:-@\\^`{-\C-?]+\\(?:\\.[^][\C-@-*,./:-@\\^`{-\C-?]+\\)+\\)")
 	  (start (point))
 	  (case-fold-search nil))
@@ -2435,7 +2435,7 @@ Valid input formats include:
      ;; URLs providing `group', `start' and `range':
      ((string-match
        ;; http://thread.gmane.org/gmane.emacs.devel/86326/focus=86525
-       "^http://thread\.gmane\.org/\\([^/]+\\)/\\([0-9]+\\)/focus=\\([0-9]+\\)$"
+       "^http://thread\\.gmane\\.org/\\([^/]+\\)/\\([0-9]+\\)/focus=\\([0-9]+\\)$"
        url)
       (setq group (match-string 1 url)
 	    start (string-to-number (match-string 2 url))
@@ -2446,15 +2446,15 @@ Valid input formats include:
      ;; URLs providing `group' and `start':
      ((or (string-match
 	   ;; http://article.gmane.org/gmane.comp.gnu.make.bugs/3584
-	   "^http://\\(?:thread\\|article\\|permalink\\)\.gmane\.org/\\([^/]+\\)/\\([0-9]+\\)"
+	   "^http://\\(?:thread\\|article\\|permalink\\)\\.gmane\\.org/\\([^/]+\\)/\\([0-9]+\\)"
 	   url)
 	  (string-match
 	   ;; Don't advertise these in the doc string yet:
-	   "^\\(?:nntp\\|news\\)://news\.gmane\.org/\\([^/]+\\)/\\([0-9]+\\)"
+	   "^\\(?:nntp\\|news\\)://news\\.gmane\\.org/\\([^/]+\\)/\\([0-9]+\\)"
 	   url)
 	  (string-match
 	   ;; http://news.gmane.org/group/gmane.emacs.gnus.general/thread=65099/force_load=t
-	   "^http://news\.gmane\.org/group/\\([^/]+\\)/thread=\\([0-9]+\\)"
+	   "^http://news\\.gmane\\.org/group/\\([^/]+\\)/thread=\\([0-9]+\\)"
 	   url))
       (setq group (match-string 1 url)
 	    start (string-to-number (match-string 2 url))))
@@ -2950,7 +2950,7 @@ and NEW-NAME will be prompted for."
 	    (gnus-info-params info))
 	   (t info))
      ;; The proper documentation.
-     (format
+     (gnus-format-message
       "Editing the %s for `%s'."
       (cond
        ((eq part 'method) "select method")
@@ -3278,7 +3278,8 @@ mail messages or news articles in files that have numeric names."
       (error "%s is not an nnimap group" group))
     (unless (setq acl (nnimap-acl-get mailbox (cadr method)))
       (error "Server does not support ACL's"))
-    (gnus-edit-form acl (format "Editing the access control list for `%s'.
+    (gnus-edit-form acl (gnus-format-message "\
+Editing the access control list for `%s'.
 
    An access control list is a list of (identifier . rights) elements.
 

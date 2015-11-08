@@ -34,7 +34,7 @@
 
 (defconst image-type-header-regexps
   `(("\\`/[\t\n\r ]*\\*.*XPM.\\*/" . xpm)
-    ("\\`P[1-6]\\\(?:\
+    ("\\`P[1-6]\\(?:\
 \\(?:\\(?:#[^\r\n]*[\r\n]\\)?[[:space:]]\\)+\
 \\(?:\\(?:#[^\r\n]*[\r\n]\\)?[0-9]\\)+\
 \\)\\{2\\}" . pbm)
@@ -343,7 +343,7 @@ of image data.  If that doesn't work, and SOURCE is a file name,
 use its file extension as image type.
 Optional DATA-P non-nil means SOURCE is a string containing image data."
   (when (and (not data-p) (not (stringp source)))
-    (error "Invalid image file name ‘%s’" source))
+    (error "Invalid image file name `%s'" source))
   (unless type
     (setq type (if data-p
 		   (image-type-from-data source)
@@ -351,7 +351,7 @@ Optional DATA-P non-nil means SOURCE is a string containing image data."
 		     (image-type-from-file-name source))))
     (or type (error "Cannot determine image type")))
   (or (memq type (and (boundp 'image-types) image-types))
-      (error "Invalid image type ‘%s’" type))
+      (error "Invalid image type `%s'" type))
   type)
 
 
@@ -735,7 +735,7 @@ for the animation speed.  A negative value means to animate in reverse."
 	   ;; Subtract off the time we took to load the image from the
 	   ;; stated delay time.
 	   (delay (max (+ (* (or (cdr animation) image-default-frame-delay)
-			     (/ 1 (abs speed)))
+			     (/ 1.0 (abs speed)))
 			  time (- (float-time)))
 		       image-minimum-frame-delay))
 	   done)

@@ -248,26 +248,32 @@ matching the resulting Git log output, and KEYWORDS is a list of
             (vc-git--state-code diff-letter)))
       (if (vc-git--empty-db-p) 'added 'up-to-date))))
 
-(defun vc-git-working-revision (file)
+(defun vc-git-working-revision (_file)
   "Git-specific version of `vc-working-revision'."
-  (let* (process-file-side-effects
-         (str (vc-git--run-command-string nil "symbolic-ref" "HEAD")))
-    (vc-file-setprop file 'vc-git-detached (null str))
-    (if str
-        (if (string-match "^\\(refs/heads/\\)?\\(.+\\)$" str)
-            (match-string 2 str)
-          str)
-      (vc-git--rev-parse "HEAD"))))
+  (let (process-file-side-effects)
+    (vc-git--rev-parse "HEAD")))
+
+(defun vc-git--symbolic-ref (file)
+  (or
+   (vc-file-getprop file 'vc-git-symbolic-ref)
+   (let* (process-file-side-effects
+          (str (vc-git--run-command-string nil "symbolic-ref" "HEAD")))
+     (vc-file-setprop file 'vc-git-symbolic-ref
+                      (if str
+                          (if (string-match "^\\(refs/heads/\\)?\\(.+\\)$" str)
+                              (match-string 2 str)
+                            str))))))
 
 (defun vc-git-mode-line-string (file)
   "Return a string for `vc-mode-line' to put in the mode line for FILE."
   (let* ((rev (vc-working-revision file))
-         (detached (vc-file-getprop file 'vc-git-detached))
+         (disp-rev (or (vc-git--symbolic-ref file)
+                       (substring rev 0 7)))
          (def-ml (vc-default-mode-line-string 'Git file))
-         (help-echo (get-text-property 0 'help-echo def-ml)))
-    (propertize (if detached
-                    (substring def-ml 0 (- 7 (length rev)))
-                  def-ml)
+         (help-echo (get-text-property 0 'help-echo def-ml))
+         (face   (get-text-property 0 'face def-ml)))
+    (propertize (replace-regexp-in-string (concat rev "\\'") disp-rev def-ml t t)
+                'face face
                 'help-echo (concat help-echo "\nCurrent revision: " rev))))
 
 (cl-defstruct (vc-git-extra-fileinfo
@@ -668,7 +674,7 @@ If toggling on, also insert its message into the buffer."
   "Major mode for editing Git log messages.
 It is based on `log-edit-mode', and has Git-specific extensions.")
 
-(defun vc-git-checkin (files comment)
+(defun vc-git-checkin (files comment &optional _rev)
   (let* ((file1 (or (car files) default-directory))
          (root (vc-git-root file1))
          (default-directory (expand-file-name root))
@@ -968,6 +974,34 @@ or BRANCH^ (where \"^\" can be repeated)."
       (buffer-string))))
 
 (defun vc-git-region-history (file buffer lfrom lto)
+  ;; The "git log" command below interprets the line numbers as applying
+  ;; to the HEAD version of the file, not to the current state of the file.
+  ;; So we need to look at all the local changes and adjust lfrom/lto
+  ;; accordingly.
+  ;; FIXME: Maybe this should be done in vc.el (i.e. for all backends), but
+  ;; since Git is the only backend to support this operation so far, it's hard
+  ;; to tell.
+  (with-temp-buffer
+    (vc-call-backend 'git 'diff file "HEAD" nil (current-buffer))
+    (goto-char (point-min))
+    (let ((last-offset 0)
+          (from-offset nil)
+          (to-offset nil))
+      (while (re-search-forward
+              "^@@ -\\([0-9]+\\),\\([0-9]+\\) \\+\\([0-9]+\\),\\([0-9]+\\) @@" nil t)
+        (let ((headno (string-to-number (match-string 1)))
+              (headcnt (string-to-number (match-string 2)))
+              (curno (string-to-number (match-string 3)))
+              (curcnt (string-to-number (match-string 4))))
+          (cl-assert (equal (- curno headno) last-offset))
+          (and (null from-offset) (> curno lfrom)
+               (setq from-offset last-offset))
+          (and (null to-offset) (> curno lto)
+               (setq to-offset last-offset))
+          (setq last-offset
+                (- (+ curno curcnt) (+ headno headcnt)))))
+      (setq lto (- lto (or to-offset last-offset)))
+      (setq lfrom (- lfrom (or to-offset last-offset)))))
   (vc-git-command buffer 'async nil "log" "-p" ;"--follow" ;FIXME: not supported?
                   (format "-L%d,%d:%s" lfrom lto (file-relative-name file))))
 
@@ -1330,11 +1364,15 @@ This command shares argument histories with \\[rgrep] and \\[grep]."
 
 (defun vc-git-stash-apply-at-point ()
   (interactive)
-  (vc-git-stash-apply (format "stash@%s" (vc-git-stash-get-at-point (point)))))
+  (let (vc-dir-buffers) ; Small optimization.
+    (vc-git-stash-apply (format "stash@%s" (vc-git-stash-get-at-point (point)))))
+  (vc-dir-refresh))
 
 (defun vc-git-stash-pop-at-point ()
   (interactive)
-  (vc-git-stash-pop (format "stash@%s" (vc-git-stash-get-at-point (point)))))
+  (let (vc-dir-buffers) ; Likewise.
+    (vc-git-stash-pop (format "stash@%s" (vc-git-stash-get-at-point (point)))))
+  (vc-dir-refresh))
 
 (defun vc-git-stash-menu (e)
   (interactive "e")
