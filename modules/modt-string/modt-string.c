@@ -2,15 +2,8 @@
 
 int plugin_is_GPL_compatible;
 
-static emacs_value Qnil;
-
 static emacs_value Fmodt_string_a_to_b (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
-  if (nargs != 1)
-    {
-      return Qnil;
-    }
-
   emacs_value lisp_str = args[0];
   size_t size = 0;
   char * buf = NULL;
@@ -51,7 +44,6 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  Qnil = env->intern (env, "nil");
   bind_function (env, "modt-string-a-to-b", env->make_function (env, 1, 1, Fmodt_string_a_to_b, NULL));
   provide (env, "modt-string");
   return 0;

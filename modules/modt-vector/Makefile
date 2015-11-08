@@ -6,7 +6,7 @@ LD      = gcc
 CFLAGS  = -ggdb3 -Wall
 LDFLAGS =
 
-all: modt-basic.so modt-basic.doc
+all: modt-vector.so modt-vector.doc
 
 %.so: %.o
 	$(CC) -shared $(LDFLAGS) -o $@ $<

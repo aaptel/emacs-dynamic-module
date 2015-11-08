@@ -3,9 +3,6 @@
 
 int plugin_is_GPL_compatible;
 
-static emacs_value Qnil;
-static emacs_value Qt;
-
 static emacs_value Fmodt_globref_make (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
   /* make a big string and make it global */
@@ -45,8 +42,6 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  Qnil = env->intern (env, "nil");
-  Qt = env->intern (env, "t");
   bind_function (env, "modt-globref-make", env->make_function (env, 0, 0, Fmodt_globref_make, NULL));
   provide (env, "modt-globref");
   return 0;

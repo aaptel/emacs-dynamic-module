@@ -120,6 +120,9 @@ static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Objec
 /* Signal an out-of-memory condition to the caller. */
 static void module_out_of_memory (emacs_env *env);
 
+/* Signal arguments are out of range. */
+static void module_args_out_of_range (emacs_env *env, Lisp_Object a1, Lisp_Object a2);
+
 
 /* Value conversion */
 
@@ -674,6 +677,58 @@ static void module_set_user_ptr_finalizer (emacs_env *env,
   XUSER_PTR (lisp)->finalizer = fin;
 }
 
+static void module_vec_set (emacs_env *env,
+			    emacs_value vec,
+			    size_t i,
+			    emacs_value val)
+{
+  check_main_thread ();
+  Lisp_Object lvec = value_to_lisp (vec);
+  if (! VECTORP (lvec))
+    {
+      module_wrong_type (env, Qvectorp, lvec);
+      return;
+    }
+  if (i >= ASIZE (lvec))
+    {
+      module_args_out_of_range (env, lvec, make_number (i));
+      return;
+    }
+  ASET (lvec, i, value_to_lisp (val));
+}
+
+static emacs_value module_vec_get (emacs_env *env,
+                                   emacs_value vec,
+                                   size_t i)
+{
+  check_main_thread ();
+  Lisp_Object lvec = value_to_lisp (vec);
+  if (! VECTORP (lvec))
+    {
+      module_wrong_type (env, Qvectorp, lvec);
+      return lisp_to_value (env, Qnil);
+    }
+  if (i >= ASIZE (lvec))
+    {
+      module_args_out_of_range (env, lvec, make_number (i));
+      return lisp_to_value (env, Qnil);
+    }
+  return lisp_to_value (env, AREF (lvec, i));
+}
+
+static size_t module_vec_size (emacs_env *env,
+                               emacs_value vec)
+{
+  check_main_thread ();
+  Lisp_Object lvec = value_to_lisp (vec);
+  if (! VECTORP (lvec))
+    {
+      module_wrong_type (env, Qvectorp, lvec);
+      return 0;
+    }
+  return (size_t) ASIZE (lvec);
+}
+
 
 /* Subroutines */
 
@@ -817,6 +872,11 @@ static void module_out_of_memory (emacs_env *env)
   module_error_signal_1 (env, XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
 }
 
+static void module_args_out_of_range (emacs_env *env, Lisp_Object a1, Lisp_Object a2)
+{
+  module_error_signal_1 (env, Qargs_out_of_range, list2 (a1, a2));
+}
+
 
 /* Value conversion */
 
@@ -909,6 +969,9 @@ static void initialize_environment (struct env_storage *env)
   env->pub.set_user_ptr_ptr = module_set_user_ptr_ptr;
   env->pub.get_user_ptr_finalizer = module_get_user_ptr_finalizer;
   env->pub.set_user_ptr_finalizer = module_set_user_ptr_finalizer;
+  env->pub.vec_set = module_vec_set;
+  env->pub.vec_get = module_vec_get;
+  env->pub.vec_size = module_vec_size;
 }
 
 static void finalize_environment (struct env_storage *env)
@@ -958,21 +1021,6 @@ static Lisp_Object module_format_fun_env (const struct module_fun_env *const env
 
 void syms_of_module (void)
 {
-  /* It is not guaranteed that dynamic initializers run in the main thread,
-     therefore we detect the main thread here. */
-#if defined(HAVE_THREADS_H)
-  main_thread = thrd_current ();
-#elif defined(HAVE_PTHREAD)
-  main_thread = pthread_self ();
-#elif defined(WINDOWSNT)
-  /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
-  if (! DuplicateHandle (GetCurrentProcess(), GetCurrentThread(),
-                         GetCurrentProcess(), &main_thread,
-                         SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION,
-                         FALSE, 0))
-    emacs_abort ();
-#endif
-
   DEFSYM (Qmodule_refs_hash, "module-refs-hash");
   DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
 	       doc: /* Module global referrence table.  */);
@@ -1015,4 +1063,25 @@ void syms_of_module (void)
      variable. */
   XSETPVECTYPE (&Smodule_call, PVEC_SUBR);
   XSETSUBR (module_call_func, &Smodule_call);
+}
+
+/* Unlike syms_of_module, this initializer is called even from an
+ * initialized (dumped) Emacs. */
+
+void module_init (void)
+{
+  /* It is not guaranteed that dynamic initializers run in the main thread,
+     therefore we detect the main thread here. */
+#if defined(HAVE_THREADS_H)
+  main_thread = thrd_current ();
+#elif defined(HAVE_PTHREAD)
+  main_thread = pthread_self ();
+#elif defined(WINDOWSNT)
+  /* GetCurrentProcess returns a pseudohandle, which we have to duplicate. */
+  if (! DuplicateHandle (GetCurrentProcess(), GetCurrentThread(),
+                         GetCurrentProcess(), &main_thread,
+                         SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION,
+                         FALSE, 0))
+    emacs_abort ();
+#endif
 }
