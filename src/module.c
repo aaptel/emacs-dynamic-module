@@ -727,8 +727,8 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
 {
   const struct module_fun_env *const envptr =
     (const struct module_fun_env *) XSAVE_POINTER (envobj, 0);
-  const int len = XINT (Flength (arglist));
-  if (len < envptr->min_arity || (envptr->max_arity >= 0 && len > envptr->max_arity))
+  const EMACS_INT len = XINT (Flength (arglist));
+  if (len > INT_MAX || len < envptr->min_arity || (envptr->max_arity >= 0 && len > envptr->max_arity))
     xsignal2 (Qwrong_number_of_arguments, module_format_fun_env (envptr), make_number (len));
 
   struct env_storage env;
