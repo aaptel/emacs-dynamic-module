@@ -1990,6 +1990,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  printchar ('>', printcharfun);
           break;
 
+#ifdef HAVE_MODULES
 	case Lisp_Misc_User_Ptr:
 	  {
 	    print_c_string ("#<user-ptr ", printcharfun);
@@ -2000,6 +2001,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	    printchar ('>', printcharfun);
 	    break;
 	  }
+#endif
 
         case Lisp_Misc_Finalizer:
           print_c_string ("#<finalizer", printcharfun);
