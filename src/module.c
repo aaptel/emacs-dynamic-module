@@ -404,16 +404,19 @@ static void module_free_global_ref (emacs_env *env,
 
 static enum emacs_funcall_exit module_error_check (emacs_env *env)
 {
+  check_main_thread ();
   return env->private_members->pending_error;
 }
 
 static void module_error_clear (emacs_env *env)
 {
+  check_main_thread ();
   env->private_members->pending_error = emacs_funcall_exit_return;
 }
 
 static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
 {
+  check_main_thread ();
   struct emacs_env_private *const p = env->private_members;
   if (p->pending_error != emacs_funcall_exit_return)
     {
