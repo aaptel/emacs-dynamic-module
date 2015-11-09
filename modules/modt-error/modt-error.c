@@ -8,14 +8,14 @@ static emacs_value Fmodt_error_signal (emacs_env *env, int nargs, emacs_value ar
 {
   assert (env->error_check (env) == emacs_funcall_exit_return);
   env->error_signal (env, env->intern (env, "error"), env->make_fixnum (env, 56));
-  return env->intern (env, "t");
+  return NULL;
 }
 
 static emacs_value Fmodt_error_throw (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
   assert (env->error_check (env) == emacs_funcall_exit_return);
   env->error_throw (env, env->intern (env, "tag"), env->make_fixnum (env, 65));
-  return env->intern (env, "t");
+  return NULL;
 }
 
 static emacs_value Fmodt_error_funcall (emacs_env *env, int nargs, emacs_value args[], void* data)
