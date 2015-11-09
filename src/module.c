@@ -278,7 +278,7 @@ static void module_reset_handlerlist (const int *dummy);
                   internal_cleanup_##handlertype)
 
 #define MODULE_SETJMP_1(handlertype, handlerfunc, retval, c, dummy)            \
-  eassert (module_error_check(env) == module_funcall_exit_return);             \
+  eassert (module_error_check (env) == emacs_funcall_exit_return);             \
   struct handler *c;                                                           \
   /* It is very important that pushing the handler doesn't itself raise a      \
      signal. */                                                                \
@@ -344,7 +344,7 @@ static emacs_value module_make_global_ref (emacs_env *env,
                                            emacs_value ref)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   eassert (HASH_TABLE_P (Vmodule_refs_hash));
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
@@ -377,7 +377,7 @@ static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   /* TODO: This probably never signals. */
   MODULE_HANDLE_SIGNALS_VOID;
   eassert (HASH_TABLE_P (Vmodule_refs_hash));
@@ -434,14 +434,14 @@ static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sy
 static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   module_error_signal_1 (env, value_to_lisp (sym), value_to_lisp (data));
 }
 
 static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value value)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   module_error_throw_1 (env, value_to_lisp (tag), value_to_lisp (value));
 }
 
@@ -465,7 +465,7 @@ static emacs_value module_make_function (emacs_env *env,
                                          void *data)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
 
   if (min_arity < 0 ||
@@ -498,7 +498,7 @@ static emacs_value module_funcall (emacs_env *env,
                                    emacs_value args[])
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   MODULE_HANDLE_THROW;
 
@@ -516,7 +516,7 @@ static emacs_value module_funcall (emacs_env *env,
 static emacs_value module_intern (emacs_env *env, const char *name)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, intern (name));
 }
@@ -524,21 +524,21 @@ static emacs_value module_intern (emacs_env *env, const char *name)
 static emacs_value module_type_of (emacs_env *env, emacs_value value)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
 }
 
 static bool module_is_not_nil (emacs_env *env, emacs_value value)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   return ! NILP (value_to_lisp (value));
 }
 
 static bool module_eq (emacs_env *env, emacs_value a, emacs_value b)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   return EQ (value_to_lisp (a), value_to_lisp (b));
 }
 
@@ -547,7 +547,7 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
   verify (INT64_MIN <= MOST_NEGATIVE_FIXNUM);
   verify (INT64_MAX >= MOST_POSITIVE_FIXNUM);
   check_main_thread ();
-  eassert (module_error_check(env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   const Lisp_Object l = value_to_lisp (n);
   if (! INTEGERP (l))
     {
@@ -560,7 +560,7 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
 static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   if (n < MOST_NEGATIVE_FIXNUM)
     {
       module_error_signal_1 (env, Qunderflow_error, Qnil);
@@ -577,7 +577,7 @@ static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
 static double module_float_to_c_double (emacs_env *env, emacs_value f)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (f);
   if (! FLOATP (lisp))
     {
@@ -590,7 +590,7 @@ static double module_float_to_c_double (emacs_env *env, emacs_value f)
 static emacs_value module_make_float (emacs_env *env, double d)
 {
   check_main_thread ();
-  eassert (module_error_check(env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, make_float (d));
 }
@@ -601,7 +601,7 @@ static bool module_copy_string_contents (emacs_env *env,
                                          size_t* length)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   Lisp_Object lisp_str = value_to_lisp (value);
   if (! STRINGP (lisp_str))
@@ -635,7 +635,7 @@ static bool module_copy_string_contents (emacs_env *env,
 static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   if (length > PTRDIFF_MAX)
     {
@@ -657,7 +657,7 @@ static emacs_value module_make_user_ptr (emacs_env *env,
 static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp))
     {
@@ -670,7 +670,7 @@ static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
 static void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp)) module_wrong_type (env, Quser_ptr, lisp);
   XUSER_PTR (lisp)->p = ptr;
@@ -679,7 +679,7 @@ static void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr
 static emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp))
     {
@@ -694,7 +694,7 @@ static void module_set_user_ptr_finalizer (emacs_env *env,
                                            emacs_finalizer_function fin)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp)) module_wrong_type (env, Quser_ptr, lisp);
   XUSER_PTR (lisp)->finalizer = fin;
@@ -706,7 +706,7 @@ static void module_vec_set (emacs_env *env,
 			    emacs_value val)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
@@ -728,7 +728,7 @@ static emacs_value module_vec_get (emacs_env *env,
   /* Type of ASIZE (lvec) is ptrdiff_t, make sure it fits */
   verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
-  eassert (module_error_check (env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
@@ -753,7 +753,7 @@ static size_t module_vec_size (emacs_env *env,
   /* Type of ASIZE (lvec) is ptrdiff_t, make sure it fits */
   verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
-  eassert (module_error_check(env) == module_funcall_exit_return);
+  eassert (module_error_check (env) == emacs_funcall_exit_return);
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
