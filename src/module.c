@@ -278,7 +278,7 @@ static void module_reset_handlerlist (const int *dummy);
                   internal_cleanup_##handlertype)
 
 #define MODULE_SETJMP_1(handlertype, handlerfunc, retval, c, dummy)            \
-  eassert(!module_error_check(env));                                           \
+  eassert (module_error_check(env) == module_funcall_exit_return);             \
   struct handler *c;                                                           \
   /* It is very important that pushing the handler doesn't itself raise a      \
      signal. */                                                                \
