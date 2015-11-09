@@ -169,13 +169,13 @@
           (cl-incf smie-warning-count))
       (puthash key val table))))
 
-(put 'smie-precs->prec2 'pure t)
 (defun smie-precs->prec2 (precs)
   "Compute a 2D precedence table from a list of precedences.
 PRECS should be a list, sorted by precedence (e.g. \"+\" will
 come before \"*\"), of elements of the form \(left OP ...)
 or (right OP ...) or (nonassoc OP ...) or (assoc OP ...).  All operators in
 one of those elements share the same precedence level and associativity."
+  (declare (pure t))
   (let ((prec2-table (make-hash-table :test 'equal)))
     (dolist (prec precs)
       (dolist (op (cdr prec))
@@ -193,8 +193,8 @@ one of those elements share the same precedence level and associativity."
                 (smie-set-prec2tab prec2-table other-op op op1)))))))
     prec2-table))
 
-(put 'smie-merge-prec2s 'pure t)
 (defun smie-merge-prec2s (&rest tables)
+  (declare (pure t))
   (if (null (cdr tables))
       (car tables)
     (let ((prec2 (make-hash-table :test 'equal)))
@@ -209,11 +209,10 @@ one of those elements share the same precedence level and associativity."
                  table))
       prec2)))
 
-(put 'smie-bnf->prec2 'pure t)
 (defun smie-bnf->prec2 (bnf &rest resolvers)
   "Convert the BNF grammar into a prec2 table.
 BNF is a list of nonterminal definitions of the form:
-  \(NONTERM RHS1 RHS2 ...)
+  (NONTERM RHS1 RHS2 ...)
 where each RHS is a (non-empty) list of terminals (aka tokens) or non-terminals.
 Not all grammars are accepted:
 - an RHS cannot be an empty list (this is not needed, since SMIE allows all
@@ -232,6 +231,7 @@ Conflicts can be resolved via RESOLVERS, which is a list of elements that can
 be either:
 - a precs table (see `smie-precs->prec2') to resolve conflicting constraints,
 - a constraint (T1 REL T2) where REL is one of = < or >."
+  (declare (pure t))
   ;; FIXME: Add repetition operator like (repeat <separator> <elems>).
   ;; Maybe also add (or <elem1> <elem2>...) for things like
   ;; (exp (exp (or "+" "*" "=" ..) exp)).
@@ -503,11 +503,11 @@ CSTS is a list of pairs representing arcs in a graph."
 ;;                     (t (cl-assert (eq v '=))))))))
 ;;            prec2))
 
-(put 'smie-prec2->grammar 'pure t)
 (defun smie-prec2->grammar (prec2)
   "Take a 2D precedence table and turn it into an alist of precedence levels.
 PREC2 is a table as returned by `smie-precs->prec2' or
 `smie-bnf->prec2'."
+  (declare (pure t))
   ;; For each operator, we create two "variables" (corresponding to
   ;; the left and right precedence level), which are represented by
   ;; cons cells.  Those are the very cons cells that appear in the
@@ -1136,6 +1136,8 @@ METHOD can be:
 - :elem, in which case the function should return either:
   - the offset to use to indent function arguments (ARG = `arg')
   - the basic indentation step (ARG = `basic').
+  - the token to use (when ARG = `empty-line-token') when we don't know how
+    to indent an empty line.
 - :list-intro, in which case ARG is a token and the function should return
   non-nil if TOKEN is followed by a list of expressions (not separated by any
   token) rather than an expression.
@@ -1686,6 +1688,19 @@ should not be computed on the basis of the following token."
         (+ (smie-indent-virtual) (smie-indent--offset 'basic))) ;
        (t (smie-indent-virtual))))))                            ;An infix.
 
+(defun smie-indent-empty-line ()
+  "Indentation rule when there's nothing yet on the line."
+  ;; Without this rule, SMIE assumes that an empty line will be filled with an
+  ;; argument (since it falls back to smie-indent-sexps), which tends
+  ;; to indent far too deeply.
+  (when (eolp)
+    (let ((token (or (funcall smie-rules-function :elem 'empty-line-token)
+                     ;; FIXME: Should we default to ";"?
+                     ;; ";"
+                     )))
+      (when (assoc token smie-grammar)
+        (smie-indent-keyword token)))))
+
 (defun smie-indent-exps ()
   ;; Indentation of sequences of simple expressions without
   ;; intervening keywords or operators.  E.g. "a b c" or "g (balbla) f".
@@ -1744,7 +1759,7 @@ should not be computed on the basis of the following token."
     smie-indent-comment smie-indent-comment-continue smie-indent-comment-close
     smie-indent-comment-inside smie-indent-inside-string
     smie-indent-keyword smie-indent-after-keyword
-                          smie-indent-exps)
+    smie-indent-empty-line smie-indent-exps)
   "Functions to compute the indentation.
 Each function is called with no argument, shouldn't move point, and should
 return either nil if it has no opinion, or an integer representing the column
@@ -2213,13 +2228,13 @@ One way to generate local rules is the command `smie-config-guess'."
     (let* ((existing (assq major-mode smie-config))
            (config
             (cond ((null existing)
-                   (message "Local rules saved in ‘smie-config’")
+                   (message "Local rules saved in `smie-config'")
                    smie-config--buffer-local)
                   ((y-or-n-p "Replace the existing mode's config? ")
-                   (message "Mode rules replaced in ‘smie-config’")
+                   (message "Mode rules replaced in `smie-config'")
                    smie-config--buffer-local)
                   ((y-or-n-p "Merge with existing mode's config? ")
-                   (message "Mode rules adjusted in ‘smie-config’")
+                   (message "Mode rules adjusted in `smie-config'")
                    (append smie-config--buffer-local (cdr existing)))
                   (t (error "Abort")))))
       (if existing

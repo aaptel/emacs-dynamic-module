@@ -399,7 +399,7 @@ A prefix argument means don't query; expand all abbrevs."
 		   (buffer-substring-no-properties
 		    (save-excursion (forward-word -1) (point))
 		    pnt)))
-	    (if (or noquery (y-or-n-p (format-message "Expand ‘%s’? " string)))
+	    (if (or noquery (y-or-n-p (format-message "Expand `%s'? " string)))
 		(expand-abbrev)))))))
 
 ;;; Abbrev properties.
@@ -580,6 +580,8 @@ An obsolete but still supported calling form is:
                   ,@(if (cadr props) (list :system (cadr props))))))
   (unless (plist-get props :count)
     (setq props (plist-put props :count 0)))
+  (setq props (plist-put props :abbrev-table-modiff
+                         (abbrev-table-get table :abbrev-table-modiff)))
   (let ((system-flag (plist-get props :system))
         (sym (intern name table)))
     ;; Don't override a prior user-defined abbrev with a system abbrev,

@@ -44,19 +44,14 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #endif /* MSDOS */
 
 #include "commands.h"
-#include "character.h"
 #include "buffer.h"
-#include "ccl.h"
 #include "coding.h"
-#include "composite.h"
 #include <epaths.h>
 #include "process.h"
 #include "syssignal.h"
-#include "systty.h"
 #include "syswait.h"
 #include "blockinput.h"
 #include "frame.h"
-#include "termhooks.h"
 
 #ifdef MSDOS
 #include "msdos.h"
@@ -226,7 +221,7 @@ The program's input comes from file INFILE (nil means `/dev/null').
 Insert output in DESTINATION before point; t means current buffer; nil for DESTINATION
  means discard it; 0 means discard and don't wait; and `(:file FILE)', where
  FILE is a file name string, means that it should be written to that file
- \(if the file already exists it is overwritten).
+ (if the file already exists it is overwritten).
 DESTINATION can also have the form (REAL-BUFFER STDERR-FILE); in that case,
 REAL-BUFFER says what to do with standard output, as above,
 while STDERR-FILE says what to do with standard error in the child.
@@ -1462,7 +1457,7 @@ This function searches `process-environment' for VARIABLE.
 
 If optional parameter ENV is a list, then search this list instead of
 `process-environment', and return t when encountering a negative entry
-\(an entry for a variable with no value).  */)
+(an entry for a variable with no value).  */)
   (Lisp_Object variable, Lisp_Object env)
 {
   char *value;
@@ -1665,7 +1660,7 @@ syms_of_callproc (void)
   DEFVAR_LISP ("shell-file-name", Vshell_file_name,
 	       doc: /* File name to load inferior shells from.
 Initialized from the SHELL environment variable, or to a system-dependent
-default if SHELL is not set.  */);
+default if SHELL is unset.  See Info node `(elisp)Security Considerations'.  */);
 
   DEFVAR_LISP ("exec-path", Vexec_path,
 	       doc: /* List of directories to search programs to run in subprocesses.

@@ -292,7 +292,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "atimer.h"
+#include "composite.h"
 #include "keyboard.h"
+#include "systime.h"
 #include "frame.h"
 #include "window.h"
 #include "termchar.h"
@@ -303,13 +305,11 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "indent.h"
 #include "commands.h"
 #include "keymap.h"
-#include "macros.h"
 #include "disptab.h"
 #include "termhooks.h"
 #include "termopts.h"
 #include "intervals.h"
 #include "coding.h"
-#include "process.h"
 #include "region-cache.h"
 #include "font.h"
 #include "fontset.h"
@@ -434,22 +434,58 @@ static Lisp_Object Vmessage_stack;
 
 static bool message_enable_multibyte;
 
-/* Nonzero if we should redraw the mode lines on the next redisplay.
-   If it has value REDISPLAY_SOME, then only redisplay the mode lines where
-   the `redisplay' bit has been set.  Otherwise, redisplay all mode lines
-   (the number used is then only used to track down the cause for this
-   full-redisplay).  */
+/* At each redisplay cycle, we should refresh everything there is to refresh.
+   To do that efficiently, we use many optimizations that try to make sure we
+   don't waste too much time updating things that haven't changed.
+   The coarsest such optimization is that, in the most common cases, we only
+   look at the selected-window.
 
-int update_mode_lines;
+   To know whether other windows should be considered for redisplay, we use the
+   variable windows_or_buffers_changed: as long as it is 0, it means that we
+   have not noticed anything that should require updating anything else than
+   the selected-window.  If it is set to REDISPLAY_SOME, it means that since
+   last redisplay, some changes have been made which could impact other
+   windows.  To know which ones need redisplay, every buffer, window, and frame
+   has a `redisplay' bit, which (if true) means that this object needs to be
+   redisplayed.  If windows_or_buffers_changed is 0, we know there's no point
+   looking for those `redisplay' bits (actually, there might be some such bits
+   set, but then only on objects which aren't displayed anyway).
 
-/* Nonzero if window sizes or contents other than selected-window have changed
-   since last redisplay that finished.
-   If it has value REDISPLAY_SOME, then only redisplay the windows where
-   the `redisplay' bit has been set.  Otherwise, redisplay all windows
-   (the number used is then only used to track down the cause for this
-   full-redisplay).  */
+   OTOH if it's non-zero we wil have to loop through all windows and then check
+   the `redisplay' bit of the corresponding window, frame, and buffer, in order
+   to decide whether that window needs attention or not.  Note that we can't
+   just look at the frame's redisplay bit to decide that the whole frame can be
+   skipped, since even if the frame's redisplay bit is unset, some of its
+   windows's redisplay bits may be set.
+
+   Mostly for historical reasons, windows_or_buffers_changed can also take
+   other non-zero values.  In that case, the precise value doesn't matter (it
+   encodes the cause of the setting but is only used for debugging purposes),
+   and what it means is that we shouldn't pay attention to any `redisplay' bits
+   and we should simply try and redisplay every window out there.  */
 
 int windows_or_buffers_changed;
+
+/* Nonzero if we should redraw the mode lines on the next redisplay.
+   Similarly to `windows_or_buffers_changed', If it has value REDISPLAY_SOME,
+   then only redisplay the mode lines in those buffers/windows/frames where the
+   `redisplay' bit has been set.
+   For any other value, redisplay all mode lines (the number used is then only
+   used to track down the cause for this full-redisplay).
+
+   Since the frame title uses the same %-constructs as the mode line
+   (except %c and %l), if this variable is non-zero, we also consider
+   redisplaying the title of each frame, see x_consider_frame_title.
+
+   The `redisplay' bits are the same as those used for
+   windows_or_buffers_changed, and setting windows_or_buffers_changed also
+   causes recomputation of the mode lines of all those windows.  IOW this
+   variable only has an effect if windows_or_buffers_changed is zero, in which
+   case we should only need to redisplay the mode-line of those objects with
+   a `redisplay' bit set but not the window's text content (tho we may still
+   need to refresh the text content of the selected-window).  */
+
+int update_mode_lines;
 
 /* True after display_mode_line if %l was used and it displayed a
    line number.  */
@@ -582,6 +618,17 @@ bset_update_mode_line (struct buffer *b)
   if (!update_mode_lines)
     update_mode_lines = REDISPLAY_SOME;
   b->text->redisplay = true;
+}
+
+void
+maybe_set_redisplay (Lisp_Object symbol)
+{
+  if (HASH_TABLE_P (Vredisplay__variables)
+      && hash_lookup (XHASH_TABLE (Vredisplay__variables), symbol, NULL) >= 0)
+    {
+      bset_update_mode_line (current_buffer);
+      current_buffer->prevent_redisplay_optimizations_p = true;
+    }
 }
 
 #ifdef GLYPH_DEBUG
@@ -768,7 +815,7 @@ static void push_it (struct it *, struct text_pos *);
 static void iterate_out_of_display_property (struct it *);
 static void pop_it (struct it *);
 static void redisplay_internal (void);
-static bool echo_area_display (bool);
+static void echo_area_display (bool);
 static void redisplay_windows (Lisp_Object);
 static void redisplay_window (Lisp_Object, bool);
 static Lisp_Object redisplay_window_error (Lisp_Object);
@@ -2661,10 +2708,18 @@ init_iterator (struct it *it, struct window *w,
      free realized faces now because they depend on face definitions
      that might have changed.  Don't free faces while there might be
      desired matrices pending which reference these faces.  */
-  if (face_change && !inhibit_free_realized_faces)
+  if (!inhibit_free_realized_faces)
     {
-      face_change = false;
-      free_all_realized_faces (Qnil);
+      if (face_change)
+	{
+	  face_change = false;
+	  free_all_realized_faces (Qnil);
+	}
+      else if (XFRAME (w->frame)->face_change)
+	{
+	  XFRAME (w->frame)->face_change = 0;
+	  free_all_realized_faces (w->frame);
+	}
     }
 
   /* Perhaps remap BASE_FACE_ID to a user-specified alternative.  */
@@ -4014,21 +4069,26 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	      /* With bidi iteration, the character before the current
 		 in the visual order cannot be found by simple
 		 iteration, because "reverse" reordering is not
-		 supported.  Instead, we need to use the move_it_*
-		 family of functions.  */
+		 supported.  Instead, we need to start from the string
+		 beginning and go all the way to the current string
+		 position, remembering the previous position.  */
 	      /* Ignore face changes before the first visible
 		 character on this display line.  */
 	      if (it->current_x <= it->first_visible_x)
 		return it->face_id;
 	      SAVE_IT (it_copy, *it, it_copy_data);
-	      /* Implementation note: Since move_it_in_display_line
-		 works in the iterator geometry, and thinks the first
-		 character is always the leftmost, even in R2L lines,
-		 we don't need to distinguish between the R2L and L2R
-		 cases here.  */
-	      move_it_in_display_line (&it_copy, SCHARS (it_copy.string),
-				       it_copy.current_x - 1, MOVE_TO_X);
-	      charpos = IT_STRING_CHARPOS (it_copy);
+	      IT_STRING_CHARPOS (it_copy) = 0;
+	      bidi_init_it (0, 0, FRAME_WINDOW_P (it_copy.f), &it_copy.bidi_it);
+
+	      do
+		{
+		  charpos = IT_STRING_CHARPOS (it_copy);
+		  if (charpos >= SCHARS (it->string))
+		    break;
+		  bidi_move_to_visually_next (&it_copy.bidi_it);
+		}
+	      while (IT_STRING_CHARPOS (it_copy) != IT_STRING_CHARPOS (*it));
+
 	      RESTORE_IT (it, it, it_copy_data);
 	    }
 	  else
@@ -4108,11 +4168,15 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	{
 	  if (before_p)
 	    {
+	      int current_x;
+
 	      /* With bidi iteration, the character before the current
 		 in the visual order cannot be found by simple
 		 iteration, because "reverse" reordering is not
 		 supported.  Instead, we need to use the move_it_*
-		 family of functions.  */
+		 family of functions, and move to the previous
+		 character starting from the beginning of the visual
+		 line.  */
 	      /* Ignore face changes before the first visible
 		 character on this display line.  */
 	      if (it->current_x <= it->first_visible_x)
@@ -4123,8 +4187,9 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 		 character is always the leftmost, even in R2L lines,
 		 we don't need to distinguish between the R2L and L2R
 		 cases here.  */
-	      move_it_in_display_line (&it_copy, ZV,
-				       it_copy.current_x - 1, MOVE_TO_X);
+	      current_x = it_copy.current_x;
+	      move_it_vertically_backward (&it_copy, 0);
+	      move_it_in_display_line (&it_copy, ZV, current_x - 1, MOVE_TO_X);
 	      pos = it_copy.current.pos;
 	      RESTORE_IT (it, it, it_copy_data);
 	    }
@@ -5895,6 +5960,13 @@ push_it (struct it *it, struct text_pos *position)
     case GET_FROM_STRETCH:
       p->u.stretch.object = it->object;
       break;
+    case GET_FROM_BUFFER:
+    case GET_FROM_DISPLAY_VECTOR:
+    case GET_FROM_STRING:
+    case GET_FROM_C_STRING:
+      break;
+    default:
+      emacs_abort ();
     }
   p->position = position ? *position : it->position;
   p->current = it->current;
@@ -6017,6 +6089,11 @@ pop_it (struct it *it)
 	  it->method = GET_FROM_BUFFER;
 	  it->object = it->w->contents;
 	}
+      break;
+    case GET_FROM_C_STRING:
+      break;
+    default:
+      emacs_abort ();
     }
   it->end_charpos = p->end_charpos;
   it->string_nchars = p->string_nchars;
@@ -6785,6 +6862,18 @@ merge_glyphless_glyph_face (struct it *it)
       last_glyphless_glyph_merged_face_id = face_id;
     }
   return face_id;
+}
+
+/* Forget the `escape-glyph' and `glyphless-char' faces.  This should
+   be called before redisplaying windows, and when the frame's face
+   cache is freed.  */
+void
+forget_escape_and_glyphless_faces (void)
+{
+  last_escape_glyph_frame = NULL;
+  last_escape_glyph_face_id = (1 << FACE_ID_BITS);
+  last_glyphless_glyph_frame = NULL;
+  last_glyphless_glyph_face_id = (1 << FACE_ID_BITS);
 }
 
 /* Load IT's display element fields with information about the next
@@ -10673,6 +10762,11 @@ display_echo_area_1 (ptrdiff_t a1, Lisp_Object a2)
   Lisp_Object window;
   struct text_pos start;
 
+  /* We are about to enter redisplay without going through
+     redisplay_internal, so we need to forget these faces by hand
+     here.  */
+  forget_escape_and_glyphless_faces ();
+
   /* Do this before displaying, so that we have a large enough glyph
      matrix for the display.  If we can't get enough space for the
      whole text, display the last N lines.  That works by setting w->start.  */
@@ -11102,11 +11196,10 @@ clear_garbaged_frames (void)
 }
 
 
-/* Redisplay the echo area of the selected frame.  If UPDATE_FRAME_P,
-   update selected_frame.  Value is true if the mini-windows height
-   has been changed.  */
+/* Redisplay the echo area of the selected frame.  If UPDATE_FRAME_P, update
+   selected_frame.  */
 
-static bool
+static void
 echo_area_display (bool update_frame_p)
 {
   Lisp_Object mini_window;
@@ -11121,14 +11214,14 @@ echo_area_display (bool update_frame_p)
 
   /* Don't display if frame is invisible or not yet initialized.  */
   if (!FRAME_VISIBLE_P (f) || !f->glyphs_initialized_p)
-    return false;
+    return;
 
 #ifdef HAVE_WINDOW_SYSTEM
   /* When Emacs starts, selected_frame may be the initial terminal
      frame.  If we let this through, a message would be displayed on
      the terminal.  */
   if (FRAME_INITIAL_P (XFRAME (selected_frame)))
-    return false;
+    return;
 #endif /* HAVE_WINDOW_SYSTEM */
 
   /* Redraw garbaged frames.  */
@@ -11166,7 +11259,7 @@ echo_area_display (bool update_frame_p)
 		 pending input.  */
 	      ptrdiff_t count = SPECPDL_INDEX ();
 	      specbind (Qredisplay_dont_pause, Qt);
-	      windows_or_buffers_changed = 44;
+	      fset_redisplay (f);
 	      redisplay_internal ();
 	      unbind_to (count, Qnil);
 	    }
@@ -11202,7 +11295,16 @@ echo_area_display (bool update_frame_p)
   if (EQ (mini_window, selected_window))
     CHARPOS (this_line_start_pos) = 0;
 
-  return window_height_changed_p;
+  if (window_height_changed_p)
+    {
+      fset_redisplay (f);
+
+      /* If window configuration was changed, frames may have been
+	 marked garbaged.  Clear them or we will experience
+	 surprises wrt scrolling.
+	 FIXME: How/why/when?  */
+      clear_garbaged_frames ();
+    }
 }
 
 /* True if W's buffer was changed but not saved.  */
@@ -11450,9 +11552,10 @@ x_consider_frame_title (Lisp_Object frame)
 {
   struct frame *f = XFRAME (frame);
 
-  if (FRAME_WINDOW_P (f)
-      || FRAME_MINIBUF_ONLY_P (f)
-      || f->explicit_name)
+  if ((FRAME_WINDOW_P (f)
+       || FRAME_MINIBUF_ONLY_P (f)
+       || f->explicit_name)
+      && NILP (Fframe_parameter (frame, Qtooltip)))
     {
       /* Do we have more than one visible frame on this X display?  */
       Lisp_Object tail, other_frame, fmt;
@@ -12255,6 +12358,7 @@ PIXELWISE non-nil means return the height of the tool bar in pixels.  */)
 static bool
 redisplay_tool_bar (struct frame *f)
 {
+  f->tool_bar_redisplayed = true;
 #if defined (USE_GTK) || defined (HAVE_NS)
 
   if (FRAME_EXTERNAL_TOOL_BAR (f))
@@ -13326,10 +13430,9 @@ redisplay_internal (void)
   sw = w;
 
   pending = false;
-  last_escape_glyph_frame = NULL;
-  last_escape_glyph_face_id = (1 << FACE_ID_BITS);
-  last_glyphless_glyph_frame = NULL;
-  last_glyphless_glyph_face_id = (1 << FACE_ID_BITS);
+  forget_escape_and_glyphless_faces ();
+
+  inhibit_free_realized_faces = false;
 
   /* If face_change, init_iterator will free all realized faces, which
      includes the faces referenced from current matrices.  So, we
@@ -13378,7 +13481,7 @@ redisplay_internal (void)
 	  /* If cursor type has been changed on the frame
 	     other than selected, consider all frames.  */
 	  if (f != sf && f->cursor_type_changed)
-	    update_mode_lines = 31;
+	    fset_redisplay (f);
 	}
       clear_desired_matrices (f);
     }
@@ -13431,7 +13534,7 @@ redisplay_internal (void)
 	     echo-area doesn't show through.  */
 	  && !MINI_WINDOW_P (XWINDOW (selected_window))))
     {
-      bool window_height_changed_p = echo_area_display (false);
+      echo_area_display (false);
 
       if (message_cleared_p)
 	update_miniwindow_p = true;
@@ -13444,16 +13547,6 @@ redisplay_internal (void)
 	 the echo area.  */
       if (!display_last_displayed_message_p)
 	message_cleared_p = false;
-
-      if (window_height_changed_p)
-	{
-	  windows_or_buffers_changed = 50;
-
-	  /* If window configuration was changed, frames may have been
-	     marked garbaged.  Clear them or we will experience
-	     surprises wrt scrolling.  */
-	  clear_garbaged_frames ();
-	}
     }
   else if (EQ (selected_window, minibuf_window)
 	   && (current_buffer->clip_changed || window_outdated (w))
@@ -13486,9 +13579,12 @@ redisplay_internal (void)
   consider_all_windows_p = (update_mode_lines
 			    || windows_or_buffers_changed);
 
-#define AINC(a,i) \
-  if (VECTORP (a) && i >= 0 && i < ASIZE (a) && INTEGERP (AREF (a, i))) \
-    ASET (a, i, make_number (1 + XINT (AREF (a, i))))
+#define AINC(a,i)							\
+  {									\
+    Lisp_Object entry = Fgethash (make_number (i), a, make_number (0));	\
+    if (INTEGERP (entry))						\
+      Fputhash (make_number (i), make_number (1 + XINT (entry)), a);	\
+  }
 
   AINC (Vredisplay__all_windows_cause, windows_or_buffers_changed);
   AINC (Vredisplay__mode_lines_cause, update_mode_lines);
@@ -13507,6 +13603,7 @@ redisplay_internal (void)
       && FRAME_VISIBLE_P (XFRAME (w->frame))
       && !FRAME_OBSCURED_P (XFRAME (w->frame))
       && !XFRAME (w->frame)->cursor_type_changed
+      && !XFRAME (w->frame)->face_change
       /* Make sure recorded data applies to current buffer, etc.  */
       && this_line_buffer == current_buffer
       && match_p
@@ -13702,7 +13799,8 @@ redisplay_internal (void)
 #endif
 
   /* Build desired matrices, and update the display.  If
-     consider_all_windows_p, do it for all windows on all frames.
+     consider_all_windows_p, do it for all windows on all frames that
+     require redisplay, as specified by their 'redisplay' flag.
      Otherwise do it for selected_window, only.  */
 
   if (consider_all_windows_p)
@@ -13723,23 +13821,12 @@ redisplay_internal (void)
 	    continue;
 
 	retry_frame:
-
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (USE_GTK) && !defined (HAVE_NS)
-	  /* Redisplay internal tool bar if this is the first time so we
-	     can adjust the frame height right now, if necessary.  */
-	  if (!f->tool_bar_redisplayed_once)
-	    {
-	      if (redisplay_tool_bar (f))
-		adjust_frame_glyphs (f);
-	      f->tool_bar_redisplayed_once = true;
-	    }
-#endif
-
 	  if (FRAME_WINDOW_P (f) || FRAME_TERMCAP_P (f) || f == sf)
 	    {
 	      bool gcscrollbars
 		/* Only GC scrollbars when we redisplay the whole frame.  */
 		= f->redisplay || !REDISPLAY_SOME_P ();
+	      bool f_redisplay_flag = f->redisplay;
 	      /* Mark all the scroll bars to be removed; we'll redeem
 		 the ones we want when we redisplay their windows.  */
 	      if (gcscrollbars && FRAME_TERMINAL (f)->condemn_scroll_bars_hook)
@@ -13782,6 +13869,20 @@ redisplay_internal (void)
 		      if (hscroll_windows (f->root_window))
 			goto retry_frame;
 		    }
+
+		  /* If the frame's redisplay flag was not set before
+		     we went about redisplaying its windows, but it is
+		     set now, that means we employed some redisplay
+		     optimizations inside redisplay_windows, and
+		     bypassed producing some screen lines.  But if
+		     f->redisplay is now set, it might mean the old
+		     faces are no longer valid (e.g., if redisplaying
+		     some window called some Lisp which defined a new
+		     face or redefined an existing face), so trying to
+		     use them in update_frame will segfault.
+		     Therefore, we must redisplay this frame.  */
+		  if (!f_redisplay_flag && f->redisplay)
+		    goto retry_frame;
 
 		  /* Prevent various kinds of signals during display
 		     update.  stdio is not robust about handling
@@ -13836,9 +13937,27 @@ redisplay_internal (void)
       /* Compare desired and current matrices, perform output.  */
 
     update:
-      /* If fonts changed, display again.  */
-      if (sf->fonts_changed)
-	goto retry;
+      /* If fonts changed, display again.  Likewise if redisplay_window_1
+	 above caused some change (e.g., a change in faces) that requires
+	 considering the entire frame again.  */
+      if (sf->fonts_changed || sf->redisplay)
+	{
+	  if (sf->redisplay)
+	    {
+	      /* Set this to force a more thorough redisplay.
+		 Otherwise, we might immediately loop back to the
+		 above "else-if" clause (since all the conditions that
+		 led here might still be true), and we will then
+		 infloop, because the selected-frame's redisplay flag
+		 is not (and cannot be) reset.  */
+	      windows_or_buffers_changed = 50;
+	    }
+	  goto retry;
+	}
+
+      /* Prevent freeing of realized faces, since desired matrices are
+	 pending that reference the faces we computed and cached.  */
+      inhibit_free_realized_faces = true;
 
       /* Prevent various kinds of signals during display update.
 	 stdio is not robust about handling signals,
@@ -15865,6 +15984,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       && REDISPLAY_SOME_P ()
       && !w->redisplay
       && !w->update_mode_line
+      && !f->face_change
       && !f->redisplay
       && !buffer->text->redisplay
       && BUF_PT (buffer) == w->last_point)
@@ -16746,7 +16866,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
  finish_menu_bars:
 
-  /* When we reach a frame's selected window, redo the frame's menu bar.  */
+  /* When we reach a frame's selected window, redo the frame's menu
+     bar and the frame's title.  */
   if (update_mode_line
       && EQ (FRAME_SELECTED_WINDOW (f), window))
     {
@@ -16781,6 +16902,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	    ignore_mouse_drag_p = true;
 #endif
         }
+      x_consider_frame_title (w->frame);
 #endif
     }
 
@@ -19770,7 +19892,8 @@ push_prefix_prop (struct it *it, Lisp_Object prop)
 
   eassert (it->method == GET_FROM_BUFFER
 	   || it->method == GET_FROM_DISPLAY_VECTOR
-	   || it->method == GET_FROM_STRING);
+	   || it->method == GET_FROM_STRING
+	   || it->method == GET_FROM_IMAGE);
 
   /* We need to save the current buffer/string position, so it will be
      restored by pop_it, because iterate_out_of_display_property
@@ -21026,7 +21149,7 @@ window-specific overlays, which can affect the results.
 
 Strong directional characters `L', `R', and `AL' can have their
 intrinsic directionality overridden by directional override
-control characters RLO \(u+202e) and LRO \(u+202d).  See the
+control characters RLO (u+202e) and LRO (u+202d).  See the
 function `get-char-code-property' for a way to inquire about
 the `bidi-class' property of a character.  */)
   (Lisp_Object from, Lisp_Object to, Lisp_Object object)
@@ -24051,7 +24174,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	prop = Qnil;
     }
 
-  if (INTEGERP (prop) || FLOATP (prop))
+  if (NUMBERP (prop))
     {
       int base_unit = (width_p
 		       ? FRAME_COLUMN_WIDTH (it->f)
@@ -24103,7 +24226,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	    car = Qnil;
 	}
 
-      if (INTEGERP (car) || FLOATP (car))
+      if (NUMBERP (car))
 	{
 	  double fact;
 	  pixels = XFLOATINT (car);
@@ -25934,9 +26057,7 @@ produce_stretch_glyph (struct it *it)
       zero_width_ok_p = true;
       width = (int)tem;
     }
-#ifdef HAVE_WINDOW_SYSTEM
-  else if (FRAME_WINDOW_P (it->f)
-	   && (prop = Fplist_get (plist, QCrelative_width), NUMVAL (prop) > 0))
+  else if (prop = Fplist_get (plist, QCrelative_width), NUMVAL (prop) > 0)
     {
       /* Relative width `:relative-width FACTOR' specified and valid.
 	 Compute the width of the characters having the `glyph'
@@ -25956,10 +26077,9 @@ produce_stretch_glyph (struct it *it)
 
       it2.glyph_row = NULL;
       it2.what = IT_CHARACTER;
-      x_produce_glyphs (&it2);
+      PRODUCE_GLYPHS (&it2);
       width = NUMVAL (prop) * it2.pixel_width;
     }
-#endif	/* HAVE_WINDOW_SYSTEM */
   else if ((prop = Fplist_get (plist, QCalign_to), !NILP (prop))
 	   && calc_pixel_width_or_height (&tem, it, prop, font, true,
 					  &align_to))
@@ -29050,7 +29170,7 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
       Lisp_Object lr, lx0, ly0;
       if (CONSP (circ)
 	  && CONSP (XCAR (circ))
-	  && (lr = XCDR (circ), INTEGERP (lr) || FLOATP (lr))
+	  && (lr = XCDR (circ), NUMBERP (lr))
 	  && (lx0 = XCAR (XCAR (circ)), INTEGERP (lx0))
 	  && (ly0 = XCDR (XCAR (circ)), INTEGERP (ly0)))
 	{
@@ -30982,18 +31102,18 @@ This variable is not guaranteed to be accurate except while processing
 
   DEFVAR_LISP ("frame-title-format", Vframe_title_format,
     doc: /* Template for displaying the title bar of visible frames.
-\(Assuming the window manager supports this feature.)
+(Assuming the window manager supports this feature.)
 
 This variable has the same structure as `mode-line-format', except that
 the %c and %l constructs are ignored.  It is used only on frames for
-which no explicit name has been set \(see `modify-frame-parameters').  */);
+which no explicit name has been set (see `modify-frame-parameters').  */);
 
   DEFVAR_LISP ("icon-title-format", Vicon_title_format,
     doc: /* Template for displaying the title bar of an iconified frame.
-\(Assuming the window manager supports this feature.)
+(Assuming the window manager supports this feature.)
 This variable has the same structure as `mode-line-format' (which see),
 and is used only on frames for which no explicit name has been set
-\(see `modify-frame-parameters').  */);
+(see `modify-frame-parameters').  */);
   Vicon_title_format
     = Vframe_title_format
     = listn (CONSTYPE_PURE, 3,
@@ -31052,9 +31172,9 @@ A positive number means delay autoselection by that many seconds: a
 window is autoselected only after the mouse has remained in that
 window for the duration of the delay.
 A negative number has a similar effect, but causes windows to be
-autoselected only after the mouse has stopped moving.  \(Because of
+autoselected only after the mouse has stopped moving.  (Because of
 the way Emacs compares mouse events, you will occasionally wait twice
-that time before the window gets selected.\)
+that time before the window gets selected.)
 Any other value means to autoselect window instantaneously when the
 mouse pointer enters it.
 
@@ -31352,13 +31472,15 @@ display table takes effect; in this case, Emacs does not consult
 
   DEFVAR_LISP ("redisplay--all-windows-cause", Vredisplay__all_windows_cause,
 	       doc: /*  */);
-  Vredisplay__all_windows_cause
-    = Fmake_vector (make_number (100), make_number (0));
+  Vredisplay__all_windows_cause = Fmake_hash_table (0, NULL);
 
   DEFVAR_LISP ("redisplay--mode-lines-cause", Vredisplay__mode_lines_cause,
 	       doc: /*  */);
-  Vredisplay__mode_lines_cause
-    = Fmake_vector (make_number (100), make_number (0));
+  Vredisplay__mode_lines_cause = Fmake_hash_table (0, NULL);
+
+  DEFVAR_LISP ("redisplay--variables", Vredisplay__variables,
+     doc: /* A hash-table of variables changing which triggers a thorough redisplay.  */);
+  Vredisplay__variables = Qnil;
 }
 
 

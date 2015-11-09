@@ -91,7 +91,7 @@ spaces.  You might want to install ls from GNU Coreutils, which does
 support this option.  Alternatively, you might want to use Emacs's
 own emulation of \"ls\", by using:
   (setq ls-lisp-use-insert-directory-program nil)
-  (require 'ls-lisp)
+  (require \\='ls-lisp)
 This is used by default on MS Windows, which does not have an \"ls\" program.
 Note that `ls-lisp' does not support as many options as GNU ls, though.
 For more details, see Info node `(emacs)ls in Lisp'."
@@ -1466,6 +1466,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     (define-key map "T" 'dired-do-touch)
     (define-key map "X" 'dired-do-shell-command)
     (define-key map "Z" 'dired-do-compress)
+    (define-key map "c" 'dired-do-compress-to)
     (define-key map "!" 'dired-do-shell-command)
     (define-key map "&" 'dired-do-async-shell-command)
     ;; Comparison commands
@@ -3494,6 +3495,9 @@ OLD and NEW are both characters used to mark files."
   (interactive)
   (dired-unmark-all-files ?\r))
 
+;; Bound in dired-unmark-all-files
+(defvar dired-unmark-all-files-query)
+
 (defun dired-unmark-all-files (mark &optional arg)
   "Remove a specific mark (or any mark) from every file.
 After this command, type the mark character to remove,
@@ -3504,6 +3508,7 @@ Type \\[help-command] at that time for help."
   (save-excursion
     (let* ((count 0)
 	   (inhibit-read-only t) case-fold-search
+           dired-unmark-all-files-query
 	   (string (format "\n%c" mark))
 	   (help-form "\
 Type SPC or `y' to unmark one file, DEL or `n' to skip to next,
@@ -3515,7 +3520,8 @@ Type SPC or `y' to unmark one file, DEL or `n' to skip to next,
 	(if (or (not arg)
 		(let ((file (dired-get-filename t t)))
 		  (and file
-		       (dired-query 'query "Unmark file `%s'? "
+		       (dired-query 'dired-unmark-all-files-query
+				    "Unmark file `%s'? "
 				    file))))
 	    (progn (subst-char-in-region (1- (point)) (point)
 					 (preceding-char) ?\s)
@@ -3567,7 +3573,7 @@ Thus, use \\[backward-page] to find the beginning of a group of errors."
 	       (unless (bolp)
 		 (insert "\n"))
 	       (insert (current-time-string)
-		       (format-message "\tBuffer ‘%s’\n" (buffer-name obuf)))
+		       (format-message "\tBuffer `%s'\n" (buffer-name obuf)))
 	       (goto-char (point-max))
 	       (insert "\f\n")))))))
 
@@ -3896,7 +3902,7 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 
 ;;; Start of automatically extracted autoloads.
 
-;;;### (autoloads nil "dired-aux" "dired-aux.el" "637aadf6baffb10be036ba4cec2372f9")
+;;;### (autoloads nil "dired-aux" "dired-aux.el" "29842a53d6651f8f535ec8e02d20d7cc")
 ;;; Generated autoloads from dired-aux.el
 
 (autoload 'dired-diff "dired-aux" "\
@@ -4088,8 +4094,18 @@ command with a prefix argument (the value does not matter).
 
 \(fn &optional ARG FMT)" t nil)
 
-(autoload 'dired-compress-file "dired-aux" "\
+(autoload 'dired-do-compress-to "dired-aux" "\
+Compress selected files and directories to an archive.
+You are prompted for the archive name.
+The archiving command is chosen based on the archive name extension and
+`dired-compress-files-alist'.
 
+\(fn)" t nil)
+
+(autoload 'dired-compress-file "dired-aux" "\
+Compress or uncompress FILE.
+Return the name of the compressed or uncompressed file.
+Return nil if no change in files.
 
 \(fn FILE)" nil nil)
 
@@ -4399,7 +4415,7 @@ instead.
 
 ;;;***
 
-;;;### (autoloads nil "dired-x" "dired-x.el" "c1a6289ba8504b605595321436a9c04d")
+;;;### (autoloads nil "dired-x" "dired-x.el" "06f532e2e812fa1cb10ade31249e9700")
 ;;; Generated autoloads from dired-x.el
 
 (autoload 'dired-jump "dired-x" "\

@@ -402,6 +402,7 @@ See variables `dired-texinfo-unclean-extensions',
                                 dired-tex-unclean-extensions
                                 (list ".dvi"))))
 
+(defvar tar-superior-buffer)
 ;;; JUMP.
 
 ;;;###autoload
@@ -416,30 +417,32 @@ Interactively with prefix argument, read FILE-NAME and
 move to its line in dired."
   (interactive
    (list nil (and current-prefix-arg
-		  (read-file-name "Jump to Dired file: "))))
-  (let* ((file (or file-name buffer-file-name))
-         (dir (if file (file-name-directory file) default-directory)))
-    (if (and (eq major-mode 'dired-mode) (null file-name))
-        (progn
-          (setq dir (dired-current-directory))
-          (dired-up-directory other-window)
-          (unless (dired-goto-file dir)
+                  (read-file-name "Jump to Dired file: "))))
+  (if (bound-and-true-p tar-subfile-mode)
+      (switch-to-buffer tar-superior-buffer)
+    (let* ((file (or file-name buffer-file-name))
+           (dir (if file (file-name-directory file) default-directory)))
+      (if (and (eq major-mode 'dired-mode) (null file-name))
+          (progn
+            (setq dir (dired-current-directory))
+            (dired-up-directory other-window)
+            (unless (dired-goto-file dir)
               ;; refresh and try again
-            (dired-insert-subdir (file-name-directory dir))
-            (dired-goto-file dir)))
-      (if other-window
-          (dired-other-window dir)
-        (dired dir))
-      (if file
-          (or (dired-goto-file file)
-              ;; refresh and try again
-              (progn
-                (dired-insert-subdir (file-name-directory file))
-                (dired-goto-file file))
-              ;; Toggle omitting, if it is on, and try again.
-	      (when dired-omit-mode
-                (dired-omit-mode)
-                (dired-goto-file file)))))))
+              (dired-insert-subdir (file-name-directory dir))
+              (dired-goto-file dir)))
+        (if other-window
+            (dired-other-window dir)
+          (dired dir))
+        (if file
+            (or (dired-goto-file file)
+                ;; refresh and try again
+                (progn
+                  (dired-insert-subdir (file-name-directory file))
+                  (dired-goto-file file))
+                ;; Toggle omitting, if it is on, and try again.
+                (when dired-omit-mode
+                  (dired-omit-mode)
+                  (dired-goto-file file))))))))
 
 ;;;###autoload
 (defun dired-jump-other-window (&optional file-name)
@@ -687,8 +690,8 @@ to put saved Dired buffers automatically into Virtual Dired mode.
 
 Also useful for `auto-mode-alist' like this:
 
-  (add-to-list 'auto-mode-alist
-               '(\"[^/]\\\\.dired\\\\'\" . dired-virtual-mode))"
+  (add-to-list \\='auto-mode-alist
+               \\='(\"[^/]\\\\.dired\\\\\\='\" . dired-virtual-mode))"
   (interactive)
   (dired-virtual (dired-virtual-guess-dir)))
 
@@ -1354,11 +1357,11 @@ otherwise."
   (let ((file (dired-get-filename t)))
     (if dired-bind-vm
 	(if (y-or-n-p (format-message
-		       "Visit ‘%s’ as a mail folder with VM?" file))
+		       "Visit `%s' as a mail folder with VM?" file))
 	    (dired-vm))
       ;; Read mail folder using rmail.
       (if (y-or-n-p (format-message
-		     "Visit ‘%s’ as a mailbox with RMAIL?" file))
+		     "Visit `%s' as a mailbox with RMAIL?" file))
 	  (dired-rmail)))))
 
 

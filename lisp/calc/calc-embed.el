@@ -3,7 +3,6 @@
 ;; Copyright (C) 1990-1993, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
-;; Maintainer: Jay Belanger <jay.p.belanger@gmail.com>
 
 ;; This file is part of GNU Emacs.
 
@@ -333,7 +332,7 @@
 	  (message (concat
                     "Embedded Calc mode enabled; "
                     (if calc-embedded-quiet
-                        "Type ‘C-x * x’"
+                        "Type `C-x * x'"
                       "Give this command again")
                     " to return to normal")))))
   (scroll-down 0))    ; fix a bug which occurs when truncate-lines is changed.

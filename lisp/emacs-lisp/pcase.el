@@ -1,4 +1,4 @@
-;;; pcase.el --- ML-style pattern-matching macro for Elisp -*- lexical-binding: t; coding: utf-8 -*-
+;;; pcase.el --- ML-style pattern-matching macro for Elisp -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2015 Free Software Foundation, Inc.
 
@@ -107,7 +107,7 @@
 
 ;;;###autoload
 (defmacro pcase (exp &rest cases)
-  "Perform ML-style pattern matching on EXP.
+  "Eval EXP and perform ML-style pattern matching on that value.
 CASES is a list of elements of the form (PATTERN CODE...).
 
 Patterns can take the following forms:
@@ -115,7 +115,7 @@ Patterns can take the following forms:
   SYMBOL	matches anything and binds it to SYMBOL.
   (or PAT...)	matches if any of the patterns matches.
   (and PAT...)	matches if all the patterns match.
-  \\='VAL		matches if the object is `equal' to VAL
+  \\='VAL		matches if the object is `equal' to VAL.
   ATOM		is a shorthand for \\='ATOM.
 		   ATOM can be a keyword, an integer, or a string.
   (pred FUN)	matches if FUN applied to the object returns non-nil.
@@ -131,11 +131,11 @@ FUN can take the form
                         which is the value being matched.
 So a FUN of the form SYMBOL is equivalent to one of the form (FUN).
 FUN can refer to variables bound earlier in the pattern.
-FUN is assumed to be pure, i.e. it can be dropped if its result is not used,
-and two identical calls can be merged into one.
 E.g. you can match pairs where the cdr is larger than the car with a pattern
 like \\=`(,a . ,(pred (< a))) or, with more checks:
 \\=`(,(and a (pred numberp)) . ,(and (pred numberp) (pred (< a))))
+FUN is assumed to be pure, i.e. it can be dropped if its result is not used,
+and two identical calls can be merged into one.
 
 Additional patterns can be defined via `pcase-defmacro'.
 Currently, the following patterns are provided this way:"
@@ -164,7 +164,7 @@ Currently, the following patterns are provided this way:"
         expansion))))
 
 (declare-function help-fns--signature "help-fns"
-                  (function doc real-def real-function raw))
+                  (function doc real-def real-function buffer))
 
 ;; FIXME: Obviously, this will collide with nadvice's use of
 ;; function-documentation if we happen to advise `pcase'.
@@ -184,7 +184,7 @@ Currently, the following patterns are provided this way:"
              (insert "\n\n-- ")
              (let* ((doc (documentation me 'raw)))
                (setq doc (help-fns--signature symbol doc me
-                                              (indirect-function me) t))
+                                              (indirect-function me) nil))
                (insert "\n" (or doc "Not documented.")))))))
       (let ((combined-doc (buffer-string)))
         (if ud (help-add-fundoc-usage combined-doc (car ud)) combined-doc)))))
@@ -197,7 +197,7 @@ Currently, the following patterns are provided this way:"
          (pcase--dontwarn-upats (cons x pcase--dontwarn-upats)))
     (pcase--expand
      ;; FIXME: Could we add the FILE:LINE data in the error message?
-     exp (append cases `((,x (error "No clause matching ‘%S’" ,x)))))))
+     exp (append cases `((,x (error "No clause matching `%S'" ,x)))))))
 
 ;;;###autoload
 (defmacro pcase-lambda (lambda-list &rest body)
@@ -775,7 +775,7 @@ Otherwise, it defers to REST which is a list of branches of the form
         (let ((code (pcase--u1 matches code vars rest)))
           (if (eq upat '_) code
             (macroexp--warn-and-return
-             "Pattern t is deprecated.  Use ‘_’ instead"
+             "Pattern t is deprecated.  Use `_' instead"
              code))))
        ((eq upat 'pcase--dontcare) :pcase--dontcare)
        ((memq (car-safe upat) '(guard pred))
@@ -860,7 +860,7 @@ Otherwise, it defers to REST which is a list of branches of the form
                      (pcase--u rest))
                    vars
                    (list `((and . ,matches) ,code . ,vars))))
-       (t (error "Unknown pattern ‘%S’" upat)))))
+       (t (error "Unknown pattern `%S'" upat)))))
    (t (error "Incorrect MATCH %S" (car matches)))))
 
 (def-edebug-spec

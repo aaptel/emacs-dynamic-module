@@ -21,7 +21,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "intervals.h"
-#include "character.h"
 #include "buffer.h"
 #include "window.h"
 
@@ -1494,7 +1493,7 @@ DEFUN ("remove-text-properties", Fremove_text_properties,
        doc: /* Remove some properties from text from START to END.
 The third argument PROPERTIES is a property list
 whose property names specify the properties to remove.
-\(The values stored in PROPERTIES are ignored.)
+(The values stored in PROPERTIES are ignored.)
 If the optional fourth argument OBJECT is a buffer (or nil, which means
 the current buffer), START and END are buffer positions (integers or
 markers).  If OBJECT is a string, START and END are 0-based indices into it.

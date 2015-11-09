@@ -33,8 +33,12 @@ The window system startup file should add its frame creation
 function to this method, which should take an alist of parameters
 as its argument.")
 
-(cl-defmethod frame-creation-function (params
-                                       &context (window-system (eql nil)))
+(cl-generic-define-context-rewriter window-system (value)
+  ;; If `value' is a `consp', it's probably an old-style specializer,
+  ;; so just use it, and anyway `eql' isn't very useful on cons cells.
+  `(window-system ,(if (consp value) value `(eql ,value))))
+
+(cl-defmethod frame-creation-function (params &context (window-system nil))
   ;; It's tempting to get rid of tty-create-frame-with-faces and turn it into
   ;; this method (i.e. move this method to faces.el), but faces.el is loaded
   ;; much earlier from loadup.el (before cl-generic and even before
@@ -461,7 +465,7 @@ there (in decreasing order of priority)."
 		    (cons (1- (car frame-size-history))
 			  (cons
 			   (list frame-initial-frame
-				 "frame-notice-user-settings"
+				 "FRAME-NOTICE-USER"
 				 nil newparms)
 			   (cdr frame-size-history)))))
 
@@ -702,7 +706,7 @@ the new frame according to its own rules."
     (when (numberp (car frame-size-history))
       (setq frame-size-history
 	    (cons (1- (car frame-size-history))
-		  (cons (list frame "make-frame")
+		  (cons (list frame "MAKE-FRAME")
 			(cdr frame-size-history)))))
 
     ;; We can run `window-configuration-change-hook' for this frame now.
@@ -743,7 +747,7 @@ the name of an X display device (HOST.SERVER.SCREEN) or a tty device file."
       (frame-terminal f)))
    ((terminal-live-p device) device)
    (t
-    (error "Invalid argument %s in ‘get-device-terminal’" device))))
+    (error "Invalid argument %s in `get-device-terminal'" device))))
 
 (defun frames-on-display-list (&optional device)
   "Return a list of all frames on DEVICE.
@@ -894,7 +898,7 @@ If there is no frame by that name, signal an error."
 	 (frame (cdr (assoc name frame-names-alist))))
     (if frame
 	(select-frame-set-input-focus frame)
-      (error "There is no frame named ‘%s’" name))))
+      (error "There is no frame named `%s'" name))))
 
 
 ;;;; Background mode.
@@ -1381,6 +1385,27 @@ and width values are in pixels.
        '(tool-bar-size 0 . 0)
        (cons 'internal-border-width
 	     (frame-parameter frame 'internal-border-width)))))))
+
+(defun frame--size-history (&optional frame)
+  "Print history of resize operations for FRAME.
+Print prettified version of `frame-size-history' into a buffer
+called *frame-size-history*.  Optional argument FRAME denotes the
+frame whose history will be printed.  FRAME defaults to the
+selected frame."
+  (let ((history (reverse frame-size-history))
+	entry)
+    (setq frame (window-normalize-frame frame))
+    (with-current-buffer (get-buffer-create "*frame-size-history*")
+      (erase-buffer)
+      (insert (format "Frame size history of %s\n" frame))
+      (while (listp (setq entry (pop history)))
+	(when (eq (car entry) frame)
+          (pop entry)
+          (insert (format "%s" (pop entry)))
+          (move-to-column 24 t)
+          (while entry
+            (insert (format " %s" (pop entry))))
+          (insert "\n"))))))
 
 (declare-function x-frame-edges "xfns.c" (&optional frame type))
 (declare-function w32-frame-edges "w32fns.c" (&optional frame type))
@@ -2205,6 +2230,15 @@ See also `toggle-frame-maximized'."
 ;; Defined in dispnew.c.
 (make-obsolete-variable
  'window-system-version "it does not give useful information." "24.3")
+
+;; Variables which should trigger redisplay of the current buffer.
+(setq redisplay--variables (make-hash-table :test 'eq :size 10))
+(mapc (lambda (var)
+        (puthash var 1 redisplay--variables))
+      '(line-spacing
+        overline-margin
+        line-prefix
+        wrap-prefix))
 
 (provide 'frame)
 

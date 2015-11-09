@@ -145,7 +145,7 @@ other arguments for `rlogin'.
 Input is sent line-at-a-time to the remote connection.
 
 Communication with the remote host is recorded in a buffer `*rlogin-HOST*'
-\(or `*rlogin-USER@HOST*' if the remote username differs\).
+\(or `*rlogin-USER@HOST*' if the remote username differs).
 If a prefix argument is given and the buffer `*rlogin-HOST*' already exists,
 a new buffer with a different connection will be made.
 
@@ -175,7 +175,7 @@ function `rlogin-directory-tracking-mode' rather than simply setting the
 variable."
   (interactive (list
 		(read-from-minibuffer (format-message
-                                       "Arguments for ‘%s’ (hostname first): "
+                                       "Arguments for `%s' (hostname first): "
                                        (file-name-nondirectory rlogin-program))
 				      nil nil nil 'rlogin-history)
 		current-prefix-arg))

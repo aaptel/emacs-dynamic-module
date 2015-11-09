@@ -940,7 +940,7 @@ Optional arguments CHANGED-WIDGET and EVENT are ignored."
   "Return propertized copy of string TAG.
 Optional argument NUM-NEW is used for choosing face, other
 arguments NT-ID, FEED, and VFEED are added as properties."
-  ;;(message "newsticker--treeview-propertize-tag '%s' %s" feed nt-id)
+  ;;(message "newsticker--treeview-propertize-tag `%s' %s" feed nt-id)
   (let ((face 'newsticker-treeview-face)
         (map (make-sparse-keymap)))
     (if (and num-new (> num-new 0))
@@ -1269,7 +1269,7 @@ Note: does not update the layout."
                    (file-exists-p newsticker-groups-filename)
                    (y-or-n-p
                     (format-message
-                     (concat "Obsolete variable ‘newsticker-groups-filename’ "
+                     (concat "Obsolete variable `newsticker-groups-filename' "
                              "points to existing file \"%s\".\n"
                              "Read it? ")
                      newsticker-groups-filename))
@@ -1281,7 +1281,7 @@ Note: does not update the layout."
          (file-exists-p newsticker-groups-filename)
 	 (y-or-n-p (format-message
                     (concat "Delete the file \"%s\",\nto which the obsolete "
-                            "variable ‘newsticker-groups-filename’ points ? ")
+                            "variable `newsticker-groups-filename' points ? ")
                     newsticker-groups-filename))
 	 (delete-file newsticker-groups-filename))
     (when buf

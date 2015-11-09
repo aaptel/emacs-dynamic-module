@@ -23,13 +23,14 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <limits.h> /* for INT_MAX */
 
 #include "lisp.h"
+#include "character.h"
+#include "coding.h"
 #include "keyboard.h"
 #include "keymap.h"
 #include "frame.h"
 #include "window.h"
 #include "termhooks.h"
 #include "blockinput.h"
-#include "dispextern.h"
 #include "buffer.h"
 
 #ifdef USE_X_TOOLKIT
@@ -1129,7 +1130,7 @@ If POSITION is t, it means to use the current mouse position.
 MENU is a specifier for a menu.  For the simplest case, MENU is a keymap.
 The menu items come from key bindings that have a menu string as well as
 a definition; actually, the "definition" in such a key binding looks like
-\(STRING . REAL-DEFINITION).  To give the menu a title, put a string into
+(STRING . REAL-DEFINITION).  To give the menu a title, put a string into
 the keymap as a top-level element.
 
 If REAL-DEFINITION is nil, that puts a nonselectable string in the menu.
@@ -1491,7 +1492,7 @@ The return value is VALUE from the chosen item.
 An ITEM may also be just a string--that makes a nonselectable item.
 An ITEM may also be nil--that means to put all preceding items
 on the left of the dialog box and all following items on the right.
-\(By default, approximately half appear on each side.)
+(By default, approximately half appear on each side.)
 
 If HEADER is non-nil, the frame title for the box is "Information",
 otherwise it is "Question".

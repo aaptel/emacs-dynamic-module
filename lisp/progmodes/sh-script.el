@@ -347,7 +347,7 @@ naming the shell."
      . ((nil
 	 ;; function FOO
 	 ;; function FOO()
-         "^\\s-*function\\s-+\\\([[:alpha:]_][[:alnum:]_]*\\)\\s-*\\(?:()\\)?"
+         "^\\s-*function\\s-+\\([[:alpha:]_][[:alnum:]_]*\\)\\s-*\\(?:()\\)?"
          1)
 	;; FOO()
 	(nil
@@ -374,7 +374,7 @@ For use in `add-log-current-defun-function'."
 	   (concat "\\(?:"
 		   ;; function FOO
 		   ;; function FOO()
-		   "^\\s-*function\\s-+\\\([[:alpha:]_][[:alnum:]_]*\\)\\s-*\\(?:()\\)?"
+		   "^\\s-*function\\s-+\\([[:alpha:]_][[:alnum:]_]*\\)\\s-*\\(?:()\\)?"
 		   "\\)\\|\\(?:"
 		   ;; FOO()
 		   "^\\s-*\\([[:alpha:]_][[:alnum:]_]*\\)\\s-*()"
@@ -1920,10 +1920,11 @@ Does not preserve point."
             ;; Pretend the here-document is a "newline representing a
             ;; semi-colon", since the here-doc otherwise covers the newline(s).
             ";")
-        (let ((semi (sh-smie--newline-semi-p)))
-          (forward-line 1)
-          (if (or semi (eobp)) ";"
-            (sh-smie-sh-forward-token))))
+        (unless (eobp)
+          (let ((semi (sh-smie--newline-semi-p)))
+            (forward-line 1)
+            (if (or semi (eobp)) ";"
+              (sh-smie-sh-forward-token)))))
     (forward-comment (point-max))
     (cond
      ((looking-at "\\\\\n") (forward-line 1) (sh-smie-sh-forward-token))
@@ -1991,9 +1992,30 @@ Does not preserve point."
          (t tok)))))))
 
 (defcustom sh-indent-after-continuation t
-  "If non-nil, try to make sure text is indented after a line continuation."
-  :version "24.3"
-  :type 'boolean
+  "If non-nil, indent relative to the continued line's beginning.
+Continued lines can either be indented as \"one long wrapped line\" without
+paying attention to the actual syntactic structure, as in:
+
+   for f \
+       in a; do \
+       toto; \
+       done
+
+or as lines that just don't have implicit semi-colons between them, as in:
+
+   for f \
+   in a; do \
+       toto; \
+   done
+
+With `always' you get the former behavior whereas with nil you get the latter.
+With t, you get the latter as long as that would indent the continuation line
+deeper than the initial line."
+  :version "25.1"
+  :type '(choice
+          (const nil :tag "Never")
+          (const t   :tag "Only if needed to make it deeper")
+          (const always :tag "Always"))
   :group 'sh-indentation)
 
 (defun sh-smie--continuation-start-indent ()
@@ -2004,24 +2026,49 @@ May return nil if the line should not be treated as continued."
     (unless (sh-smie--looking-back-at-continuation-p)
       (current-indentation))))
 
+(defun sh-smie--indent-continuation ()
+  (cond
+   ((not (and sh-indent-after-continuation
+              (save-excursion
+                (ignore-errors
+                  (skip-chars-backward " \t")
+                  (sh-smie--looking-back-at-continuation-p)))))
+    nil)
+   ((eq sh-indent-after-continuation 'always)
+    (save-excursion
+      (forward-line -1)
+      (if (sh-smie--looking-back-at-continuation-p)
+          (current-indentation)
+        (+ (current-indentation) sh-indentation))))
+   (t
+    ;; Just make sure a line-continuation is indented deeper.
+    (save-excursion
+      (let ((indent (let ((sh-indent-after-continuation nil))
+                      (smie-indent-calculate)))
+            (max most-positive-fixnum))
+        (if (not (numberp indent)) indent
+          (while (progn
+                   (forward-line -1)
+                   (let ((ci (current-indentation)))
+                     (cond
+                      ;; Previous line is less indented, we're good.
+                      ((< ci indent) nil)
+                      ((sh-smie--looking-back-at-continuation-p)
+                       (setq max (min max ci))
+                       ;; Previous line is itself a continuation.
+                       ;; If it's indented like us, we're good, otherwise
+                       ;; check the line before that one.
+                       (> ci indent))
+                      (t ;Previous line is the beginning of the continued line.
+                       (setq indent (min (+ ci sh-indentation) max))
+                       nil)))))
+          indent))))))
+
 (defun sh-smie-sh-rules (kind token)
   (pcase (cons kind token)
     (`(:elem . basic) sh-indentation)
     (`(:after . "case-)") (- (sh-var-value 'sh-indent-for-case-alt)
                              (sh-var-value 'sh-indent-for-case-label)))
-    ((and `(:before . ,_)
-          ;; After a line-continuation, make sure the rest is indented.
-          (guard sh-indent-after-continuation)
-          (guard (save-excursion
-                   (ignore-errors
-                     (skip-chars-backward " \t")
-                     (sh-smie--looking-back-at-continuation-p))))
-          (let initial (sh-smie--continuation-start-indent))
-          (guard (let* ((sh-indent-after-continuation nil)
-                        (indent (smie-indent-calculate)))
-                   (and (numberp indent) (numberp initial)
-                        (<= indent initial)))))
-     `(column . ,(+ initial sh-indentation)))
     (`(:before . ,(or `"(" `"{" `"[" "while" "if" "for" "case"))
      (if (not (smie-rule-prev-p "&&" "||" "|"))
          (when (smie-rule-hanging-p)
@@ -2319,7 +2366,7 @@ controls whether to query about making the visited file executable.
 
 Calls the value of `sh-set-shell-hook' if set."
   (interactive (list (completing-read
-                      (format "Shell \(default %s\): "
+                      (format "Shell (default %s): "
                               sh-shell-file)
                       ;; This used to use interpreter-mode-alist, but that is
                       ;; no longer appropriate now that uses regexps.
@@ -2363,6 +2410,7 @@ Calls the value of `sh-set-shell-hook' if set."
 			  (if (looking-at "[ \t]*\\\\\n")
 			      (goto-char (match-end 0))
 			    (funcall orig))))
+          (add-hook 'smie-indent-functions #'sh-smie--indent-continuation nil t)
           (smie-setup (symbol-value (funcall mksym "grammar"))
                       (funcall mksym "rules")
                       :forward-token  (funcall mksym "forward-token")
@@ -2810,15 +2858,15 @@ Return new point if successful, nil if an error occurred."
   "Return indent-info for this line.
 This is a list.  nil means the line is to be left as is.
 Otherwise it contains one or more of the following sublists:
-\(t NUMBER\)   NUMBER is the base location in the buffer that indentation is
+\(t NUMBER)   NUMBER is the base location in the buffer that indentation is
 	     relative to.  If present, this is always the first of the
 	     sublists.  The indentation of the line in question is
 	     derived from the indentation of this point, possibly
 	     modified by subsequent sublists.
-\(+ VAR\)
-\(- VAR\)      Get the value of variable VAR and add to or subtract from
+\(+ VAR)
+\(- VAR)      Get the value of variable VAR and add to or subtract from
 	     the indentation calculated so far.
-\(= VAR\)	     Get the value of variable VAR and *replace* the
+\(= VAR)      Get the value of variable VAR and *replace* the
 	     indentation with its value.  This only occurs for
 	     special variables such as `sh-indent-comment'.
 STRING	     This is ignored for the purposes of calculating
@@ -3086,7 +3134,7 @@ we go to the end of the previous line and do not check for continuations."
 		(setq prev (point))
 		))
 	  ;; backward-sexp failed
-	  (if (zerop (skip-chars-backward " \t()[\]{};`'"))
+	  (if (zerop (skip-chars-backward " \t()[]{};`'"))
 	      (forward-char -1))
 	  (if (bolp)
 	      (let ((back (sh-prev-line nil)))

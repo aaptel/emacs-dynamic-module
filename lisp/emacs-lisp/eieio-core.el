@@ -135,10 +135,10 @@ Currently under control of this var:
       (or (cl--find-class class) class)
     class))
 
-(defun class-p (class)
-  "Return non-nil if CLASS is a valid class vector.
-CLASS is a symbol."                     ;FIXME: Is it a vector or a symbol?
-  (and (symbolp class) (eieio--class-p (cl--find-class class))))
+(defun class-p (x)
+  "Return non-nil if X is a valid class vector.
+X can also be is a symbol."
+  (eieio--class-p (if (symbolp x) (cl--find-class x) x)))
 
 (defun eieio--class-print-name (class)
   "Return a printed representation of CLASS."
@@ -219,7 +219,8 @@ It creates an autoload function for CNAME's constructor."
       ;; turn this into a usable self-pointing symbol
       (when eieio-backward-compatibility
         (set cname cname)
-        (make-obsolete-variable cname (format "use '%s instead" cname) "25.1"))
+        (make-obsolete-variable cname (format "use \\='%s instead" cname)
+                                "25.1"))
 
       ;; Store the new class vector definition into the symbol.  We need to
       ;; do this first so that we can call defmethod for the accessor.
@@ -338,7 +339,8 @@ See `defclass' for more information."
     ;; turn this into a usable self-pointing symbol;  FIXME: Why?
     (when eieio-backward-compatibility
       (set cname cname)
-      (make-obsolete-variable cname (format "use '%s instead" cname) "25.1"))
+      (make-obsolete-variable cname (format "use \\='%s instead" cname)
+                              "25.1"))
 
     ;; Create a handy list of the class test too
     (when eieio-backward-compatibility
@@ -357,8 +359,9 @@ See `defclass' for more information."
                                       (object-of-class-p (car obj) ,cname)))
                        (setq obj (cdr obj)))
                      ans))))
-        (make-obsolete csym (format "use (cl-typep ... '(list-of %s)) instead"
-                                    cname)
+        (make-obsolete csym (format
+                             "use (cl-typep ... \\='(list-of %s)) instead"
+                             cname)
                        "25.1")))
 
     ;; Before adding new slots, let's add all the methods and classes
@@ -407,7 +410,7 @@ See `defclass' for more information."
                  (progn
                    (set initarg initarg)
                    (make-obsolete-variable
-                    initarg (format "use '%s instead" initarg) "25.1"))))
+                    initarg (format "use \\='%s instead" initarg) "25.1"))))
 
 	;; The customgroup should be a list of symbols.
 	(cond ((and (null customg) custom)
@@ -544,7 +547,7 @@ If SKIPNIL is non-nil, then if default value is nil return t instead."
     (if (not (eq type t))
         (if (not (equal type tp))
             (error
-             "Child slot type ‘%s’ does not match inherited type ‘%s’ for ‘%s’"
+             "Child slot type `%s' does not match inherited type `%s' for `%s'"
              type tp a))
       (setf (cl--slot-descriptor-type new) tp))
     ;; If we have a repeat, only update the initarg...
@@ -564,7 +567,7 @@ If SKIPNIL is non-nil, then if default value is nil return t instead."
     (let ((super-prot (alist-get :protection oprops))
           (prot (alist-get :protection nprops)))
       (if (not (eq prot super-prot))
-          (error "Child slot protection ‘%s’ does not match inherited protection ‘%s’ for ‘%s’"
+          (error "Child slot protection `%s' does not match inherited protection `%s' for `%s'"
                  prot super-prot a)))
     ;; End original PLN
 
@@ -733,7 +736,7 @@ Argument FN is the function calling this verifier."
                 ((and (or `',name (and name (pred keywordp)))
                       (guard (not (memq name eieio--known-slot-names))))
                  (macroexp--warn-and-return
-                  (format-message "Unknown slot ‘%S’" name) exp 'compile-only))
+                  (format-message "Unknown slot `%S'" name) exp 'compile-only))
                 (_ exp)))))
   (cl-check-type slot symbol)
   (cl-check-type obj (or eieio-object class))
@@ -766,7 +769,8 @@ Fills in OBJ's SLOT with its default value."
   (cl-check-type obj (or eieio-object class))
   (cl-check-type slot symbol)
   (let* ((cl (cond ((symbolp obj) (cl--find-class obj))
-                   (t (eieio--object-class obj))))
+                   ((eieio-object-p obj) (eieio--object-class obj))
+                   (t obj)))
 	 (c (eieio--slot-name-index cl slot)))
     (if (not c)
 	;; It might be missing because it is a :class allocated slot.
@@ -847,7 +851,7 @@ Fills in the default value in CLASS' in SLOT with VALUE."
       ;; gnus/registry.el, so it might be used elsewhere as well, so let's
       ;; keep it for now.
       ;; FIXME: Generate a compile-time warning for it!
-      ;; (error "Can't ‘oset-default’ an instance-allocated slot: %S of %S"
+      ;; (error "Can't `oset-default' an instance-allocated slot: %S of %S"
       ;;        slot class)
       (eieio--validate-slot-value class c value slot)
       ;; Set this into the storage for defaults.
@@ -1055,16 +1059,15 @@ method invocation orders of the involved classes."
 
 ;;;; General support to dispatch based on the type of the argument.
 
-(defconst eieio--generic-generalizer
-  (cl-generic-make-generalizer
-   ;; Use the exact same tagcode as for cl-struct, so that methods
-   ;; that dispatch on both kinds of objects get to share this
-   ;; part of the dispatch code.
-   50 #'cl--generic-struct-tag
-   (lambda (tag)
-        (and (symbolp tag) (boundp tag) (eieio--class-p (symbol-value tag))
-             (mapcar #'eieio--class-name
-                     (eieio--class-precedence-list (symbol-value tag)))))))
+(cl-generic-define-generalizer eieio--generic-generalizer
+  ;; Use the exact same tagcode as for cl-struct, so that methods
+  ;; that dispatch on both kinds of objects get to share this
+  ;; part of the dispatch code.
+  50 #'cl--generic-struct-tag
+  (lambda (tag &rest _)
+    (and (symbolp tag) (boundp tag) (eieio--class-p (symbol-value tag))
+         (mapcar #'eieio--class-name
+                 (eieio--class-precedence-list (symbol-value tag))))))
 
 (cl-defmethod cl-generic-generalizers :extra "class" (specializer)
   ;; CLHS says:
@@ -1084,22 +1087,21 @@ method invocation orders of the involved classes."
 ;; would not make much sense (e.g. to which argument should it apply?).
 ;; Instead, we add a new "subclass" specializer.
 
-(defun eieio--generic-subclass-specializers (tag)
+(defun eieio--generic-subclass-specializers (tag &rest _)
   (when (eieio--class-p tag)
     (mapcar (lambda (class)
               `(subclass ,(eieio--class-name class)))
             (eieio--class-precedence-list tag))))
 
-(defconst eieio--generic-subclass-generalizer
-  (cl-generic-make-generalizer
-   60 (lambda (name) `(and (symbolp ,name) (cl--find-class ,name)))
-   #'eieio--generic-subclass-specializers))
+(cl-generic-define-generalizer eieio--generic-subclass-generalizer
+  60 (lambda (name &rest _) `(and (symbolp ,name) (cl--find-class ,name)))
+  #'eieio--generic-subclass-specializers)
 
 (cl-defmethod cl-generic-generalizers ((_specializer (head subclass)))
   (list eieio--generic-subclass-generalizer))
 
 
-;;;### (autoloads nil "eieio-compat" "eieio-compat.el" "ea8c7f24ed47c6b71ac37cbdae1c9931")
+;;;### (autoloads nil "eieio-compat" "eieio-compat.el" "11dd361fd4c1c625de90a39977936236")
 ;;; Generated autoloads from eieio-compat.el
 
 (autoload 'eieio--defalias "eieio-compat" "\

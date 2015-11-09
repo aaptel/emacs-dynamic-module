@@ -1,4 +1,4 @@
-;;; fringe.el --- fringe setup and control  -*- coding: utf-8 -*-
+;;; fringe.el --- fringe setup and control
 
 ;; Copyright (C) 2002-2015 Free Software Foundation, Inc.
 
@@ -122,7 +122,7 @@ See `fringe-mode' for possible values and their effect."
       (and (consp style)
 	   (or (null (car style)) (integerp (car style)))
 	   (or (null (cdr style)) (integerp (cdr style))))
-      (error "Invalid fringe style ‘%s’" style)))
+      (error "Invalid fringe style `%s'" style)))
 
 ;; For initialization of fringe-mode, take account of changes
 ;; made explicitly to default-frame-alist.

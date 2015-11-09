@@ -575,7 +575,7 @@ If the key is not valid, signal an error."
   (if server-auth-key
     (if (string-match-p "^[!-~]\\{64\\}$" server-auth-key)
         server-auth-key
-      (error "The key ‘%s’ is invalid" server-auth-key))
+      (error "The key `%s' is invalid" server-auth-key))
     (server-generate-key)))
 
 ;;;###autoload
@@ -1491,13 +1491,12 @@ specifically for the clients and did not exist before their request for it."
 
 (defun server-kill-emacs-query-function ()
   "Ask before exiting Emacs if it has live clients."
-  (or (not server-clients)
-      (let (live-client)
-	(dolist (proc server-clients)
-	  (when (memq t (mapcar 'buffer-live-p (process-get
-						proc 'buffers)))
-	    (setq live-client t)))
-        live-client)
+  (or (not (let (live-client)
+             (dolist (proc server-clients)
+               (when (memq t (mapcar 'buffer-live-p (process-get
+                                                     proc 'buffers)))
+                 (setq live-client t)))
+             live-client))
       (yes-or-no-p "This Emacs session has clients; exit anyway? ")))
 
 (defun server-kill-buffer ()
@@ -1649,7 +1648,7 @@ only these files will be asked to be saved."
   "Contact the Emacs server named SERVER and evaluate FORM there.
 Returns the result of the evaluation, or signals an error if it
 cannot contact the specified server.  For example:
-  (server-eval-at \"server\" '(emacs-pid))
+  (server-eval-at \"server\" \\='(emacs-pid))
 returns the process ID of the Emacs instance running \"server\"."
   (let* ((server-dir (if server-use-tcp server-auth-dir server-socket-dir))
 	 (server-file (expand-file-name server server-dir))

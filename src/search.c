@@ -22,13 +22,11 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
-#include "category.h"
 #include "character.h"
 #include "buffer.h"
 #include "syntax.h"
 #include "charset.h"
 #include "region-cache.h"
-#include "commands.h"
 #include "blockinput.h"
 #include "intervals.h"
 
@@ -2784,7 +2782,7 @@ if the last match was on a buffer; integers or nil if a string was matched.
 Use `set-match-data' to reinstate the data in this list.
 
 If INTEGERS (the optional first argument) is non-nil, always use
-integers \(rather than markers) to represent buffer positions.  In
+integers (rather than markers) to represent buffer positions.  In
 this case, and if the last match was in a buffer, the buffer will get
 stored as one additional element at the end of the list.
 

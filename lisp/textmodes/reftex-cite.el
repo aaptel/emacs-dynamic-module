@@ -177,6 +177,28 @@ If RETURN is non-nil, just return the entry and restore point."
           (progn (forward-list 1) (point)))
       (error (min (point-max) (+ 300 (point)))))))
 
+(defun reftex--query-search-regexps (default)
+  "Query for regexps for searching entries using DEFAULT as default.
+Return a list of regular expressions."
+  (split-string
+   (completing-read
+    (concat
+     "Regex { && Regex...}: "
+     "[" default "]: ")
+    ;; Ensure default is always in the completion list.
+    (let ((def (when default (list default)))
+          (coll (if reftex-mode
+                    (if (fboundp 'LaTeX-bibitem-list)
+                        (LaTeX-bibitem-list)
+                      (cdr (assoc 'bibview-cache
+                                  (symbol-value reftex-docstruct-symbol))))
+                  nil)))
+      (if (and def (member def coll))
+          coll
+        (cons def coll)))
+    nil nil nil 'reftex-cite-regexp-hist)
+   "[ \t]*&&[ \t]*"))
+
 ;;; Parse bibtex buffers
 (defun reftex-extract-bib-entries (buffers)
   "Extract bib entries which match regexps from BUFFERS.
@@ -189,20 +211,7 @@ Return list with entries."
 
     ;; Read a regexp, completing on known citation keys.
     (setq default (regexp-quote (reftex-get-bibkey-default)))
-    (setq re-list
-          (split-string
-           (completing-read
-            (concat
-             "Regex { && Regex...}: "
-             "[" default "]: ")
-            (if reftex-mode
-                (if (fboundp 'LaTeX-bibitem-list)
-                    (or (LaTeX-bibitem-list) '(""))
-                  (cdr (assoc 'bibview-cache
-                              (symbol-value reftex-docstruct-symbol))))
-              nil)
-            nil nil nil 'reftex-cite-regexp-hist)
-           "[ \t]*&&[ \t]*"))
+    (setq re-list (reftex--query-search-regexps default))
 
     (if (or (null re-list ) (equal re-list '("")))
         (setq re-list (list default)))
@@ -210,7 +219,9 @@ Return list with entries."
     (setq first-re (car re-list)    ; We'll use the first re to find things,
           rest-re  (cdr re-list))   ; the others to narrow down.
     (if (string-match "\\`[ \t]*\\'" (or first-re ""))
-        (error "Empty regular expression"))
+        (user-error "Empty regular expression"))
+    (if (string-match first-re "")
+        (user-error "Regular expression matches the empty string."))
 
     (save-excursion
       (save-window-excursion
@@ -385,27 +396,14 @@ The environment should be located in FILES."
 					       (buffer-substring-no-properties
 						start end)
 					       "[ \t\n\r]*\\\\bibitem[ \t]*\
-\\(\\[[^]]*]\\)*\[ \t]*"))))))
+\\(\\[[^]]*]\\)*[ \t]*"))))))
 	      (goto-char end))))))
     (unless entries
       (error "No bibitems found"))
 
     ;; Read a regexp, completing on known citation keys.
     (setq default (regexp-quote (reftex-get-bibkey-default)))
-    (setq re-list
-          (split-string
-           (completing-read
-            (concat
-             "Regex { && Regex...}: "
-             "[" default "]: ")
-            (if reftex-mode
-                (if (fboundp 'LaTeX-bibitem-list)
-                    (LaTeX-bibitem-list)
-                  (cdr (assoc 'bibview-cache
-                              (symbol-value reftex-docstruct-symbol))))
-              nil)
-            nil nil nil 'reftex-cite-regexp-hist)
-           "[ \t]*&&[ \t]*"))
+    (setq re-list (reftex--query-search-regexps default))
 
     (if (or (null re-list ) (equal re-list '("")))
         (setq re-list (list default)))
@@ -477,7 +475,7 @@ If RAW is non-nil, keep double quotes/curly braces delimiting fields."
         (goto-char (point-min))
 
         (if (re-search-forward "@\\(\\(?:\\w\\|\\s_\\)+\\)[ \t\n\r]*\
-\[{(][ \t\n\r]*\\([^ \t\n\r,]+\\)" nil t)
+[{(][ \t\n\r]*\\([^ \t\n\r,]+\\)" nil t)
             (setq alist
                   (list
                    (cons "&type" (downcase (reftex-match-string 1)))
@@ -1195,7 +1193,7 @@ created files in the variables `reftex-create-bibtex-header' or
              (widen)
              (goto-char (point-min))
              (while (re-search-forward "^[ \t]*@\\(?:\\w\\|\\s_\\)+[ \t\n\r]*\
-\[{(][ \t\n\r]*\\([^ \t\n\r,]+\\)" nil t)
+[{(][ \t\n\r]*\\([^ \t\n\r,]+\\)" nil t)
                (setq key (match-string 1)
                      beg (match-beginning 0)
                      end (progn

@@ -1536,7 +1536,7 @@ as a Meta key and any number of multiple escapes are allowed."
 (defun viper-repeat (arg)
   "Re-execute last destructive command.
 Use the info in viper-d-com, which has the form
-\(com val ch reg inserted-text command-keys\),
+\(com val ch reg inserted-text command-keys),
 where `com' is the command to be re-executed, `val' is the
 argument to `com', `ch' is a flag for repeat, and `reg' is optional;
 if it exists, it is the name of the register for `com'.
@@ -1751,8 +1751,8 @@ invokes the command before that, etc."
 
     (setq this-command 'viper-display-current-destructive-command)
 
-    (message " `.' runs  %s%s"
-	     (concat "`" (viper-array-to-string keys) "'")
+    (message " `.' runs  `%s'%s"
+	     (viper-array-to-string keys)
 	     (viper-abbreviate-string
 	      (if (featurep 'xemacs)
 		  (replace-in-string ; xemacs
@@ -1763,7 +1763,8 @@ invokes the command before that, etc."
 		text ; emacs
 		)
 	      max-text-len
-	      "  inserting  `" "'" "    ......."))
+	      (format-message "  inserting  `") (format-message "'")
+	      "    ......."))
     ))
 
 
@@ -3423,7 +3424,7 @@ controlled by the sign of prefix numeric value."
 	      ((re-search-backward "[][(){}]" beg-lim t))
 	      (t
 	       (error "No matching character on line"))))
-      (cond ((looking-at "[\(\[{]")
+      (cond ((looking-at "[([{]")
 	     (if com (viper-move-marker-locally 'viper-com-point (point)))
 	     (forward-sexp 1)
 	     (if com
@@ -3448,7 +3449,7 @@ controlled by the sign of prefix numeric value."
   (setq viper-parse-sexp-ignore-comments
 	(not viper-parse-sexp-ignore-comments))
   (princ (format-message
-	  "From now on, ‘%%’ will %signore parentheses inside comment fields"
+	  "From now on, `%%' will %signore parentheses inside comment fields"
 	  (if viper-parse-sexp-ignore-comments "" "NOT "))))
 
 
@@ -3640,7 +3641,7 @@ the Emacs binding of `/'."
     (cond ((or (eq arg 1)
 	       (and (null arg)
 		    (y-or-n-p (format-message
-                               "Search style: ‘%s’.  Want ‘%s’? "
+                               "Search style: `%s'.  Want `%s'? "
                                (if viper-case-fold-search
                                    "case-insensitive" "case-sensitive")
                                (if viper-case-fold-search
@@ -3653,7 +3654,7 @@ the Emacs binding of `/'."
 	  ((or (eq arg 2)
 	       (and (null arg)
 		    (y-or-n-p (format-message
-                               "Search style: ‘%s’.  Want ‘%s’? "
+                               "Search style: `%s'.  Want `%s'? "
                                (if viper-re-search
                                    "regexp-search" "vanilla-search")
                                (if viper-re-search
@@ -3732,7 +3733,7 @@ With a prefix argument, this function unsets the macros.
 If the optional prefix argument is non-nil and specifies a valid major mode,
 this sets the macros only in the macros in that major mode.  Otherwise,
 the macros are set in the current major mode.
-\(When unsetting the macros, the second argument has no effect.\)"
+\(When unsetting the macros, the second argument has no effect.)"
   (interactive "P")
   (or noninteractive
       (if (not unset)
@@ -3979,7 +3980,7 @@ Null string will repeat previous search."
   (let (buffer buffer-name)
     (setq buffer-name
 	  (funcall viper-read-buffer-function
-		   (format "Kill buffer \(%s\): "
+		   (format "Kill buffer (%s): "
 			   (buffer-name (current-buffer)))))
     (setq buffer
 	  (if (null buffer-name)
@@ -3989,7 +3990,7 @@ Null string will repeat previous search."
     (if (or (not (buffer-modified-p buffer))
 	    (y-or-n-p
 	     (format-message
-	      "Buffer ‘%s’ is modified, are you sure you want to kill it? "
+	      "Buffer `%s' is modified, are you sure you want to kill it? "
 	      buffer-name)))
 	(kill-buffer buffer)
       (error "Buffer not killed"))))
@@ -4341,7 +4342,7 @@ and regexp replace."
 	  (query-replace-regexp
 	   str
 	   (viper-read-string-with-history
-	    (format "Query replace regexp `%s' with: " str)
+	    (format-message "Query replace regexp `%s' with: " str)
 	    nil  ; no initial
 	    'viper-replace1-history
 	    (car viper-replace1-history) ; default
@@ -4349,7 +4350,7 @@ and regexp replace."
 	(query-replace
 	 str
 	 (viper-read-string-with-history
-	  (format "Query replace `%s' with: " str)
+	  (format-message "Query replace `%s' with: " str)
 	  nil  ; no initial
 	  'viper-replace1-history
 	  (car viper-replace1-history) ; default
@@ -4587,7 +4588,7 @@ One can use \\=`\\=` and \\='\\=' to temporarily jump 1 step back."
 ;; Viewing registers
 
 (defun viper-ket-function (arg)
-  "Function called by \], the ket.  View registers and call \]\]."
+  "Function called by ], the ket.  View registers and call ]]."
   (interactive "P")
   (let ((reg (read-char)))
     (cond ((viper-valid-register reg '(letter Letter))
@@ -4604,7 +4605,7 @@ One can use \\=`\\=` and \\='\\=' to temporarily jump 1 step back."
 	      viper-InvalidRegister reg)))))
 
 (defun viper-brac-function (arg)
-  "Function called by \[, the brac.  View textmarkers and call \[\[."
+  "Function called by [, the brac.  View textmarkers and call [[."
   (interactive "P")
   (let ((reg (read-char)))
     (cond ((viper= ?\[ reg)
@@ -4639,11 +4640,11 @@ One can use \\=`\\=` and \\='\\=' to temporarily jump 1 step back."
 					  reg (substring text (- pos s)))))
 		     (princ
 		      (format-message
-		       "Textmarker ‘%c’ is in buffer ‘%s’ at line %d.\n"
+		       "Textmarker `%c' is in buffer `%s' at line %d.\n"
 				     reg (buffer-name buf) line-no))
 		     (princ (format "Here is some text around %c:\n\n %s"
 				     reg text)))
-		 (princ (format viper-EmptyTextmarker reg))))
+		 (princ (format-message viper-EmptyTextmarker reg))))
 	     ))
 	  (t (error viper-InvalidTextmarker reg)))))
 
@@ -4980,7 +4981,7 @@ back trace of the execution that leads to the error.  Please include this
 trace in your bug report.
 
 If you believe that one of Viper's commands goes into an infinite loop
-\(e.g., Emacs freezes\), type:
+\(e.g., Emacs freezes), type:
 
     M-x set-variable <Return> debug-on-quit <Return> t <Return>
 

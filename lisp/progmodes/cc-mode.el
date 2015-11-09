@@ -1265,7 +1265,7 @@ Note that the style variables are always made local to the buffer."
   ;;
   ;;
   ;;     void myfunc(T* p) {}
-  ;; 
+  ;;
   ;; Type a space in the first blank line, and the fontification of the next
   ;; line was fouled up by context fontification.
   (let (new-beg new-end new-region case-fold-search
@@ -1307,8 +1307,9 @@ Note that the style variables are always made local to the buffer."
 (defun c-after-font-lock-init ()
   ;; Put on `font-lock-mode-hook'.  This function ensures our after-change
   ;; function will get executed before the font-lock one.
-  (remove-hook 'after-change-functions 'c-after-change t)
-  (add-hook 'after-change-functions 'c-after-change nil t))
+  (when (memq #'c-after-change after-change-functions)
+    (remove-hook 'after-change-functions #'c-after-change t)
+    (add-hook 'after-change-functions #'c-after-change nil t)))
 
 (defun c-font-lock-init ()
   "Set up the font-lock variables for using the font-lock support in CC Mode.
@@ -1455,7 +1456,8 @@ This function is called from `c-common-init', once per mode initialization."
 
 ;;;###autoload
 (define-derived-mode c-mode prog-mode "C"
-  "Major mode for editing K&R and ANSI C code.
+  "Major mode for editing C code.
+
 To submit a problem report, enter `\\[c-submit-bug-report]' from a
 c-mode buffer.  This automatically sets up a mail buffer with version
 information already added.  You just need to add a description of the

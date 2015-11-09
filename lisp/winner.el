@@ -177,6 +177,12 @@ You may want to include buffer names such as *Help*, *Apropos*,
 ;; Called whenever the window configuration changes
 ;; (a `window-configuration-change-hook').
 (defun winner-change-fun ()
+
+  ;; Cull dead frames.
+  (setq winner-modified-list
+        (cl-loop for frame in winner-modified-list
+             if (frame-live-p frame) collect frame))
+
   (unless (or (memq (selected-frame) winner-modified-list)
               (/= 0 (minibuffer-depth)))
     (push (selected-frame) winner-modified-list)))

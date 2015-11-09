@@ -18,7 +18,9 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <config.h>
-#include "sysstdio.h"
+
+#include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 
 /* Include this before including <setjmp.h> to work around bugs with
@@ -38,7 +40,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "systime.h"
 #include <epaths.h>
-#include "character.h"
 #include "coding.h"
 #include "termhooks.h"
 #include "font.h"
@@ -647,7 +648,7 @@ image_error (const char *format, ...)
 static void
 image_size_error (void)
 {
-  image_error ("Invalid image size (see `%s')", "max-image-size");
+  image_error ("Invalid image size (see `max-image-size')");
 }
 
 
@@ -797,7 +798,7 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	  return 0;
 
 	case IMAGE_NUMBER_VALUE:
-	  if (!INTEGERP (value) && !FLOATP (value))
+	  if (! NUMBERP (value))
 	    return 0;
 	  break;
 
@@ -1107,10 +1108,7 @@ get_spec_bg_or_alpha_as_argb (struct image *img,
   XColor xbgcolor;
   Lisp_Object bg = image_spec_value (img->spec, QCbackground, NULL);
 
-  if (STRINGP (bg) && XParseColor (FRAME_X_DISPLAY (f),
-                                   FRAME_X_COLORMAP (f),
-                                   SSDATA (bg),
-                                   &xbgcolor))
+  if (STRINGP (bg) && x_parse_color (f, SSDATA (bg), &xbgcolor))
     bgcolor = xcolor_to_argb32 (xbgcolor);
 
   return bgcolor;
@@ -2295,7 +2293,19 @@ x_find_image_fd (Lisp_Object file, int *pfd)
   /* Try to find FILE in data-directory/images, then x-bitmap-file-path.  */
   fd = openp (search_path, file, Qnil, &file_found,
 	      pfd ? Qt : make_number (R_OK), false);
-  if (fd < 0)
+  if (fd >= 0 || fd == -2)
+    {
+      file_found = ENCODE_FILE (file_found);
+      if (fd == -2)
+	{
+	  /* The file exists locally, but has a file handler.  (This
+	     happens, e.g., under Auto Image File Mode.)  'openp'
+	     didn't open the file, so we should, because the caller
+	     expects that.  */
+	  fd = emacs_open (SSDATA (file_found), O_RDONLY | O_BINARY, 0);
+	}
+    }
+  else	/* fd < 0, but not -2 */
     return Qnil;
   if (pfd)
     *pfd = fd;
@@ -3240,7 +3250,10 @@ static struct xpm_cached_color *xpm_cache_color (struct frame *, char *,
 /* An entry in a hash table used to cache color definitions of named
    colors.  This cache is necessary to speed up XPM image loading in
    case we do color allocations ourselves.  Without it, we would need
-   a call to XParseColor per pixel in the image.  */
+   a call to XParseColor per pixel in the image.
+
+   FIXME Now that we're using x_parse_color and its cache, reevaluate
+   the need for this caching layer.  */
 
 struct xpm_cached_color
 {
@@ -3275,8 +3288,7 @@ xpm_init_color_cache (struct frame *f, XpmAttributes *attrs)
       XColor color;
 
       for (i = 0; i < attrs->numsymbols; ++i)
-	if (XParseColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f),
-			 attrs->colorsymbols[i].value, &color))
+	if (x_parse_color (f, attrs->colorsymbols[i].value, &color))
 	  {
 	    color.pixel = lookup_rgb_color (f, color.red, color.green,
 					    color.blue);
@@ -3355,8 +3367,7 @@ xpm_lookup_color (struct frame *f, char *color_name, XColor *color)
 
   if (p != NULL)
     *color = p->color;
-  else if (XParseColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f),
-			color_name, color))
+  else if (x_parse_color (f, color_name, color))
     {
       color->pixel = lookup_rgb_color (f, color->red, color->green,
 				       color->blue);
@@ -4432,8 +4443,6 @@ lookup_rgb_color (struct frame *f, int r, int g, int b)
   dpyinfo = FRAME_DISPLAY_INFO (f);
   if (dpyinfo->red_bits > 0)
     {
-      unsigned long pr, pg, pb;
-
       /* Apply gamma-correction like normal color allocation does.  */
       if (f->gamma)
 	{
@@ -4443,15 +4452,7 @@ lookup_rgb_color (struct frame *f, int r, int g, int b)
 	  r = color.red, g = color.green, b = color.blue;
 	}
 
-      /* Scale down RGB values to the visual's bits per RGB, and shift
-	 them to the right position in the pixel color.  Note that the
-	 original RGB values are 16-bit values, as usual in X.  */
-      pr = (r >> (16 - dpyinfo->red_bits))   << dpyinfo->red_offset;
-      pg = (g >> (16 - dpyinfo->green_bits)) << dpyinfo->green_offset;
-      pb = (b >> (16 - dpyinfo->blue_bits))  << dpyinfo->blue_offset;
-
-      /* Assemble the pixel color.  */
-      return pr | pg | pb;
+      return x_make_truecolor_pixel (dpyinfo, r, g, b);
     }
 
   for (p = ct_table[i]; p; p = p->next)
@@ -7499,6 +7500,12 @@ gif_image_p (Lisp_Object object)
 #  define GIFLIB_MAJOR 4
 # endif
 
+/* GifErrorString is declared to return char const * when GIFLIB_MAJOR
+   and GIFLIB_MINOR indicate 5.1 or later.  Do not bother using it in
+   earlier releases, where either it returns char * or GIFLIB_MINOR
+   may be incorrect.  */
+# define HAVE_GIFERRORSTRING (5 < GIFLIB_MAJOR + (1 <= GIFLIB_MINOR))
+
 # ifdef WINDOWSNT
 
 /* GIF library details.  */
@@ -7514,7 +7521,9 @@ DEF_DLL_FN (GifFileType *, DGifOpenFileName, (const char *));
 #  else
 DEF_DLL_FN (GifFileType *, DGifOpen, (void *, InputFunc, int *));
 DEF_DLL_FN (GifFileType *, DGifOpenFileName, (const char *, int *));
-DEF_DLL_FN (char *, GifErrorString, (int));
+#  endif
+#  if HAVE_GIFERRORSTRING
+DEF_DLL_FN (char const *, GifErrorString, (int));
 #  endif
 
 static bool
@@ -7529,7 +7538,7 @@ init_gif_functions (void)
   LOAD_DLL_FN (library, DGifSlurp);
   LOAD_DLL_FN (library, DGifOpen);
   LOAD_DLL_FN (library, DGifOpenFileName);
-#  if GIFLIB_MAJOR >= 5
+#  if HAVE_GIFERRORSTRING
   LOAD_DLL_FN (library, GifErrorString);
 #  endif
   return 1;
@@ -7641,20 +7650,19 @@ gif_load (struct frame *f, struct image *img)
       /* Open the GIF file.  */
 #if GIFLIB_MAJOR < 5
       gif = DGifOpenFileName (SSDATA (encoded_file));
-      if (gif == NULL)
-	{
-	  image_error ("Cannot open `%s'", file);
-	  return 0;
-	}
 #else
       gif = DGifOpenFileName (SSDATA (encoded_file), &gif_err);
+#endif
       if (gif == NULL)
 	{
+#if HAVE_GIFERRORSTRING
 	  image_error ("Cannot open `%s': %s",
 		       file, build_string (GifErrorString (gif_err)));
+#else
+	  image_error ("Cannot open `%s'", file);
+#endif
 	  return 0;
 	}
-#endif
     }
   else
     {
@@ -7672,20 +7680,19 @@ gif_load (struct frame *f, struct image *img)
 
 #if GIFLIB_MAJOR < 5
       gif = DGifOpen (&memsrc, gif_read_from_memory);
-      if (!gif)
-	{
-	  image_error ("Cannot open memory source `%s'", img->spec);
-	  return 0;
-	}
 #else
       gif = DGifOpen (&memsrc, gif_read_from_memory, &gif_err);
+#endif
       if (!gif)
 	{
+#if HAVE_GIFERRORSTRING
 	  image_error ("Cannot open memory source `%s': %s",
 		       img->spec, build_string (GifErrorString (gif_err)));
+#else
+	  image_error ("Cannot open memory source `%s'", img->spec);
+#endif
 	  return 0;
 	}
-#endif
     }
 
   /* Before reading entire contents, check the declared image size. */
@@ -7980,8 +7987,8 @@ gif_load (struct frame *f, struct image *img)
 
   if (gif_close (gif, &gif_err) == GIF_ERROR)
     {
-#if 5 <= GIFLIB_MAJOR
-      char *error_text = GifErrorString (gif_err);
+#if HAVE_GIFERRORSTRING
+      char const *error_text = GifErrorString (gif_err);
 
       if (error_text)
 	image_error ("Error closing `%s': %s",
@@ -8997,7 +9004,7 @@ DEF_DLL_FN (int, gdk_pixbuf_get_bits_per_sample, (const GdkPixbuf *));
 DEF_DLL_FN (void, g_type_init, (void));
 #  endif
 DEF_DLL_FN (void, g_object_unref, (gpointer));
-DEF_DLL_FN (void, g_error_free, (GError *));
+DEF_DLL_FN (void, g_clear_error, (GError **));
 
 static bool
 init_svg_functions (void)
@@ -9035,7 +9042,7 @@ init_svg_functions (void)
   LOAD_DLL_FN (gobject, g_type_init);
 #  endif
   LOAD_DLL_FN (gobject, g_object_unref);
-  LOAD_DLL_FN (glib, g_error_free);
+  LOAD_DLL_FN (glib, g_clear_error);
 
   return 1;
 }
@@ -9051,7 +9058,7 @@ init_svg_functions (void)
 #  undef gdk_pixbuf_get_pixels
 #  undef gdk_pixbuf_get_rowstride
 #  undef gdk_pixbuf_get_width
-#  undef g_error_free
+#  undef g_clear_error
 #  undef g_object_unref
 #  undef g_type_init
 #  undef rsvg_handle_close
@@ -9069,7 +9076,7 @@ init_svg_functions (void)
 #  define gdk_pixbuf_get_pixels fn_gdk_pixbuf_get_pixels
 #  define gdk_pixbuf_get_rowstride fn_gdk_pixbuf_get_rowstride
 #  define gdk_pixbuf_get_width fn_gdk_pixbuf_get_width
-#  define g_error_free fn_g_error_free
+#  define g_clear_error fn_g_clear_error
 #  define g_object_unref fn_g_object_unref
 #  define g_type_init fn_g_type_init
 #  define rsvg_handle_close fn_rsvg_handle_close
@@ -9324,7 +9331,7 @@ svg_load_image (struct frame *f,         /* Pointer to emacs frame structure.  *
   /* FIXME: Use error->message so the user knows what is the actual
      problem with the image.  */
   image_error ("Error parsing SVG image `%s'", img->spec);
-  g_error_free (err);
+  g_clear_error (&err);
   return 0;
 }
 
@@ -9537,7 +9544,6 @@ void
 x_kill_gs_process (Pixmap pixmap, struct frame *f)
 {
   struct image_cache *c = FRAME_IMAGE_CACHE (f);
-  int class;
   ptrdiff_t i;
   struct image *img;
 
@@ -9563,8 +9569,7 @@ x_kill_gs_process (Pixmap pixmap, struct frame *f)
   /* On displays with a mutable colormap, figure out the colors
      allocated for the image by looking at the pixels of an XImage for
      img->pixmap.  */
-  class = FRAME_X_VISUAL (f)->class;
-  if (class != StaticColor && class != StaticGray && class != TrueColor)
+  if (x_mutable_colormap (FRAME_X_VISUAL (f)))
     {
       XImagePtr ximg;
 
@@ -9752,7 +9757,7 @@ syms_of_image (void)
      defining the supported image types.  */
   DEFVAR_LISP ("image-types", Vimage_types,
     doc: /* List of potentially supported image types.
-Each element of the list is a symbol for an image type, like 'jpeg or 'png.
+Each element of the list is a symbol for an image type, like `jpeg' or `png'.
 To check whether it is really supported, use `image-type-available-p'.  */);
   Vimage_types = Qnil;
 

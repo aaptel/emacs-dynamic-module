@@ -551,6 +551,8 @@ callback data (if any)."
 (defun epg-errors-to-string (errors)
   (mapconcat #'epg-error-to-string errors "; "))
 
+(declare-function pinentry-start "pinentry" (&optional quiet))
+
 (defun epg--start (context args)
   "Start `epg-gpg-program' in a subprocess with given ARGS."
   (if (and (epg-context-process context)
@@ -614,7 +616,7 @@ callback data (if any)."
 		   (re-search-forward
                     "^allow-emacs-pinentry:\\(?:.*:\\)\\{8\\}1"
                     nil t))))
-      (pinentry-start))
+      (pinentry-start 'quiet))
     (setq process-environment
 	  (cons (format "INSIDE_EMACS=%s,epg" emacs-version)
 		process-environment))
@@ -2199,7 +2201,7 @@ The return value is an alist mapping from types to values."
       (if (eq index (string-match "[ \t\n\r]*" string index))
 	  (setq index (match-end 0)))
       (if (eq index (string-match
-		     "\\([0-9]+\\(\\.[0-9]+\\)*\\)\[ \t\n\r]*=[ \t\n\r]*"
+		     "\\([0-9]+\\(\\.[0-9]+\\)*\\)[ \t\n\r]*=[ \t\n\r]*"
 		     string index))
 	  (setq type (match-string 1 string)
 		index (match-end 0))

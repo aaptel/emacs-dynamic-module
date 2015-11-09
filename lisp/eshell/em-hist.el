@@ -306,8 +306,9 @@ element, regardless of any text on the command line.  In that case,
 		   eshell-save-history-on-exit
 		   (or (eq eshell-save-history-on-exit t)
 		       (y-or-n-p
-			(format "Save input history for Eshell buffer `%s'? "
-				(buffer-name buf)))))
+			(format-message
+			 "Save input history for Eshell buffer `%s'? "
+			 (buffer-name buf)))))
 	      (eshell-write-history))))))
 
 (defun eshell/history (&rest args)
@@ -638,7 +639,7 @@ matched."
   ;; `!'
   ;;      Start a history substitution, except when followed by a
   ;;      space, tab, the end of the line, = or (.
-  (if (not (string-match "^![^ \t\n=\(]" reference))
+  (if (not (string-match "^![^ \t\n=(]" reference))
       reference
     (setq eshell-history-index nil)
     (let ((event (eshell-hist-parse-event-designator reference)))

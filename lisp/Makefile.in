@@ -103,7 +103,7 @@ BYTE_COMPILE_FLAGS = $(BIG_STACK_OPTS) \
 # Files to compile before others during a bootstrap.  This is done to
 # speed up the bootstrap process.  They're ordered by size, so we use
 # the slowest-compiler on the smallest file and move to larger files as the
-# compiler gets faster.  `autoload.elc' comes last because it is not used by
+# compiler gets faster.  'autoload.elc' comes last because it is not used by
 # the compiler (so its compilation does not speed up subsequent compilations),
 # it's only placed here so as to speed up generation of the loaddefs.el file.
 
@@ -221,7 +221,7 @@ lisptagsfiles2 = $(srcdir)/*/*.el
 lisptagsfiles3 = $(srcdir)/*/*/*.el
 lisptagsfiles4 = $(srcdir)/*/*/*/*.el
 
-## The echo | sed | xargs is to stop the command line getting too long
+## The ls | sed | xargs is to stop the command line getting too long
 ## on MS Windows, when the MSYS Bash passes it to a MinGW compiled
 ## etags.  It might be better to use find in a similar way to
 ## compile-main.  But maybe this is not even necessary any more now
@@ -229,10 +229,9 @@ lisptagsfiles4 = $(srcdir)/*/*/*/*.el
 TAGS: $(lisptagsfiles1) $(lisptagsfiles2) $(lisptagsfiles3) $(lisptagsfiles4)
 	rm -f $@
 	touch $@
-	echo $(lisptagsfiles1) $(lisptagsfiles2) $(lisptagsfiles3) $(lisptagsfiles4) | \
-	  sed -e 's,$(srcdir)/[^ ]*loaddefs[^ ]*,,g' \
-	    -e 's,$(srcdir)/ldefs-boot[^ ]*,,' \
-	    -e 's,$(srcdir)/[^ ]*esh-groups.el[^ ]*,,' | \
+	ls $(lisptagsfiles1) $(lisptagsfiles2) \
+	   $(lisptagsfiles3) $(lisptagsfiles4) | \
+	    sed -e '/loaddefs/d; /\/ldefs-boot/d; /esh-groups\.el/d' | \
 	    xargs $(XARGS_LIMIT) "$(ETAGS)" -a -o $@
 
 
@@ -272,22 +271,22 @@ $(THEFILE)c:
 
 compile-first: $(COMPILE_FIRST)
 
-# In `compile-main' we could directly do
+# In 'compile-main' we could directly do
 #    ... | xargs $(MAKE)
 # and it works, but it generates a lot of messages like
 #    make[2]: gnus/gnus-mlspl.elc is up to date.
 # so instead, we use "xargs echo" to split the list of file into manageable
-# chunks and then use an intermediate `compile-targets' target so the
+# chunks and then use an intermediate 'compile-targets' target so the
 # actual targets (the .elc files) are not mentioned as targets on the
 # make command line.
 
 
 .PHONY: compile-targets
-# TARGETS is set dynamically in the recursive call from `compile-main'.
+# TARGETS is set dynamically in the recursive call from 'compile-main'.
 compile-targets: $(TARGETS)
 
 # Compile all the Elisp files that need it.  Beware: it approximates
-# `no-byte-compile', so watch out for false-positives!
+# 'no-byte-compile', so watch out for false-positives!
 compile-main: leim semantic compile-clean
 	@(cd $(lisp) && \
 	els=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
@@ -326,7 +325,7 @@ semantic:
 compile: $(LOADDEFS) autoloads compile-first
 	$(MAKE) compile-main
 
-# Compile all Lisp files.  This is like `compile' but compiles files
+# Compile all Lisp files.  This is like 'compile' but compiles files
 # unconditionally.  Some files don't actually get compiled because they
 # set the local variable no-byte-compile.
 compile-always:

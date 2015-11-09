@@ -20738,9 +20738,13 @@ mean, then repeating until the two values converge.
 $$ a_{i+1} = { a_i + b_i \over 2 } , \qquad b_{i+1} = \sqrt{a_i b_i} $$
 @end tex
 
-@c @cindex Root-mean-square
-@c Another commonly used mean, the RMS (root-mean-square), can be computed
-@c for a vector of numbers simply by using the @kbd{A} command.
+@kindex u R
+@cindex Root-mean-square
+@tindex rms
+The @kbd{u R} (@code{calc-vector-rms}) [@code{rms}]
+command computes the RMS (root-mean-square) of the data values.
+As its name suggests, this is the square root of the mean of the
+squares of the data values.
 
 @kindex u S
 @pindex calc-vector-sdev
@@ -29899,6 +29903,19 @@ number in its displayed form, 3.142.  (Since the default display modes
 show all objects to their full precision, this feature normally makes no
 difference.)
 
+The @kbd{C-y} command can be given a prefix, which will interpret the
+text being yanked with a different radix.  If the text being yanked can be
+interpreted as a binary, octal, hexadecimal, or decimal number, then a
+prefix of @kbd{2}, @kbd{8}, @kbd{6} or @kbd{0} will have Calc
+interpret the yanked text as a number in the appropriate base.  For example,
+if @samp{111} has just been killed and is yanked into Calc with a command
+of @kbd{C-2 C-y}, then the number @samp{7} will be put on the stack.
+If you use the plain prefix @kbd{C-u}, then you will be prompted for a
+base to use, which can be any integer from 2 to 36.  If Calc doesn't
+allow the text being yanked to be read in a different base (such as if
+the text is an algebraic expression), then the prefix will have no
+effect.
+
 @node Saving Into Registers, Inserting From Registers, Yanking Into Stack, Kill and Yank
 @section Saving into Registers
 
@@ -36503,6 +36520,7 @@ keystrokes are not listed in this summary.
 @r{      v@:    H u M   @:             @:    19  @:vmedian@:(v)}
 @r{      v@:  I H u M   @:             @:    19  @:vhmean@:(v)}
 @r{      v@:      u N   @:             @:    19  @:vmin@:(v)}
+@r{      v@:      u R   @:             @:        @:rms@:(v)}
 @r{      v@:      u S   @:             @:    19  @:vsdev@:(v)}
 @r{      v@:    I u S   @:             @:    19  @:vpsdev@:(v)}
 @r{      v@:    H u S   @:             @:    19  @:vvar@:(v)}
