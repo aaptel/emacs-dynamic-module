@@ -725,15 +725,22 @@ static emacs_value module_vec_get (emacs_env *env,
                                    emacs_value vec,
                                    size_t i)
 {
+  /* Type of ASIZE (lvec) is ptrdiff_t, make sure it fits */
+  verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
+  eassert (module_error_check (env) == module_funcall_exit_return);
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
       module_wrong_type (env, Qvectorp, lvec);
       return lisp_to_value (env, Qnil);
     }
-  if (i >= ASIZE (lvec))
+  /* Prevent error-prone comparison between types of different signedness. */
+  const size_t size = ASIZE (lvec);
+  eassert (size >= 0);
+  if (i >= size)
     {
+      if (i > MOST_POSITIVE_FIXNUM) i = MOST_POSITIVE_FIXNUM;
       module_args_out_of_range (env, lvec, make_number (i));
       return lisp_to_value (env, Qnil);
     }
@@ -743,14 +750,18 @@ static emacs_value module_vec_get (emacs_env *env,
 static size_t module_vec_size (emacs_env *env,
                                emacs_value vec)
 {
+  /* Type of ASIZE (lvec) is ptrdiff_t, make sure it fits */
+  verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
+  eassert (module_error_check(env) == module_funcall_exit_return);
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
       module_wrong_type (env, Qvectorp, lvec);
       return 0;
     }
-  return (size_t) ASIZE (lvec);
+  eassert (ASIZE (lvec) >= 0);
+  return ASIZE (lvec);
 }
 
 
