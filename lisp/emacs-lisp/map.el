@@ -45,12 +45,16 @@
 (require 'seq)
 
 (pcase-defmacro map (&rest args)
-  "pcase pattern matching map elements.
-Matches if the object is a map (list, hash-table or array), and
-binds values from ARGS to their corresponding elements of the map.
+  "Build a `pcase' pattern matching map elements.
 
-ARGS can be a list elements of the form (KEY PAT), in which case
-KEY in an unquoted form.
+The `pcase' pattern will match each element of PATTERN against
+the corresponding elements of the map.
+
+Extra elements of the map are ignored if fewer ARGS are
+given, and the match does not fail.
+
+ARGS can be a list of the form (KEY PAT), in which case KEY in an
+unquoted form.
 
 ARGS can also be a list of symbols, which stands for ('SYMBOL
 SYMBOL)."
@@ -88,7 +92,7 @@ Return RESULT if non-nil or the result of evaluation of the form."
            (t (error "Unsupported map: %s" ,map-var)))))
 
 (defun map-elt (map key &optional default)
-  "Perform a lookup in MAP of KEY and return its associated value.
+  "Lookup KEY in MAP and return its associated value.
 If KEY is not found, return DEFAULT which defaults to nil.
 
 If MAP is a list, `eql' is used to lookup KEY.
@@ -118,7 +122,7 @@ MAP can be a list, hash-table or array."
              default)))
 
 (defmacro map-put (map key value)
-  "In MAP, associate KEY with VALUE and return MAP.
+  "Associate KEY with VALUE in MAP and return MAP.
 If KEY is already present in MAP, replace the associated value
 with VALUE.
 
@@ -129,8 +133,9 @@ MAP can be a list, hash-table or array."
        ,map)))
 
 (defmacro map-delete (map key)
-  "In MAP, delete the key KEY if present and return MAP.
-If MAP is an array, store nil at the index KEY.
+  "Delete KEY from MAP and return MAP.
+No error is signaled if KEY is not a key of MAP.  If MAP is an
+array, store nil at the index KEY.
 
 MAP can be a list, hash-table or array."
   (declare (debug t))
@@ -241,7 +246,7 @@ MAP can be a list, hash-table or array."
       (arrayp map)))
 
 (defun map-empty-p (map)
-  "Return non-nil is MAP is empty.
+  "Return non-nil if MAP is empty.
 
 MAP can be a list, hash-table or array."
   (map--dispatch map
@@ -249,21 +254,22 @@ MAP can be a list, hash-table or array."
     :array (seq-empty-p map)
     :hash-table (zerop (hash-table-count map))))
 
-(defun map-contains-key-p (map key &optional testfn)
-  "Return non-nil if MAP contain the key KEY, nil otherwise.
+(defun map-contains-key (map key &optional testfn)
+  "Return non-nil if MAP contain KEY, nil otherwise.
 Equality is defined by TESTFN if non-nil or by `equal' if nil.
 
 MAP can be a list, hash-table or array."
-  (seq-contains-p (map-keys map) key testfn))
+  (seq-contains (map-keys map) key testfn))
 
-(defun map-some-p (pred map)
-  "Return a key/value pair for which (PRED key val) is non-nil in MAP.
+(defun map-some (pred map)
+  "Return a non-nil if (PRED key val) is non-nil for any key/value pair in MAP.
 
 MAP can be a list, hash-table or array."
   (catch 'map--break
     (map-apply (lambda (key value)
-                 (when (funcall pred key value)
-                   (throw 'map--break (cons key value))))
+                 (let ((result (funcall pred key value)))
+                   (when result
+                     (throw 'map--break result))))
                map)
     nil))
 
@@ -279,7 +285,7 @@ MAP can be a list, hash-table or array."
     t))
 
 (defun map-merge (type &rest maps)
-  "Merge into a map of type TYPE all the key/value pairs in the maps MAPS.
+  "Merge into a map of type TYPE all the key/value pairs in MAPS.
 
 MAP can be a list, hash-table or array."
   (let (result)

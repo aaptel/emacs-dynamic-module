@@ -43,7 +43,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 
 #include "lisp.h"
-#include "intervals.h"
+#include "composite.h"
 #include "character.h"
 #include "buffer.h"
 #include "coding.h"
@@ -51,7 +51,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "region-cache.h"
 #include "frame.h"
-#include "dispextern.h"
 
 #ifdef WINDOWSNT
 #define NOMINMAX 1
@@ -208,6 +207,22 @@ void
 report_file_error (char const *string, Lisp_Object name)
 {
   report_file_errno (string, name, errno);
+}
+
+/* Like report_file_error, but reports a file-notify-error instead.  */
+
+void
+report_file_notify_error (const char *string, Lisp_Object name)
+{
+  Lisp_Object data = CONSP (name) || NILP (name) ? name : list1 (name);
+  synchronize_system_messages_locale ();
+  char *str = strerror (errno);
+  Lisp_Object errstring
+    = code_convert_string_norecord (build_unibyte_string (str),
+				    Vlocale_coding_system, 0);
+  Lisp_Object errdata = Fcons (errstring, data);
+
+  xsignal (Qfile_notify_error, Fcons (build_string (string), errdata));
 }
 
 void
@@ -435,7 +450,7 @@ DEFUN ("unhandled-file-name-directory", Funhandled_file_name_directory,
 A `directly usable' directory name is one that may be used without the
 intervention of any file handler.
 If FILENAME is a directly usable file itself, return
-\(file-name-directory FILENAME).
+(file-name-as-directory FILENAME).
 If FILENAME refers to a file which is not accessible from a local process,
 then this should return nil.
 The `call-process' and `start-process' functions use this function to
@@ -454,7 +469,7 @@ get a current directory to run processes in.  */)
       return STRINGP (handled_name) ? handled_name : Qnil;
     }
 
-  return Ffile_name_directory (filename);
+  return Ffile_name_as_directory (filename);
 }
 
 /* Maximum number of bytes that DST will be longer than SRC
@@ -726,7 +741,7 @@ DEFUN ("make-temp-name", Fmake_temp_name, Smake_temp_name, 1, 1, 0,
        doc: /* Generate temporary file name (string) starting with PREFIX (a string).
 The Emacs process number forms part of the result, so there is no
 danger of generating a name being used by another Emacs process
-\(so long as only a single host can access the containing directory...).
+(so long as only a single host can access the containing directory...).
 
 This function tries to choose a name that has no existing file.
 For this to work, PREFIX should be an absolute file name.
@@ -742,7 +757,7 @@ normally use `make-temp-file' instead.  */)
 DEFUN ("expand-file-name", Fexpand_file_name, Sexpand_file_name, 1, 2, 0,
        doc: /* Convert filename NAME to absolute, and canonicalize it.
 Second arg DEFAULT-DIRECTORY is directory to start with if NAME is relative
-\(does not start with slash or tilde); both the directory name and
+(does not start with slash or tilde); both the directory name and
 a directory's file name are accepted.  If DEFAULT-DIRECTORY is nil or
 missing, the current buffer's value of `default-directory' is used.
 NAME should be a string that is a valid file name for the underlying
@@ -760,8 +775,8 @@ See also the function `substitute-in-file-name'.
 
 For technical reasons, this function can return correct but
 non-intuitive results for the root directory; for instance,
-\(expand-file-name ".." "/") returns "/..".  For this reason, use
-\(directory-file-name (file-name-directory dirname)) to traverse a
+(expand-file-name ".." "/") returns "/..".  For this reason, use
+(directory-file-name (file-name-directory dirname)) to traverse a
 filesystem tree, not (expand-file-name ".."  dirname).  */)
   (Lisp_Object name, Lisp_Object default_directory)
 {
@@ -1444,7 +1459,7 @@ filesystem tree, not (expand-file-name ".."  dirname).  */)
 DEAFUN ("expand-file-name", Fexpand_file_name, Sexpand_file_name, 1, 2, 0,
   "Convert FILENAME to absolute, and canonicalize it.\n\
 Second arg DEFAULT is directory to start with if FILENAME is relative\n\
-\(does not start with slash); if DEFAULT is nil or missing,\n\
+(does not start with slash); if DEFAULT is nil or missing,\n\
 the current buffer's value of default-directory is used.\n\
 Filenames containing `.' or `..' as components are simplified;\n\
 initial `~/' expands to your home directory.\n\
@@ -2453,7 +2468,7 @@ Use `file-symlink-p' to test for such links.  */)
 DEFUN ("file-executable-p", Ffile_executable_p, Sfile_executable_p, 1, 1, 0,
        doc: /* Return t if FILENAME can be executed by you.
 For a directory, this means you can access files in that directory.
-\(It is generally better to use `file-accessible-directory-p' for that
+(It is generally better to use `file-accessible-directory-p' for that
 purpose, though.)  */)
   (Lisp_Object filename)
 {
@@ -2655,11 +2670,7 @@ and the directory must allow you to open files in it.  In order to use a
 directory as a buffer's current directory, this predicate must return true.
 A directory name spec may be given instead; then the value is t
 if the directory so specified exists and really is a readable and
-searchable directory.
-
-The result might be a false positive on MS-Windows in some rare cases,
-i.e., this function could return t for a directory that is not
-accessible by the current user.  */)
+searchable directory.  */)
   (Lisp_Object filename)
 {
   Lisp_Object absname;
@@ -2689,10 +2700,18 @@ bool
 file_accessible_directory_p (Lisp_Object file)
 {
 #ifdef DOS_NT
-  /* There's no need to test whether FILE is searchable, as the
-     searchable/executable bit is invented on DOS_NT platforms.  */
+# ifdef WINDOWSNT
+  /* We need a special-purpose test because (a) NTFS security data is
+     not reflected in Posix-style mode bits, and (b) the trick with
+     accessing "DIR/.", used below on Posix hosts, doesn't work on
+     Windows, because "DIR/." is normalized to just "DIR" before
+     hitting the disk.  */
+  return (SBYTES (file) == 0
+	  || w32_accessible_directory_p (SSDATA (file), SBYTES (file)));
+# else	/* MSDOS */
   return file_directory_p (SSDATA (file));
-#else
+# endif	 /* MSDOS */
+#else	 /* !DOS_NT */
   /* On POSIXish platforms, use just one system call; this avoids a
      race and is typically faster.  */
   const char *data = SSDATA (file);
@@ -2725,7 +2744,7 @@ file_accessible_directory_p (Lisp_Object file)
   SAFE_FREE ();
   errno = saved_errno;
   return ok;
-#endif
+#endif	/* !DOS_NT */
 }
 
 DEFUN ("file-regular-p", Ffile_regular_p, Sfile_regular_p, 1, 1, 0,
@@ -3450,7 +3469,11 @@ by calling `format-decode', which see.  */)
       mtime = time_error_value (save_errno);
       st.st_size = -1;
       if (!NILP (Vcoding_system_for_read))
-	Fset (Qbuffer_file_coding_system, Vcoding_system_for_read);
+	{
+	  /* Don't let invalid values into buffer-file-coding-system.  */
+	  CHECK_CODING_SYSTEM (Vcoding_system_for_read);
+	  Fset (Qbuffer_file_coding_system, Vcoding_system_for_read);
+	}
       goto notfound;
     }
 
@@ -4549,7 +4572,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
       if (NILP (val))
 	{
 	  /* If we still have not decided a coding system, use the
-	     default value of buffer-file-coding-system.  */
+	     current buffer's value of buffer-file-coding-system.  */
 	  val = BVAR (current_buffer, buffer_file_coding_system);
 	  using_default_coding = 1;
 	}
@@ -4558,6 +4581,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
 	{
 	  Lisp_Object spec, attrs;
 
+	  CHECK_CODING_SYSTEM (val);
 	  CHECK_CODING_SYSTEM_GET_SPEC (val, spec);
 	  attrs = AREF (spec, 0);
 	  if (EQ (CODING_ATTR_TYPE (attrs), Qraw_text))
@@ -4566,17 +4590,27 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
 
       if (!force_raw_text
 	  && !NILP (Ffboundp (Vselect_safe_coding_system_function)))
-	/* Confirm that VAL can surely encode the current region.  */
-	val = call5 (Vselect_safe_coding_system_function,
-		     start, end, val, Qnil, filename);
+	{
+	  /* Confirm that VAL can surely encode the current region.  */
+	  val = call5 (Vselect_safe_coding_system_function,
+		       start, end, val, Qnil, filename);
+	  /* As the function specified by select-safe-coding-system-function
+	     is out of our control, make sure we are not fed by bogus
+	     values.  */
+	  if (!NILP (val))
+	    CHECK_CODING_SYSTEM (val);
+	}
 
       /* If the decided coding-system doesn't specify end-of-line
 	 format, we use that of
 	 `default-buffer-file-coding-system'.  */
-      if (! using_default_coding
-	  && ! NILP (BVAR (&buffer_defaults, buffer_file_coding_system)))
-	val = (coding_inherit_eol_type
-	       (val, BVAR (&buffer_defaults, buffer_file_coding_system)));
+      if (! using_default_coding)
+	{
+	  Lisp_Object dflt = BVAR (&buffer_defaults, buffer_file_coding_system);
+
+	  if (! NILP (dflt))
+	    val = coding_inherit_eol_type (val, dflt);
+	}
 
       /* If we decide not to encode text, use `raw-text' or one of its
 	 subsidiaries.  */
@@ -5286,8 +5320,8 @@ DEFUN ("set-visited-file-modtime", Fset_visited_file_modtime,
 Useful if the buffer was not read from the file normally
 or if the file itself has been changed for some known benign reason.
 An argument specifies the modification time value to use
-\(instead of that of the visited file), in the form of a list
-\(HIGH LOW USEC PSEC) or an integer flag as returned by
+(instead of that of the visited file), in the form of a list
+(HIGH LOW USEC PSEC) or an integer flag as returned by
 `visited-file-modtime'.  */)
   (Lisp_Object time_flag)
 {
@@ -5874,7 +5908,7 @@ the arguments that were passed to that primitive.  For example, if you
 do (file-exists-p FILENAME) and FILENAME is handled by HANDLER, then
 HANDLER is called like this:
 
-  (funcall HANDLER 'file-exists-p FILENAME)
+  (funcall HANDLER \\='file-exists-p FILENAME)
 
 Note that HANDLER must be able to handle all I/O primitives; if it has
 nothing special to do for a primitive, it should reinvoke the

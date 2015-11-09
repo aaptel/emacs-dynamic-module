@@ -277,7 +277,7 @@ nil."
 If t, hitting TAB always just indents the current line.  If nil, hitting
 TAB indents the current line if point is at the left margin or in the
 line's indentation, otherwise it inserts a `real' tab character \(see
-note\).  If some other value (not nil or t), then tab is inserted only
+note).  If some other value \(not nil or t), then tab is inserted only
 within literals \(comments and strings), but the line is always
 reindented.
 
@@ -833,7 +833,7 @@ string in the mode line), and a semicolon or comma is typed (see
 no arguments, and should return one of the following values:
 
   nil             -- no determination made, continue checking
-  'stop           -- do not insert a newline, and stop checking
+  `stop'          -- do not insert a newline, and stop checking
   (anything else) -- insert a newline, and stop checking
 
 If every function in the list is called with no determination made,

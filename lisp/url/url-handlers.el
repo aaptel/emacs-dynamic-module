@@ -117,9 +117,9 @@ When URL Handler mode is enabled, this regular expression is
 added to `file-name-handler-alist'.
 
 Some valid URL protocols just do not make sense to visit
-interactively \(about, data, info, irc, mailto, etc\).  This
+interactively \(about, data, info, irc, mailto, etc.).  This
 regular expression avoids conflicts with local files that look
-like URLs \(Gnus is particularly bad at this\)."
+like URLs \(Gnus is particularly bad at this)."
   :group 'url
   :type 'regexp
   :version "25.1"
@@ -223,7 +223,7 @@ the arguments that would have been passed to OPERATION."
         ;; which really stands for "/".
         ;; FIXME: maybe we should check that the host part is "" or "localhost"
         ;; or some name that represents the local host?
-        (or (file-name-directory (url-filename url)) "/")
+        (or (file-name-as-directory (url-filename url)) "/")
       ;; All other URLs are not expected to be directly accessible from
       ;; a local process.
       nil)))

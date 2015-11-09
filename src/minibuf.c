@@ -25,17 +25,12 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <binary-io.h>
 
 #include "lisp.h"
-#include "commands.h"
 #include "character.h"
 #include "buffer.h"
-#include "dispextern.h"
 #include "keyboard.h"
 #include "frame.h"
 #include "window.h"
-#include "syntax.h"
-#include "intervals.h"
 #include "keymap.h"
-#include "termhooks.h"
 #include "systty.h"
 
 /* List of buffers for use as minibuffers.
@@ -234,12 +229,7 @@ read_minibuf_noninteractive (Lisp_Object map, Lisp_Object initial,
 	  if (hide_char)
 	    fprintf (stdout, "%c", hide_char);
 	  if (len == size)
-	    {
-	      if (STRING_BYTES_BOUND / 2 < size)
-		memory_full (SIZE_MAX);
-	      size *= 2;
-	      line = xrealloc (line, size);
-	    }
+	    line = xpalloc (line, &size, 1, -1, sizeof *line);
 	  line[len++] = c;
 	}
     }
@@ -916,7 +906,7 @@ INITIAL-CONTENTS argument in more detail.  It is only relevant when
 studying existing code, or when HIST is a cons.  If non-nil,
 INITIAL-CONTENTS is a string to be inserted into the minibuffer before
 reading input.  Normally, point is put at the end of that string.
-However, if INITIAL-CONTENTS is \(STRING . POSITION), the initial
+However, if INITIAL-CONTENTS is (STRING . POSITION), the initial
 input is STRING, but point is placed at _one-indexed_ position
 POSITION in the minibuffer.  Any integer value less than or equal to
 one puts point at the beginning of the string.  *Note* that this
@@ -996,7 +986,7 @@ DEFUN ("read-no-blanks-input", Fread_no_blanks_input, Sread_no_blanks_input, 1, 
 Prompt with PROMPT.  Whitespace terminates the input.  If INITIAL is
 non-nil, it should be a string, which is used as initial input, with
 point positioned at the end, so that SPACE will accept the input.
-\(Actually, INITIAL can also be a cons of a string and an integer.
+(Actually, INITIAL can also be a cons of a string and an integer.
 Such values are treated as in `read-from-minibuffer', but are normally
 not useful in this function.)
 Third arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
@@ -1595,8 +1585,11 @@ PROMPT is a string to prompt with; normally it ends in a colon and a space.
 COLLECTION can be a list of strings, an alist, an obarray or a hash table.
 COLLECTION can also be a function to do the completion itself.
 PREDICATE limits completion to a subset of COLLECTION.
-See `try-completion' and `all-completions' for more details
- on completion, COLLECTION, and PREDICATE.
+See `try-completion', `all-completions', `test-completion',
+and `completion-boundaries', for more details on completion,
+COLLECTION, and PREDICATE.  See also Info nodes `(elisp)Basic Completion'
+for the details about completion, and `(elisp)Programmed Completion' for
+expectations from COLLECTION when it's a function.
 
 REQUIRE-MATCH can take the following values:
 - t means that the user is not allowed to exit unless

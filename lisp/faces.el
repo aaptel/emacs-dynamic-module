@@ -433,7 +433,7 @@ completely specified)."
 (defun face-attribute-merged-with (attribute value faces &optional frame)
   "Merges ATTRIBUTE, initially VALUE, with faces from FACES until absolute.
 FACES may be either a single face or a list of faces.
-\[This is an internal function.]"
+[This is an internal function.]"
   (cond ((not (face-attribute-relative-p attribute value))
 	 value)
 	((null faces)
@@ -574,7 +574,7 @@ If FACE is a face-alias, get the documentation for the target face."
   (let ((alias (get face 'face-alias)))
     (if alias
         (let ((doc (get alias 'face-documentation)))
-	  (format-message "%s is an alias for the face ‘%s’.%s" face alias
+	  (format "%s is an alias for the face `%s'.%s" face alias
                   (if doc (format "\n%s" doc)
                     "")))
       (get face 'face-documentation))))
@@ -1005,7 +1005,7 @@ a single face name."
     (setq default (car (split-string default crm-separator t))))
 
   (let ((prompt (if default
-                    (format-message "%s (default ‘%s’): " prompt default)
+                    (format-message "%s (default `%s'): " prompt default)
                   (format "%s: " prompt)))
         aliasfaces nonaliasfaces faces)
     ;; Build up the completion tables.
@@ -1137,8 +1137,8 @@ Value is the new attribute value."
   (let* ((completion-ignore-case t)
 	 (value (completing-read
                  (format-message (if default
-                                     "%s for face ‘%s’ (default %s): "
-                                   "%s for face ‘%s’: ")
+                                     "%s for face `%s' (default %s): "
+                                   "%s for face `%s': ")
                                  name face default)
 		 completion-alist nil nil nil nil default)))
     (if (equal value "") default value)))
@@ -1225,7 +1225,7 @@ of a global face.  Value is the new attribute value."
 If optional argument FRAME is nil or omitted, use the selected frame."
   (let ((completion-ignore-case t))
     (completing-read (format-message
-                      "Set font attributes of face ‘%s’ from font: " face)
+                      "Set font attributes of face `%s' from font: " face)
 		     (append (fontset-list) (x-list-fonts "*" nil frame)))))
 
 
@@ -1437,11 +1437,11 @@ If FRAME is omitted or nil, use the selected frame."
 		    (setq face alias)
 		    (insert
 		     (format-message
-                      "\n  %s is an alias for the face ‘%s’.\n%s"
+                      "\n  %s is an alias for the face `%s'.\n%s"
                       f alias
                       (if (setq obsolete (get f 'obsolete-face))
                           (format-message
-                           "  This face is obsolete%s; use ‘%s’ instead.\n"
+                           "  This face is obsolete%s; use `%s' instead.\n"
                            (if (stringp obsolete)
                                (format " since %s" obsolete)
                              "")
@@ -1459,13 +1459,13 @@ If FRAME is omitted or nil, use the selected frame."
 		    (help-xref-button 1 'help-customize-face f)))
 		(setq file-name (find-lisp-object-file-name f 'defface))
 		(when file-name
-		  (princ (substitute-command-keys "Defined in ‘"))
+		  (princ (substitute-command-keys "Defined in `"))
 		  (princ (file-name-nondirectory file-name))
-		  (princ (substitute-command-keys "’"))
+		  (princ (substitute-command-keys "'"))
 		  ;; Make a hyperlink to the library.
 		  (save-excursion
 		    (re-search-backward
-                     (substitute-command-keys "‘\\([^‘’]+\\)’") nil t)
+                     (substitute-command-keys "`\\([^`']+\\)'") nil t)
 		    (help-xref-button 1 'help-face-def f file-name))
 		  (princ ".")
 		  (terpri)
@@ -1552,7 +1552,7 @@ If FRAME is nil, the current FRAME is used."
 			       options))
 			((eq req 'supports)
 			 (display-supports-face-attributes-p options frame))
-			(t (error "Unknown req ‘%S’ with options ‘%S’"
+			(t (error "Unknown req `%S' with options `%S'"
 				  req options)))))
     match))
 
@@ -1598,6 +1598,13 @@ is given, in which case return its value instead."
 	  result
 	no-match-retval))))
 
+;; When over 80 faces get processed at frame creation time, all but
+;; one specifying all attributes as "unspecified", generating this
+;; list every time means a lot of consing.
+(defconst face--attributes-unspecified
+  (apply 'append
+         (mapcar (lambda (x) (list (car x) 'unspecified))
+                 face-attribute-name-alist)))
 
 (defun face-spec-reset-face (face &optional frame)
   "Reset all attributes of FACE on FRAME to unspecified."
@@ -1622,9 +1629,7 @@ is given, in which case return its value instead."
 				     "unspecified-fg"
 				   "unspecified-bg")))))
 	   ;; For all other faces, unspecify all attributes.
-	   (apply 'append
-		  (mapcar (lambda (x) (list (car x) 'unspecified))
-			  face-attribute-name-alist)))))
+           face--attributes-unspecified)))
 
 (defun face-spec-set (face spec &optional spec-type)
   "Set the face spec SPEC for FACE.
@@ -1925,7 +1930,7 @@ resulting color name in the echo area."
 				(logand 65535 (nth 0 components))
 				(logand 65535 (nth 1 components))
 				(logand 65535 (nth 2 components))))))))
-    (when msg (message "Color: ‘%s’" color))
+    (when msg (message "Color: `%s'" color))
     color))
 
 (defun face-at-point (&optional thing multiple)
@@ -1953,39 +1958,42 @@ Return nil if there is no face."
         (delete-dups (nreverse faces))
       (car (last faces)))))
 
-(defun foreground-color-at-point ()
-  "Return the foreground color of the character after point."
+(defun faces--attribute-at-point (attribute &optional attribute-unnamed)
+  "Return the face ATTRIBUTE at point.
+ATTRIBUTE is a keyword.
+If ATTRIBUTE-UNNAMED is non-nil, it is a symbol to look for in
+unnamed faces (e.g, `foreground-color')."
   ;; `face-at-point' alone is not sufficient.  It only gets named faces.
   ;; Need also pick up any face properties that are not associated with named faces.
-  (let ((face (or (face-at-point)
-		  (get-char-property (point) 'read-face-name)
-		  (get-char-property (point) 'face))))
-    (cond ((and face (symbolp face))
-	   (let ((value (face-foreground face nil 'default)))
-	     (if (member value '("unspecified-fg" "unspecified-bg"))
-		 nil
-	       value)))
-	  ((consp face)
-	   (cond ((memq 'foreground-color face) (cdr (memq 'foreground-color face)))
-		 ((memq ':foreground face) (cadr (memq ':foreground face)))))
-	  (t nil))))			; Invalid face value.
+  (let ((faces (or (get-char-property (point) 'read-face-name)
+                   ;; If `font-lock-mode' is on, `font-lock-face' takes precedence.
+                   (and font-lock-mode
+                        (get-char-property (point) 'font-lock-face))
+                   (get-char-property (point) 'face)))
+        (found nil))
+    (dolist (face (if (listp faces) faces (list faces)))
+      (cond (found)
+            ((and face (symbolp face))
+             (let ((value (face-attribute-specified-or
+                           (face-attribute face attribute nil t)
+                           nil)))
+               (unless (member value '(nil "unspecified-fg" "unspecified-bg"))
+                 (setq found value))))
+            ((consp face)
+             (setq found (cond ((and attribute-unnamed
+                                     (memq attribute-unnamed face))
+                                (cdr (memq attribute-unnamed face)))
+                               ((memq attribute face) (cadr (memq attribute face))))))))
+    (or found
+        (face-attribute 'default attribute))))
+
+(defun foreground-color-at-point ()
+  "Return the foreground color of the character after point."
+  (faces--attribute-at-point :foreground 'foreground-color))
 
 (defun background-color-at-point ()
   "Return the background color of the character after point."
-  ;; `face-at-point' alone is not sufficient.  It only gets named faces.
-  ;; Need also pick up any face properties that are not associated with named faces.
-  (let ((face (or (face-at-point)
-		  (get-char-property (point) 'read-face-name)
-		  (get-char-property (point) 'face))))
-    (cond ((and face (symbolp face))
-	   (let ((value (face-background face nil 'default)))
-	     (if (member value '("unspecified-fg" "unspecified-bg"))
-		 nil
-	       value)))
-	  ((consp face)
-	   (cond ((memq 'background-color face) (cdr (memq 'background-color face)))
-		 ((memq ':background face) (cadr (memq ':background face)))))
-	  (t nil))))			; Invalid face value.
+  (faces--attribute-at-point :background 'background-color))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2691,10 +2699,12 @@ It is used for characters of no fonts too."
      :background "turquoise")		; looks OK on tty (becomes cyan)
     (((class color) (background dark))
      :background "steelblue3")		; looks OK on tty (becomes blue)
-    (((background dark))
+    (((background dark) (min-colors 4))
      :background "grey50")
+    (((background light) (min-colors 4))
+     :background "gray")
     (t
-     :background "gray"))
+     :inherit underline))
   "Face used for a matching paren."
   :group 'paren-showing-faces)
 
@@ -2778,13 +2788,13 @@ also the same size as FACE on FRAME, or fail."
 		(if (string-match-p "\\*" pattern)
 		    (if (null (face-font face))
 			(error "No matching fonts are the same height as the frame default font")
-		      (error "No matching fonts are the same height as face ‘%s’" face))
+		      (error "No matching fonts are the same height as face `%s'" face))
 		  (if (null (face-font face))
-		      (error "Height of font ‘%s’ doesn't match the frame default font"
+		      (error "Height of font `%s' doesn't match the frame default font"
 			     pattern)
-		    (error "Height of font ‘%s’ doesn't match face ‘%s’"
+		    (error "Height of font `%s' doesn't match face `%s'"
 			   pattern face)))
-	      (error "No fonts match ‘%s’" pattern)))
+	      (error "No fonts match `%s'" pattern)))
 	(car fonts))
     (cdr (assq 'font (frame-parameters (selected-frame))))))
 

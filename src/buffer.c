@@ -30,7 +30,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <verify.h>
 
 #include "lisp.h"
+#include "coding.h"
 #include "intervals.h"
+#include "systime.h"
 #include "window.h"
 #include "commands.h"
 #include "character.h"
@@ -38,7 +40,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "region-cache.h"
 #include "indent.h"
 #include "blockinput.h"
-#include "keyboard.h"
 #include "keymap.h"
 #include "frame.h"
 
@@ -1042,7 +1043,7 @@ DEFUN ("generate-new-buffer-name", Fgenerate_new_buffer_name,
        doc: /* Return a string that is the name of no existing buffer based on NAME.
 If there is no live buffer named NAME, then return NAME.
 Otherwise modify name by appending `<NUMBER>', incrementing NUMBER
-\(starting at 2) until an unused name is found, and then return that name.
+(starting at 2) until an unused name is found, and then return that name.
 Optional second argument IGNORE specifies a name that is okay to use (if
 it is in the sequence to be tried) even if a buffer with that name exists.
 
@@ -1385,7 +1386,7 @@ DEFUN ("buffer-chars-modified-tick", Fbuffer_chars_modified_tick,
        Sbuffer_chars_modified_tick, 0, 1, 0,
        doc: /* Return BUFFER's character-change tick counter.
 Each buffer has a character-change tick counter, which is set to the
-value of the buffer's tick counter \(see `buffer-modified-tick'), each
+value of the buffer's tick counter (see `buffer-modified-tick'), each
 time text in that buffer is inserted or deleted.  By comparing the
 values returned by two individual calls of `buffer-chars-modified-tick',
 you can tell whether a character change occurred in that buffer in
@@ -3791,10 +3792,10 @@ If omitted, BUFFER defaults to the current buffer.
 BEG and END may be integers or markers.
 The fourth arg FRONT-ADVANCE, if non-nil, makes the marker
 for the front of the overlay advance when text is inserted there
-\(which means the text *is not* included in the overlay).
+(which means the text *is not* included in the overlay).
 The fifth arg REAR-ADVANCE, if non-nil, makes the marker
 for the rear of the overlay advance when text is inserted there
-\(which means the text *is* included in the overlay).  */)
+(which means the text *is* included in the overlay).  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object buffer,
    Lisp_Object front_advance, Lisp_Object rear_advance)
 {
@@ -4480,6 +4481,23 @@ report_overlay_modification (Lisp_Object start, Lisp_Object end, bool after,
     Lisp_Object *copy;
     ptrdiff_t i;
 
+    if (size)
+      {
+	Lisp_Object ovl
+	  = XVECTOR (last_overlay_modification_hooks)->contents[1];
+
+	/* If the buffer of the first overlay in the array doesn't
+	   match the current buffer, then these modification hooks
+	   should not be run in this buffer.  This could happen when
+	   some code calls some insdel functions, such as del_range_1,
+	   with the PREPARE argument false -- in that case this
+	   function is never called to record the overlay modification
+	   hook functions in the last_overlay_modification_hooks
+	   array, so anything we find there is not ours.  */
+	if (XMARKER (OVERLAY_START (ovl))->buffer != current_buffer)
+	  return;
+      }
+
     USE_SAFE_ALLOCA;
     SAFE_ALLOCA_LISP (copy, size);
     memcpy (copy, XVECTOR (last_overlay_modification_hooks)->contents,
@@ -4572,8 +4590,6 @@ evaporate_overlays (ptrdiff_t pos)
 #if MAP_ANON == 0
 #include <fcntl.h>
 #endif
-
-#include "coding.h"
 
 
 /* Memory is allocated in regions which are mapped using mmap(2).
@@ -5402,140 +5418,140 @@ syms_of_buffer (void)
   DEFVAR_BUFFER_DEFAULTS ("default-mode-line-format",
 			  mode_line_format,
 			  doc: /* Default value of `mode-line-format' for buffers that don't override it.
-This is the same as (default-value 'mode-line-format).  */);
+This is the same as (default-value \\='mode-line-format).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-header-line-format",
 			  header_line_format,
 			  doc: /* Default value of `header-line-format' for buffers that don't override it.
-This is the same as (default-value 'header-line-format).  */);
+This is the same as (default-value \\='header-line-format).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-cursor-type", cursor_type,
 			  doc: /* Default value of `cursor-type' for buffers that don't override it.
-This is the same as (default-value 'cursor-type).  */);
+This is the same as (default-value \\='cursor-type).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-line-spacing",
 			  extra_line_spacing,
 			  doc: /* Default value of `line-spacing' for buffers that don't override it.
-This is the same as (default-value 'line-spacing).  */);
+This is the same as (default-value \\='line-spacing).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-cursor-in-non-selected-windows",
 			  cursor_in_non_selected_windows,
 			  doc: /* Default value of `cursor-in-non-selected-windows'.
-This is the same as (default-value 'cursor-in-non-selected-windows).  */);
+This is the same as (default-value \\='cursor-in-non-selected-windows).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-abbrev-mode",
 			  abbrev_mode,
 			  doc: /* Default value of `abbrev-mode' for buffers that do not override it.
-This is the same as (default-value 'abbrev-mode).  */);
+This is the same as (default-value \\='abbrev-mode).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-ctl-arrow",
 			  ctl_arrow,
 			  doc: /* Default value of `ctl-arrow' for buffers that do not override it.
-This is the same as (default-value 'ctl-arrow).  */);
+This is the same as (default-value \\='ctl-arrow).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-enable-multibyte-characters",
 			  enable_multibyte_characters,
 			  doc: /* Default value of `enable-multibyte-characters' for buffers not overriding it.
-This is the same as (default-value 'enable-multibyte-characters).  */);
+This is the same as (default-value \\='enable-multibyte-characters).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-buffer-file-coding-system",
 			  buffer_file_coding_system,
 			  doc: /* Default value of `buffer-file-coding-system' for buffers not overriding it.
-This is the same as (default-value 'buffer-file-coding-system).  */);
+This is the same as (default-value \\='buffer-file-coding-system).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-truncate-lines",
 			  truncate_lines,
 			  doc: /* Default value of `truncate-lines' for buffers that do not override it.
-This is the same as (default-value 'truncate-lines).  */);
+This is the same as (default-value \\='truncate-lines).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-fill-column",
 			  fill_column,
 			  doc: /* Default value of `fill-column' for buffers that do not override it.
-This is the same as (default-value 'fill-column).  */);
+This is the same as (default-value \\='fill-column).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-left-margin",
 			  left_margin,
 			  doc: /* Default value of `left-margin' for buffers that do not override it.
-This is the same as (default-value 'left-margin).  */);
+This is the same as (default-value \\='left-margin).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-tab-width",
 			  tab_width,
 			  doc: /* Default value of `tab-width' for buffers that do not override it.
 NOTE: This controls the display width of a TAB character, and not
 the size of an indentation step.
-This is the same as (default-value 'tab-width).  */);
+This is the same as (default-value \\='tab-width).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-case-fold-search",
 			  case_fold_search,
 			  doc: /* Default value of `case-fold-search' for buffers that don't override it.
-This is the same as (default-value 'case-fold-search).  */);
+This is the same as (default-value \\='case-fold-search).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-left-margin-width",
 			  left_margin_cols,
 			  doc: /* Default value of `left-margin-width' for buffers that don't override it.
-This is the same as (default-value 'left-margin-width).  */);
+This is the same as (default-value \\='left-margin-width).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-right-margin-width",
 			  right_margin_cols,
 			  doc: /* Default value of `right-margin-width' for buffers that don't override it.
-This is the same as (default-value 'right-margin-width).  */);
+This is the same as (default-value \\='right-margin-width).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-left-fringe-width",
 			  left_fringe_width,
 			  doc: /* Default value of `left-fringe-width' for buffers that don't override it.
-This is the same as (default-value 'left-fringe-width).  */);
+This is the same as (default-value \\='left-fringe-width).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-right-fringe-width",
 			  right_fringe_width,
 			  doc: /* Default value of `right-fringe-width' for buffers that don't override it.
-This is the same as (default-value 'right-fringe-width).  */);
+This is the same as (default-value \\='right-fringe-width).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-fringes-outside-margins",
 			  fringes_outside_margins,
 			  doc: /* Default value of `fringes-outside-margins' for buffers that don't override it.
-This is the same as (default-value 'fringes-outside-margins).  */);
+This is the same as (default-value \\='fringes-outside-margins).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-scroll-bar-width",
 			  scroll_bar_width,
 			  doc: /* Default value of `scroll-bar-width' for buffers that don't override it.
-This is the same as (default-value 'scroll-bar-width).  */);
+This is the same as (default-value \\='scroll-bar-width).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-vertical-scroll-bar",
 			  vertical_scroll_bar_type,
 			  doc: /* Default value of `vertical-scroll-bar' for buffers that don't override it.
-This is the same as (default-value 'vertical-scroll-bar).  */);
+This is the same as (default-value \\='vertical-scroll-bar).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-indicate-empty-lines",
 			  indicate_empty_lines,
 			  doc: /* Default value of `indicate-empty-lines' for buffers that don't override it.
-This is the same as (default-value 'indicate-empty-lines).  */);
+This is the same as (default-value \\='indicate-empty-lines).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-indicate-buffer-boundaries",
 			  indicate_buffer_boundaries,
 			  doc: /* Default value of `indicate-buffer-boundaries' for buffers that don't override it.
-This is the same as (default-value 'indicate-buffer-boundaries).  */);
+This is the same as (default-value \\='indicate-buffer-boundaries).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-fringe-indicator-alist",
 			  fringe_indicator_alist,
 			  doc: /* Default value of `fringe-indicator-alist' for buffers that don't override it.
-This is the same as (default-value 'fringe-indicator-alist).  */);
+This is the same as (default-value \\='fringe-indicator-alist).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-fringe-cursor-alist",
 			  fringe_cursor_alist,
 			  doc: /* Default value of `fringe-cursor-alist' for buffers that don't override it.
-This is the same as (default-value 'fringe-cursor-alist).  */);
+This is the same as (default-value \\='fringe-cursor-alist).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-scroll-up-aggressively",
 			  scroll_up_aggressively,
 			  doc: /* Default value of `scroll-up-aggressively'.
 This value applies in buffers that don't have their own local values.
-This is the same as (default-value 'scroll-up-aggressively).  */);
+This is the same as (default-value \\='scroll-up-aggressively).  */);
 
   DEFVAR_BUFFER_DEFAULTS ("default-scroll-down-aggressively",
 			  scroll_down_aggressively,
 			  doc: /* Default value of `scroll-down-aggressively'.
 This value applies in buffers that don't have their own local values.
-This is the same as (default-value 'scroll-down-aggressively).  */);
+This is the same as (default-value \\='scroll-down-aggressively).  */);
 
   DEFVAR_PER_BUFFER ("header-line-format",
 		     &BVAR (current_buffer, header_line_format),
@@ -5740,7 +5756,7 @@ visual lines rather than logical lines.  See the documentation of
 
   DEFVAR_PER_BUFFER ("default-directory", &BVAR (current_buffer, directory),
 		     Qstringp,
-		     doc: /* Name of default directory of current buffer.  Should end with slash.
+		     doc: /* Name of default directory of current buffer.
 To interactively change the default directory, use command `cd'.  */);
 
   DEFVAR_PER_BUFFER ("auto-fill-function", &BVAR (current_buffer, auto_fill_function),
@@ -6014,7 +6030,7 @@ between 0.0 and 1.0, inclusive.  */);
 	       doc: /* List of functions to call before each text change.
 Two arguments are passed to each function: the positions of
 the beginning and end of the range of old text to be changed.
-\(For an insertion, the beginning and end are at the same place.)
+(For an insertion, the beginning and end are at the same place.)
 No information is given about the length of the text after the change.
 
 Buffer changes made while executing the `before-change-functions'
@@ -6031,7 +6047,7 @@ from happening repeatedly and making Emacs nonfunctional.  */);
 Three arguments are passed to each function: the positions of
 the beginning and end of the range of changed text,
 and the length in chars of the pre-change text replaced by that range.
-\(For an insertion, the pre-change length is zero;
+(For an insertion, the pre-change length is zero;
 for a deletion, that length is the number of chars deleted,
 and the post-change beginning and end are at the same place.)
 
@@ -6076,7 +6092,7 @@ was modified between BEG and END.  PROPERTY is the property name,
 and VALUE is the old value.
 
 An entry (apply FUN-NAME . ARGS) means undo the change with
-\(apply FUN-NAME ARGS).
+(apply FUN-NAME ARGS).
 
 An entry (apply DELTA BEG END FUN-NAME . ARGS) supports selective undo
 in the active region.  BEG and END is the range affected by this entry
@@ -6236,9 +6252,9 @@ to the default frame line height.  A value of nil means add no extra space.  */)
 		     doc: /* Non-nil means show a cursor in non-selected windows.
 If nil, only shows a cursor in the selected window.
 If t, displays a cursor related to the usual cursor type
-\(a solid box becomes hollow, a bar becomes a narrower bar).
+(a solid box becomes hollow, a bar becomes a narrower bar).
 You can also specify the cursor type as in the `cursor-type' variable.
-Use Custom to set this variable and update the display."  */);
+Use Custom to set this variable and update the display.  */);
 
   DEFVAR_LISP ("kill-buffer-query-functions", Vkill_buffer_query_functions,
 	       doc: /* List of functions called with no args to query before killing a buffer.

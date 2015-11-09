@@ -28,7 +28,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 /* cm.h must come after dispextern.h on Windows.  */
 #include "dispextern.h"
 #include "cm.h"
-#include "character.h"
 #include "buffer.h"
 #include "keyboard.h"
 #include "frame.h"
@@ -36,12 +35,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "commands.h"
 #include "disptab.h"
-#include "indent.h"
-#include "intervals.h"
 #include "blockinput.h"
-#include "process.h"
-
 #include "syssignal.h"
+#include "systime.h"
 #include "tparam.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -51,7 +47,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <errno.h>
 
 #include <fpending.h>
-#include <timespec.h>
 
 #ifdef WINDOWSNT
 #include "w32.h"
@@ -1699,7 +1694,8 @@ required_matrix_height (struct window *w)
 
   if (FRAME_WINDOW_P (f))
     {
-      int ch_height = FRAME_SMALLEST_FONT_HEIGHT (f);
+      /* http://lists.gnu.org/archive/html/emacs-devel/2015-11/msg00194.html  */
+      int ch_height = max (FRAME_SMALLEST_FONT_HEIGHT (f), 1);
       int window_pixel_height = window_box_height (w) + eabs (w->vscroll);
 
       return (((window_pixel_height + ch_height - 1)
@@ -1725,7 +1721,8 @@ required_matrix_width (struct window *w)
   struct frame *f = XFRAME (w->frame);
   if (FRAME_WINDOW_P (f))
     {
-      int ch_width = FRAME_SMALLEST_CHAR_WIDTH (f);
+      /* http://lists.gnu.org/archive/html/emacs-devel/2015-11/msg00194.html  */
+      int ch_width = max (FRAME_SMALLEST_CHAR_WIDTH (f), 1);
 
       /* Compute number of glyphs needed in a glyph row.  */
       return (((WINDOW_PIXEL_WIDTH (w) + ch_width - 1)
@@ -3004,7 +3001,7 @@ redraw_frame (struct frame *f)
   clear_frame (f);
   clear_current_matrices (f);
   update_end (f);
-  windows_or_buffers_changed = 13;
+  fset_redisplay (f);
   /* Mark all windows as inaccurate, so that every window will have
      its redisplay done.  */
   mark_window_display_accurate (FRAME_ROOT_WINDOW (f), 0);
@@ -5665,7 +5662,7 @@ DEFUN ("sleep-for", Fsleep_for, Ssleep_for, 1, 2, 0,
 SECONDS may be a floating-point value, meaning that you can wait for a
 fraction of a second.  Optional second arg MILLISECONDS specifies an
 additional wait period, in milliseconds; this is for backwards compatibility.
-\(Not all operating systems support waiting for a fraction of a second.)  */)
+(Not all operating systems support waiting for a fraction of a second.)  */)
   (Lisp_Object seconds, Lisp_Object milliseconds)
 {
   double duration = extract_float (seconds);
@@ -6102,8 +6099,8 @@ init_display (void)
        change.  It's not clear what better we could do.  The rest of
        the code assumes that (width + 2) * height * sizeof (struct glyph)
        does not overflow and does not exceed PTRDIFF_MAX or SIZE_MAX.  */
-    if (INT_ADD_RANGE_OVERFLOW (width, 2, INT_MIN, INT_MAX)
-	|| INT_MULTIPLY_RANGE_OVERFLOW (width + 2, height, INT_MIN, INT_MAX)
+    if (INT_ADD_OVERFLOW (width, 2)
+	|| INT_MULTIPLY_OVERFLOW (width + 2, height)
 	|| (min (PTRDIFF_MAX, SIZE_MAX) / sizeof (struct glyph)
 	    < (width + 2) * height))
       fatal ("screen size %dx%d too big", width, height);

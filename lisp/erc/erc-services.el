@@ -172,7 +172,7 @@ You can also use M-x erc-nickserv-identify-mode to change modes."
 
 Example of use:
   (setq erc-nickserv-passwords
-        '((freenode ((\"nick-one\" . \"password\")
+        \\='((freenode ((\"nick-one\" . \"password\")
                      (\"nick-two\" . \"password\")))
           (DALnet ((\"nick\" . \"password\")))))"
   :group 'erc-services
@@ -280,7 +280,7 @@ Example of use:
      "IDENTIFY" nil nil nil))
    "Alist of NickServer details, sorted by network.
 Every element in the list has the form
-  \(SYMBOL NICKSERV REGEXP NICK KEYWORD USE-CURRENT ANSWER SUCCESS-REGEXP)
+  (SYMBOL NICKSERV REGEXP NICK KEYWORD USE-CURRENT ANSWER SUCCESS-REGEXP)
 
 SYMBOL is a network identifier, a symbol, as used in `erc-networks-alist'.
 NICKSERV is the description of the nickserv in the form nick!user@host.

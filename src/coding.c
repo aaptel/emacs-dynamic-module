@@ -297,8 +297,6 @@ encode_coding_XXX (struct coding_system *coding)
 #include "ccl.h"
 #include "composite.h"
 #include "coding.h"
-#include "window.h"
-#include "frame.h"
 #include "termhooks.h"
 
 Lisp_Object Vcoding_system_hash_table;
@@ -4295,6 +4293,9 @@ encode_invocation_designation (struct charset *charset,
 	  else
 	    ENCODE_LOCKING_SHIFT_3;
 	  break;
+
+	default:
+	  break;
 	}
     }
 
@@ -6001,6 +6002,8 @@ coding_inherit_eol_type (Lisp_Object coding_system, Lisp_Object parent)
 
   if (NILP (coding_system))
     coding_system = Qraw_text;
+  else
+    CHECK_CODING_SYSTEM (coding_system);
   spec = CODING_SYSTEM_SPEC (coding_system);
   eol_type = AREF (spec, 2);
   if (VECTORP (eol_type))
@@ -6011,6 +6014,7 @@ coding_inherit_eol_type (Lisp_Object coding_system, Lisp_Object parent)
 	{
 	  Lisp_Object parent_spec;
 
+	  CHECK_CODING_SYSTEM (parent);
 	  parent_spec = CODING_SYSTEM_SPEC (parent);
 	  parent_eol_type = AREF (parent_spec, 2);
 	  if (VECTORP (parent_eol_type))
@@ -7291,6 +7295,8 @@ produce_annotation (struct coding_system *coding, ptrdiff_t pos)
 		break;
 	      case CODING_ANNOTATE_CHARSET_MASK:
 		produce_charset (coding, charbuf, pos);
+		break;
+	      default:
 		break;
 	      }
 	  charbuf += len;
@@ -9795,7 +9801,7 @@ DEFUN ("find-operation-coding-system", Ffind_operation_coding_system,
        doc: /* Choose a coding system for an operation based on the target name.
 The value names a pair of coding systems: (DECODING-SYSTEM . ENCODING-SYSTEM).
 DECODING-SYSTEM is the coding system to use for decoding
-\(in case OPERATION does decoding), and ENCODING-SYSTEM is the coding system
+(in case OPERATION does decoding), and ENCODING-SYSTEM is the coding system
 for encoding (in case OPERATION does encoding).
 
 The first argument OPERATION specifies an I/O primitive:
@@ -11170,7 +11176,7 @@ the cdr part is used for encoding a text to be sent to a process.  */);
 Table of extra Latin codes in the range 128..159 (inclusive).
 This is a vector of length 256.
 If Nth element is non-nil, the existence of code N in a file
-\(or output of subprocess) doesn't prevent it to be detected as
+(or output of subprocess) doesn't prevent it to be detected as
 a coding system of ISO 2022 variant which has a flag
 `accept-latin-extra-code' t (e.g. iso-latin-1) on reading a file
 or reading output of a subprocess.

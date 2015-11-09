@@ -1,4 +1,4 @@
-@c -*-texinfo-*-
+@c -*- mode: texinfo; coding: utf-8 -*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
 @c Copyright (C) 1990-1995, 1998-1999, 2001-2015 Free Software
 @c Foundation, Inc.
@@ -486,8 +486,8 @@ accent Unicode characters:
 
 The optional argument @var{locale}, a string, overrides the setting of
 your current locale identifier for collation.  The value is system
-dependent; a @var{locale} "en_US.UTF-8" is applicable on POSIX
-systems, while it would be, e.g., "enu_USA.1252" on MS-Windows
+dependent; a @var{locale} @code{"en_US.UTF-8"} is applicable on POSIX
+systems, while it would be, e.g., @code{"enu_USA.1252"} on MS-Windows
 systems.
 
 If @var{ignore-case} is non-@code{nil}, characters are converted to lower-case
@@ -495,7 +495,7 @@ before comparing them.
 
 To emulate Unicode-compliant collation on MS-Windows systems,
 bind @code{w32-collate-ignore-punctuation} to a non-@code{nil} value, since
-the codeset part of the locale cannot be "UTF-8" on MS-Windows.
+the codeset part of the locale cannot be @code{"UTF-8"} on MS-Windows.
 
 If your system does not support a locale environment, this function
 behaves like @code{string-equal}.
@@ -584,8 +584,8 @@ determined by the lexicographic order of the characters contained in
 relations between these characters.  Usually, it is defined by the
 @var{locale} environment Emacs is running with.
 
-For example, punctuation and whitespace characters might be considered
-less significant for @ref{Sorting,,sorting}.
+For example, punctuation and whitespace characters might be ignored
+for sorting (@pxref{Sequence Functions}):
 
 @example
 @group
@@ -594,11 +594,14 @@ less significant for @ref{Sorting,,sorting}.
 @end group
 @end example
 
+This behavior is system-dependent; punctuation and whitespace are
+never ignored on Cygwin, regardless of locale.
+
 The optional argument @var{locale}, a string, overrides the setting of
 your current locale identifier for collation.  The value is system
-dependent; a @var{locale} "en_US.UTF-8" is applicable on POSIX
-systems, while it would be, e.g., "enu_USA.1252" on MS-Windows
-systems.  The @var{locale} "POSIX" lets @code{string-collate-lessp}
+dependent; a @var{locale} @code{"en_US.UTF-8"} is applicable on POSIX
+systems, while it would be, e.g., @code{"enu_USA.1252"} on MS-Windows
+systems.  The @var{locale} @code{"POSIX"} lets @code{string-collate-lessp}
 behave like @code{string-lessp}:
 
 @example
@@ -614,7 +617,7 @@ before comparing them.
 
 To emulate Unicode-compliant collation on MS-Windows systems,
 bind @code{w32-collate-ignore-punctuation} to a non-@code{nil} value, since
-the codeset part of the locale cannot be "UTF-8" on MS-Windows.
+the codeset part of the locale cannot be @code{"UTF-8"} on MS-Windows.
 
 If your system does not support a locale environment, this function
 behaves like @code{string-lessp}.
@@ -644,7 +647,7 @@ string.  Likewise, the specified part of @var{string2} runs from index
 @var{start2} up to index @var{end2}.
 
 The strings are compared by the numeric values of their characters.
-For instance, @var{str1} is considered ``smaller than'' @var{str2} if
+For instance, @var{str1} is considered less than @var{str2} if
 its first differing character has a smaller numeric value.  If
 @var{ignore-case} is non-@code{nil}, characters are converted to
 lower-case before comparing them.  Unibyte strings are converted to
@@ -685,7 +688,7 @@ against a string, can be used for a kind of string comparison; see
 strings and integers.  @code{format} (@pxref{Formatting Strings}) and
 @code{prin1-to-string} (@pxref{Output Functions}) can also convert
 Lisp objects into strings.  @code{read-from-string} (@pxref{Input
-Functions}) can ``convert'' a string representation of a Lisp object
+Functions}) can convert a string representation of a Lisp object
 into an object.  The functions @code{string-to-multibyte} and
 @code{string-to-unibyte} convert the text representation of a string
 (@pxref{Converting Representations}).
@@ -990,7 +993,7 @@ numbers and negative numbers use the same number of columns.  They are
 ignored except for @samp{%d}, @samp{%e}, @samp{%f}, @samp{%g}, and if
 both flags are used, @samp{+} takes precedence.
 
-  The flag @samp{#} specifies an ``alternate form'' which depends on
+  The flag @samp{#} specifies an alternate form which depends on
 the format in use.  For @samp{%o}, it ensures that the result begins
 with a @samp{0}.  For @samp{%x} and @samp{%X}, it prefixes the result
 with @samp{0x} or @samp{0X}.  For @samp{%e}, @samp{%f}, and @samp{%g},
@@ -1245,8 +1248,8 @@ Exits}).
 
   Some language environments modify the case conversions of
 @acronym{ASCII} characters; for example, in the Turkish language
-environment, the @acronym{ASCII} character @samp{I} is downcased into
-a Turkish ``dotless i''.  This can interfere with code that requires
+environment, the @acronym{ASCII} capital I is downcased into
+a Turkish dotless i (@samp{ı}).  This can interfere with code that requires
 ordinary @acronym{ASCII} case conversion, such as implementations of
 @acronym{ASCII}-based network protocols.  In that case, use the
 @code{with-case-table} macro with the variable @var{ascii-case-table},

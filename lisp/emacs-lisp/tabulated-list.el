@@ -129,7 +129,7 @@ no entry at POS.  POS, if omitted or nil, defaults to point."
 TAG should be a string, with length <= `tabulated-list-padding'.
 If ADVANCE is non-nil, move forward by one line afterwards."
   (unless (stringp tag)
-    (error "Invalid argument to ‘tabulated-list-put-tag’"))
+    (error "Invalid argument to `tabulated-list-put-tag'"))
   (unless (> tabulated-list-padding 0)
     (error "Unable to tag the current line"))
   (save-excursion
@@ -520,7 +520,9 @@ With a numeric prefix argument N, sort the Nth column."
 		  (car (aref tabulated-list-format n))
 		(get-text-property (point)
 				   'tabulated-list-column-name))))
-    (tabulated-list--sort-by-column-name name)))
+    (if (nth 2 (assoc name (append tabulated-list-format nil)))
+        (tabulated-list--sort-by-column-name name)
+      (user-error "Cannot sort by %s" name))))
 
 (defun tabulated-list--sort-by-column-name (name)
   (when (and name (derived-mode-p 'tabulated-list-mode))
@@ -580,9 +582,5 @@ as the ewoc pretty-printer."
 (put 'tabulated-list-mode 'mode-class 'special)
 
 (provide 'tabulated-list)
-
-;; Local Variables:
-;; coding: utf-8
-;; End:
 
 ;;; tabulated-list.el ends here

@@ -367,7 +367,7 @@ few false positives here."
 
 (defcustom message-archive-header "X-No-Archive: Yes\n"
   "Header to insert when you don't want your article to be archived.
-Archives \(such as groups.google.com\) respect this header."
+Archives \(such as groups.google.com) respect this header."
   :version "22.1"
   :type 'string
   :link '(custom-manual "(message)Header Commands")
@@ -1131,7 +1131,7 @@ Presets to impersonate popular mail agents are found in the
 message-cite-style-* variables.  This variable is intended for
 use in `gnus-posting-styles', such as:
 
-  ((posting-from-work-p) (eval (set (make-local-variable 'message-cite-style) message-cite-style-outlook)))"
+  ((posting-from-work-p) (eval (set (make-local-variable \\='message-cite-style) message-cite-style-outlook)))"
   :version "24.1"
   :group 'message-insertion
   :type '(choice (const :tag "Do not override variables" :value nil)
@@ -1200,7 +1200,7 @@ If stringp, use this; if non-nil, use no host name (user name only)."
 (defvar message-reply-headers nil
   "The headers of the current replied article.
 It is a vector of the following headers:
-\[number subject from date id references chars lines xref extra].")
+[number subject from date id references chars lines xref extra].")
 (defvar message-newsreader nil)
 (defvar message-mailer nil)
 (defvar message-sent-message-via nil)
@@ -1303,7 +1303,7 @@ actually occur."
   "Alist of ways to send outgoing messages.
 Each element has the form
 
-  \(TYPE PREDICATE FUNCTION)
+  (TYPE PREDICATE FUNCTION)
 
 where TYPE is a symbol that names the method; PREDICATE is a function
 called without any parameters to determine whether the message is
@@ -2235,7 +2235,7 @@ contains a valid encoded word.  Decode again? "
 	  (unless cs-coding
 	    (setq cs-coding
 		  (mm-read-coding-system
-		   (format "\
+		   (gnus-format-message "\
 Decoded Subject \"%s\"
 contains an encoded word.  The charset `%s' is unknown or invalid.
 Hit RET to replace non-decodable characters with \"%s\" or enter replacement
@@ -4510,7 +4510,7 @@ This function could be useful in `message-setup-hook'."
 	  (dolist (bog (message-bogus-recipient-p addr))
 	    (and bog
 		 (not (y-or-n-p
-		       (format
+		       (gnus-format-message
 			"Address `%s'%s might be bogus.  Continue? "
 			bog
 			;; If the encoded version of the email address
@@ -8329,7 +8329,7 @@ From headers in the original article."
 		     (list message-hidden-headers)
 		   message-hidden-headers))
 	(inhibit-point-motion-hooks t)
-	(after-change-functions nil)
+	(inhibit-modification-hooks t)
 	(end-of-headers (point-min)))
     (when regexps
       (save-excursion
@@ -8484,7 +8484,7 @@ Header and body are separated by `mail-header-separator'."
 	(when force
 	  (sit-for message-send-form-letter-delay))
 	(if (or force
-		  (y-or-n-p (format "Send message to `%s'? " to)))
+		  (y-or-n-p (gnus-format-message "Send message to `%s'? " to)))
 	    (progn
 	      (setq sent (1+ sent))
 	      (message-send-and-exit))

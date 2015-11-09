@@ -31,9 +31,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "character.h"
+#include "coding.h"
 #include "buffer.h"
 #include "disptab.h"
-#include "keyboard.h"
 #include "keymap.h"
 
 /* Buffer used for reading from documentation file.  */
@@ -716,7 +716,7 @@ is not on any keys.
 Each substring of the form \\=\\{MAPVAR} is replaced by a summary of
 the value of MAPVAR as a keymap.  This summary is similar to the one
 produced by `describe-bindings'.  The summary ends in two newlines
-\(used by the helper function `help-make-xrefs' to find the end of the
+(used by the helper function `help-make-xrefs' to find the end of the
 summary).
 
 Each substring of the form \\=\\<MAPVAR> specifies the use of MAPVAR
@@ -724,7 +724,7 @@ as the keymap for future \\=\\[COMMAND] substrings.
 
 Each \\=‘ and \\=` is replaced by left quote, and each \\=’ and \\='
 is replaced by right quote.  Left and right quote characters are
-specified by ‘text-quoting-style’.
+specified by `text-quoting-style'.
 
 \\=\\= quotes the following character and is discarded; thus,
 \\=\\=\\=\\= puts \\=\\= into the output, \\=\\=\\=\\[ puts \\=\\[ into the output, and
@@ -1024,15 +1024,15 @@ syms_of_doc (void)
 
   DEFVAR_LISP ("text-quoting-style", Vtext_quoting_style,
                doc: /* Style to use for single quotes when generating text.
-‘curve’ means quote with curved single quotes \\=‘like this\\=’.
-‘straight’ means quote with straight apostrophes \\='like this\\='.
-‘grave’ means quote with grave accent and apostrophe \\=`like this\\='.
-The default value nil acts like ‘curve’ if curved single quotes are
-displayable, and like ‘grave’ otherwise.  */);
+`curve' means quote with curved single quotes \\=‘like this\\=’.
+`straight' means quote with straight apostrophes \\='like this\\='.
+`grave' means quote with grave accent and apostrophe \\=`like this\\='.
+The default value nil acts like `curve' if curved single quotes are
+displayable, and like `grave' otherwise.  */);
   Vtext_quoting_style = Qnil;
 
   DEFVAR_BOOL ("internal--text-quoting-flag", text_quoting_flag,
-	       doc: /* If nil, a nil ‘text-quoting-style’ is treated as ‘grave’.  */);
+	       doc: /* If nil, a nil `text-quoting-style' is treated as `grave'.  */);
   /* Initialized by ‘main’.  */
 
   defsubr (&Sdocumentation);

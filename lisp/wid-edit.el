@@ -2654,8 +2654,7 @@ Return an alist of (TYPE MATCH)."
   (save-excursion
     (let ((children (widget-get widget :children))
 	  (inhibit-read-only t)
-	  before-change-functions
-	  after-change-functions)
+	  (inhibit-modification-hooks t))
       (cond (before
 	     (goto-char (widget-get before :entry-from)))
 	    (t
@@ -2679,8 +2678,7 @@ Return an alist of (TYPE MATCH)."
     (let ((buttons (copy-sequence (widget-get widget :buttons)))
 	  button
 	  (inhibit-read-only t)
-	  before-change-functions
-	  after-change-functions)
+	  (inhibit-modification-hooks t))
       (while buttons
 	(setq button (car buttons)
 	      buttons (cdr buttons))
@@ -2691,8 +2689,7 @@ Return an alist of (TYPE MATCH)."
     (let ((entry-from (widget-get child :entry-from))
 	  (entry-to (widget-get child :entry-to))
 	  (inhibit-read-only t)
-	  before-change-functions
-	  after-change-functions)
+	  (inhibit-modification-hooks t))
       (widget-delete child)
       (delete-region entry-from entry-to)
       (set-marker entry-from nil)
@@ -3477,10 +3474,10 @@ themselves.  A list, for example, is defined as either nil, or a cons
 cell whose cdr itself is a list.  The obvious way to translate this
 into a widget type would be
 
-  (define-widget 'my-list 'choice
+  (define-widget \\='my-list \\='choice
     \"A list of sexps.\"
     :tag \"Sexp list\"
-    :args '((const nil) (cons :value (nil) sexp my-list)))
+    :args \\='((const nil) (cons :value (nil) sexp my-list)))
 
 Here we attempt to define my-list as a choice of either the constant
 nil, or a cons-cell containing a sexp and my-lisp.  This will not work
@@ -3489,10 +3486,10 @@ because the `choice' widget does not allow recursion.
 Using the `lazy' widget you can overcome this problem, as in this
 example:
 
-  (define-widget 'sexp-list 'lazy
+  (define-widget \\='sexp-list \\='lazy
     \"A list of sexps.\"
     :tag \"Sexp list\"
-    :type '(choice (const nil) (cons :value (nil) sexp sexp-list)))"
+    :type \\='(choice (const nil) (cons :value (nil) sexp sexp-list)))"
   :format "%{%t%}: %v"
   ;; We don't convert :type because we want to allow recursive
   ;; data structures.  This is slow, so we should not create speed

@@ -34,6 +34,7 @@
 (defun flymake-tests--current-face (file predicate)
   (let ((buffer (find-file-noselect
                  (expand-file-name file flymake-tests-data-directory)))
+        (process-environment (cons "LC_ALL=C" process-environment))
         (i 0))
     (unwind-protect
         (with-current-buffer buffer
@@ -49,7 +50,7 @@
 
 (ert-deftest warning-predicate-rx-gcc ()
   "Test GCC warning via regexp predicate."
-  (skip-unless (executable-find "gcc"))
+  (skip-unless (and (executable-find "gcc") (executable-find "make")))
   (should (eq 'flymake-warnline
               (flymake-tests--current-face "test.c" "^[Ww]arning"))))
 

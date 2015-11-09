@@ -360,7 +360,7 @@ file.  Since that is a plaintext file, this could be dangerous."
      :sqli-comint-func sql-comint-db2
      :prompt-regexp "^db2 => "
      :prompt-length 7
-     :prompt-cont-regexp "^db2 (cont\.) => "
+     :prompt-cont-regexp "^db2 (cont\\.) => "
      :input-filter sql-escape-newlines-filter)
 
     (informix
@@ -381,9 +381,9 @@ file.  Since that is a plaintext file, this could be dangerous."
      :sqli-options sql-ingres-options
      :sqli-login sql-ingres-login-params
      :sqli-comint-func sql-comint-ingres
-     :prompt-regexp "^\* "
+     :prompt-regexp "^\\* "
      :prompt-length 2
-     :prompt-cont-regexp "^\* ")
+     :prompt-cont-regexp "^\\* ")
 
     (interbase
      :name "Interbase"
@@ -491,7 +491,7 @@ file.  Since that is a plaintext file, this could be dangerous."
      :completion-object sql-sqlite-completion-object
      :prompt-regexp "^sqlite> "
      :prompt-length 8
-     :prompt-cont-regexp "^   \.\.\.> "
+     :prompt-cont-regexp "^   \\.\\.\\.> "
      :terminator ";")
 
     (sybase
@@ -525,7 +525,7 @@ highlighted and will not support `sql-interactive-mode'.
 
 Each element in the list is in the following format:
 
- \(PRODUCT FEATURE VALUE ...)
+ (PRODUCT FEATURE VALUE ...)
 
 where PRODUCT is the appropriate value of `sql-product'.  The
 product name is then followed by FEATURE-VALUE pairs.  If a
@@ -639,7 +639,7 @@ settings.")
   "An alist of connection parameters for interacting with a SQL product.
 Each element of the alist is as follows:
 
-  \(CONNECTION \(SQL-VARIABLE VALUE) ...)
+  (CONNECTION \(SQL-VARIABLE VALUE) ...)
 
 Where CONNECTION is a case-insensitive string identifying the
 connection, SQL-VARIABLE is the symbol name of a SQL mode
@@ -2609,8 +2609,8 @@ of the current highlighting list.
 
 For example:
 
- (sql-add-product-keywords 'ms
-  '((\"\\\\b\\\\w+_t\\\\b\" . font-lock-type-face)))
+ (sql-add-product-keywords \\='ms
+  \\='((\"\\\\b\\\\w+_t\\\\b\" . font-lock-type-face)))
 
 adds a fontification pattern to fontify identifiers ending in
 `_t' as data types."
@@ -3897,14 +3897,14 @@ Here is an example for your init file.  It keeps the SQLi buffer a
 certain length.
 
 \(add-hook \\='sql-interactive-mode-hook
-    \(function (lambda ()
-        \(setq comint-output-filter-functions \\='comint-truncate-buffer))))
+    (function (lambda ()
+        (setq comint-output-filter-functions \\='comint-truncate-buffer))))
 
 Here is another example.  It will always put point back to the statement
 you entered, right above the output it created.
 
 \(setq comint-output-filter-functions
-       \(function (lambda (STR) (comint-show-output))))"
+       (function (lambda (STR) (comint-show-output))))"
   (delay-mode-hooks (comint-mode))
 
   ;; Get the `sql-product' for this interactive session.
@@ -4276,7 +4276,7 @@ passed as command line arguments."
     ;; work for remote hosts; we suppress the check there.
     (unless (or (file-remote-p default-directory)
 		(executable-find program))
-      (error "Unable to locate SQL program ‘%s’" program))
+      (error "Unable to locate SQL program `%s'" program))
     ;; Make sure buffer name is unique.
     (when (sql-buffer-live-p (format "*%s*" buf-name))
       (setq buf-name (format "SQL-%s" product))

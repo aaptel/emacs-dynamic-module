@@ -1,4 +1,4 @@
-/* Lisp functions pertaining to editing.
+/* Lisp functions pertaining to editing.                 -*- coding: utf-8 -*-
 
 Copyright (C) 1985-1987, 1989, 1993-2015 Free Software Foundation, Inc.
 
@@ -52,11 +52,11 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <strftime.h>
 #include <verify.h>
 
+#include "composite.h"
 #include "intervals.h"
 #include "character.h"
 #include "buffer.h"
 #include "coding.h"
-#include "frame.h"
 #include "window.h"
 #include "blockinput.h"
 
@@ -2156,7 +2156,7 @@ applied without consideration for daylight saving time.
 You can pass more than 7 arguments; then the first six arguments
 are used as SECOND through YEAR, and the *last* argument is used as ZONE.
 The intervening arguments are ignored.
-This feature lets (apply 'encode-time (decode-time ...)) work.
+This feature lets (apply \\='encode-time (decode-time ...)) work.
 
 Out-of-range values for SECOND, MINUTE, HOUR, DAY, or MONTH are allowed;
 for example, a DAY of 0 means the day preceding the given month.
@@ -3627,7 +3627,7 @@ save_restriction_restore (Lisp_Object data)
 DEFUN ("save-restriction", Fsave_restriction, Ssave_restriction, 0, UNEVALLED, 0,
        doc: /* Execute BODY, saving and restoring current buffer's restrictions.
 The buffer's restrictions make parts of the beginning and end invisible.
-\(They are set up with `narrow-to-region' and eliminated with `widen'.)
+(They are set up with `narrow-to-region' and eliminated with `widen'.)
 This special form, `save-restriction', saves the current buffer's restrictions
 when it is entered, and restores them when it is exited.
 So any `narrow-to-region' within BODY lasts only until the end of the form.
@@ -3837,11 +3837,11 @@ DEFUN ("format-message", Fformat_message, Sformat_message, 1, MANY, 0,
 The first argument is a format control string.
 The other arguments are substituted into it to make the result, a string.
 
-This acts like ‘format’, except it also replaces each left single
+This acts like `format', except it also replaces each left single
 quotation mark (\\=‘) and grave accent (\\=`) by a left quote, and each
 right single quotation mark (\\=’) and apostrophe (\\=') by a right quote.
 The left and right quote replacement characters are specified by
-‘text-quoting-style’.
+`text-quoting-style'.
 
 usage: (format-message STRING &rest OBJECTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
@@ -4154,7 +4154,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		      || conversion == 'X'))
 	    error ("Invalid format operation %%%c",
 		   STRING_CHAR ((unsigned char *) format - 1));
-	  else if (! (INTEGERP (args[n]) || FLOATP (args[n])))
+	  else if (! NUMBERP (args[n]))
 	    error ("Format specifier doesn't match argument type");
 	  else
 	    {

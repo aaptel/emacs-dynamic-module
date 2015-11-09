@@ -67,7 +67,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #undef localtime
 
 #include "lisp.h"
-#include "epaths.h"	/* for SHELL */
+#include "epaths.h"	/* for PATH_EXEC */
 
 #include <pwd.h>
 #include <grp.h>
@@ -224,20 +224,22 @@ typedef struct _REPARSE_DATA_BUFFER {
 
 #include <iphlpapi.h>	/* should be after winsock2.h */
 
+#include <c-strcase.h>
+
 #include "w32.h"
 #include <dirent.h>
 #include "w32common.h"
-#include "w32heap.h"
 #include "w32select.h"
-#include "systime.h"
+#include "systime.h"		/* for current_timespec, struct timespec */
 #include "dispextern.h"		/* for xstrcasecmp */
 #include "coding.h"		/* for Vlocale_coding_system */
 
 #include "careadlinkat.h"
 #include "allocator.h"
 
-/* For serial_configure and serial_open.  */
+/* For Lisp_Process, serial_configure and serial_open.  */
 #include "process.h"
+#include "systty.h"
 
 typedef HRESULT (WINAPI * ShGetFolderPath_fn)
   (IN HWND, IN int, IN HANDLE, IN DWORD, OUT char *);
@@ -3399,30 +3401,41 @@ sys_readdir (DIR *dirp)
   /* If we aren't dir_finding, do a find-first, otherwise do a find-next. */
   else if (dir_find_handle == INVALID_HANDLE_VALUE)
     {
-      char filename[MAX_UTF8_PATH + 2];
+      char filename[MAX_UTF8_PATH];
       int ln;
+      bool last_slash = true;
 
+      /* Note: We don't need to worry about dir_pathname being longer
+	 than MAX_UTF8_PATH, as sys_opendir already took care of that
+	 when it called map_w32_filename: that function will put a "?"
+	 in its return value in that case, thus failing all the calls
+	 below.  */
       strcpy (filename, dir_pathname);
       ln = strlen (filename);
       if (!IS_DIRECTORY_SEP (filename[ln - 1]))
-	filename[ln++] = '\\';
-      strcpy (filename + ln, "*");
+	last_slash = false;
 
       /* Note: No need to resolve symlinks in FILENAME, because
 	 FindFirst opens the directory that is the target of a
 	 symlink.  */
       if (w32_unicode_filenames)
 	{
-	  wchar_t fnw[MAX_PATH];
+	  wchar_t fnw[MAX_PATH + 2];
 
 	  filename_to_utf16 (filename, fnw);
+	  if (!last_slash)
+	    wcscat (fnw, L"\\");
+	  wcscat (fnw, L"*");
 	  dir_find_handle = FindFirstFileW (fnw, &dir_find_data_w);
 	}
       else
 	{
-	  char fna[MAX_PATH];
+	  char fna[MAX_PATH + 2];
 
 	  filename_to_ansi (filename, fna);
+	  if (!last_slash)
+	    strcat (fna, "\\");
+	  strcat (fna, "*");
 	  /* If FILENAME is not representable by the current ANSI
 	     codepage, we don't want FindFirstFileA to interpret the
 	     '?' characters as a wildcard.  */
@@ -3815,7 +3828,7 @@ faccessat (int dirfd, const char * path, int mode, int flags)
 		  errno = EACCES;
 		  return -1;
 		}
-	      break;
+	      goto check_attrs;
 	    }
 	  /* FALLTHROUGH */
 	case ERROR_FILE_NOT_FOUND:
@@ -3828,6 +3841,8 @@ faccessat (int dirfd, const char * path, int mode, int flags)
 	}
       return -1;
     }
+
+ check_attrs:
   if ((mode & X_OK) != 0
       && !(is_exec (path) || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0))
     {
@@ -3845,6 +3860,76 @@ faccessat (int dirfd, const char * path, int mode, int flags)
       return -1;
     }
   return 0;
+}
+
+/* A special test for DIRNAME being a directory accessible by the
+   current user.  This is needed because the security permissions in
+   directory's ACLs are not visible in the Posix-style mode bits
+   returned by 'stat' and in attributes returned by GetFileAttributes.
+   So a directory would seem like it's readable by the current user,
+   but will in fact error out with EACCES when they actually try.  */
+int
+w32_accessible_directory_p (const char *dirname, ptrdiff_t dirlen)
+{
+  char pattern[MAX_UTF8_PATH];
+  bool last_slash = dirlen > 0 && IS_DIRECTORY_SEP (dirname[dirlen - 1]);
+  HANDLE dh;
+
+  /* Network volumes need a different reading method.  */
+  if (is_unc_volume (dirname))
+    {
+      void *read_result = NULL;
+      wchar_t fnw[MAX_PATH];
+      char fna[MAX_PATH];
+
+      dh = open_unc_volume (dirname);
+      if (dh != INVALID_HANDLE_VALUE)
+	{
+	  read_result = read_unc_volume (dh, fnw, fna, MAX_PATH);
+	  close_unc_volume (dh);
+	}
+      /* Treat empty volumes as accessible.  */
+      return read_result != NULL || GetLastError () == ERROR_NO_MORE_ITEMS;
+    }
+
+  /* Note: map_w32_filename makes sure DIRNAME is not longer than
+     MAX_UTF8_PATH.  */
+  strcpy (pattern, map_w32_filename (dirname, NULL));
+
+  /* Note: No need to resolve symlinks in FILENAME, because FindFirst
+     opens the directory that is the target of a symlink.  */
+  if (w32_unicode_filenames)
+    {
+      wchar_t pat_w[MAX_PATH + 2];
+      WIN32_FIND_DATAW dfd_w;
+
+      filename_to_utf16 (pattern, pat_w);
+      if (!last_slash)
+	wcscat (pat_w, L"\\");
+      wcscat (pat_w, L"*");
+      dh = FindFirstFileW (pat_w, &dfd_w);
+    }
+  else
+    {
+      char pat_a[MAX_PATH + 2];
+      WIN32_FIND_DATAA dfd_a;
+
+      filename_to_ansi (pattern, pat_a);
+      if (!last_slash)
+	strcpy (pat_a, "\\");
+      strcat (pat_a, "*");
+      /* In case DIRNAME cannot be expressed in characters from the
+	 current ANSI codepage.  */
+      if (_mbspbrk (pat_a, "?"))
+	dh = INVALID_HANDLE_VALUE;
+      else
+	dh = FindFirstFileA (pat_a, &dfd_a);
+    }
+
+  if (dh == INVALID_HANDLE_VALUE)
+    return 0;
+  FindClose (dh);
+  return 1;
 }
 
 /* A version of 'access' to be used locally with file names in
@@ -4451,6 +4536,8 @@ sys_rmdir (const char * path)
 int
 sys_unlink (const char * path)
 {
+  int rmstatus, e;
+
   path = map_w32_filename (path, NULL);
 
   if (w32_unicode_filenames)
@@ -4458,9 +4545,18 @@ sys_unlink (const char * path)
       wchar_t path_w[MAX_PATH];
 
       filename_to_utf16 (path, path_w);
-      /* On Unix, unlink works without write permission. */
+      /* On Unix, unlink works without write permission.  */
       _wchmod (path_w, 0666);
-      return _wunlink (path_w);
+      rmstatus = _wunlink (path_w);
+      e = errno;
+      /* Symlinks to directories can only be deleted by _rmdir;
+	 _unlink returns EACCES.  */
+      if (rmstatus != 0
+	  && errno == EACCES
+	  && (is_symlink (path) & FILE_ATTRIBUTE_DIRECTORY) != 0)
+	rmstatus = _wrmdir (path_w);
+      else
+	errno = e;
     }
   else
     {
@@ -4468,8 +4564,17 @@ sys_unlink (const char * path)
 
       filename_to_ansi (path, path_a);
       _chmod (path_a, 0666);
-      return _unlink (path_a);
+      rmstatus = _unlink (path_a);
+      e = errno;
+      if (rmstatus != 0
+	  && errno == EACCES
+	  && (is_symlink (path) & FILE_ATTRIBUTE_DIRECTORY) != 0)
+	rmstatus = _rmdir (path_a);
+      else
+	errno = e;
     }
+
+  return rmstatus;
 }
 
 static FILETIME utc_base_ft;
@@ -5543,7 +5648,8 @@ symlink (char const *filename, char const *linkname)
 /* A quick inexpensive test of whether FILENAME identifies a file that
    is a symlink.  Returns non-zero if it is, zero otherwise.  FILENAME
    must already be in the normalized form returned by
-   map_w32_filename.
+   map_w32_filename.  If the symlink is to a directory, the
+   FILE_ATTRIBUTE_DIRECTORY bit will be set in the return value.
 
    Note: for repeated operations on many files, it is best to test
    whether the underlying volume actually supports symlinks, by
@@ -5601,6 +5707,8 @@ is_symlink (const char *filename)
       attrs_mean_symlink =
 	(wfdw.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
 	&& (wfdw.dwReserved0 & IO_REPARSE_TAG_SYMLINK) == IO_REPARSE_TAG_SYMLINK;
+      if (attrs_mean_symlink)
+	attrs_mean_symlink |= (wfdw.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
     }
   else if (_mbspbrk (filename_a, "?"))
     {
@@ -5614,6 +5722,8 @@ is_symlink (const char *filename)
       attrs_mean_symlink =
 	(wfda.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
 	&& (wfda.dwReserved0 & IO_REPARSE_TAG_SYMLINK) == IO_REPARSE_TAG_SYMLINK;
+      if (attrs_mean_symlink)
+	attrs_mean_symlink |= (wfda.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
     }
   if (fh == INVALID_HANDLE_VALUE)
     return 0;

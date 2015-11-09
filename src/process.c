@@ -103,13 +103,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "process.h"
 #include "frame.h"
-#include "termhooks.h"
 #include "termopts.h"
-#include "commands.h"
 #include "keyboard.h"
 #include "blockinput.h"
-#include "dispextern.h"
-#include "composite.h"
 #include "atimer.h"
 #include "sysselect.h"
 #include "syssignal.h"
@@ -957,7 +953,7 @@ DEFUN ("process-command", Fprocess_command, Sprocess_command, 1, 1, 0,
 This is a list of strings, the first string being the program executed
 and the rest of the strings being the arguments given to it.
 For a network or serial process, this is nil (process is running) or t
-\(process is stopped).  */)
+(process is stopped).  */)
   (register Lisp_Object process)
 {
   CHECK_PROCESS (process);
@@ -2674,7 +2670,7 @@ is not given or nil, 1 stopbit is used.
 :flowcontrol FLOWCONTROL -- FLOWCONTROL determines the type of
 flowcontrol to be used, which is either nil (don't use flowcontrol),
 the symbol `hw' (use RTS/CTS hardware flowcontrol), or the symbol `sw'
-\(use XON/XOFF software flowcontrol).  If FLOWCONTROL is not given, no
+(use XON/XOFF software flowcontrol).  If FLOWCONTROL is not given, no
 flowcontrol is used.
 
 `serial-process-configure' is called by `make-serial-process' for the
@@ -2682,12 +2678,12 @@ initial configuration of the serial port.
 
 Examples:
 
-\(serial-process-configure :process "/dev/ttyS0" :speed 1200)
+(serial-process-configure :process "/dev/ttyS0" :speed 1200)
 
-\(serial-process-configure
-    :buffer "COM1" :stopbits 1 :parity 'odd :flowcontrol 'hw)
+(serial-process-configure
+    :buffer "COM1" :stopbits 1 :parity \\='odd :flowcontrol \\='hw)
 
-\(serial-process-configure :port "\\\\.\\COM13" :bytesize 7)
+(serial-process-configure :port "\\\\.\\COM13" :bytesize 7)
 
 usage: (serial-process-configure &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
@@ -2781,13 +2777,13 @@ is available via the function `process-contact'.
 
 Examples:
 
-\(make-serial-process :port "/dev/ttyS0" :speed 9600)
+(make-serial-process :port "/dev/ttyS0" :speed 9600)
 
-\(make-serial-process :port "COM1" :speed 115200 :stopbits 2)
+(make-serial-process :port "COM1" :speed 115200 :stopbits 2)
 
-\(make-serial-process :port "\\\\.\\COM13" :speed 1200 :bytesize 7 :parity 'odd)
+(make-serial-process :port "\\\\.\\COM13" :speed 1200 :bytesize 7 :parity \\='odd)
 
-\(make-serial-process :port "/dev/tty.BlueConsole-SPP-1" :speed nil)
+(make-serial-process :port "/dev/tty.BlueConsole-SPP-1" :speed nil)
 
 usage:  (make-serial-process &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
@@ -4859,6 +4855,10 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
              data is available in the buffers manually.  */
           if (nfds == 0)
 	    {
+	      fd_set tls_available;
+	      int set = 0;
+
+	      FD_ZERO (&tls_available);
 	      if (! wait_proc)
 		{
 		  /* We're not waiting on a specific process, so loop
@@ -4879,7 +4879,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 			  {
 			    nfds++;
 			    eassert (p->infd == channel);
-			    FD_SET (p->infd, &Available);
+			    FD_SET (p->infd, &tls_available);
+			    set++;
 			  }
 		      }
 		}
@@ -4896,9 +4897,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		      nfds = 1;
 		      eassert (0 <= wait_proc->infd);
 		      /* Set to Available.  */
-		      FD_SET (wait_proc->infd, &Available);
+		      FD_SET (wait_proc->infd, &tls_available);
+		      set++;
 		    }
 		}
+	      if (set)
+		Available = tls_available;
 	    }
 #endif
 	}
@@ -6261,7 +6265,7 @@ SIGCODE may be an integer, or a symbol whose name is a signal name.  */)
 	{
 	  Lisp_Object process_number
 	    = string_to_number (SSDATA (process), 10, 1);
-	  if (INTEGERP (process_number) || FLOATP (process_number))
+	  if (NUMBERP (process_number))
 	    tem = process_number;
 	}
       process = tem;
@@ -6686,10 +6690,12 @@ status_notify (struct Lisp_Process *deleting_process,
 	  p->update_tick = p->tick;
 	  /* Now output the message suitably.  */
 	  exec_sentinel (proc, msg);
+	  if (BUFFERP (p->buffer))
+	    /* In case it uses %s in mode-line-format.  */
+	    bset_update_mode_line (XBUFFER (p->buffer));
 	}
     } /* end for */
 
-  update_mode_lines = 24;  /* In case buffers use %s in mode-line-format.  */
   return got_some_output;
 }
 
@@ -7170,8 +7176,10 @@ setup_process_coding_systems (Lisp_Object process)
 }
 
 DEFUN ("get-buffer-process", Fget_buffer_process, Sget_buffer_process, 1, 1, 0,
-       doc: /* Return the (or a) process associated with BUFFER.
-BUFFER may be a buffer or the name of one.  */)
+       doc: /* Return the (or a) live process associated with BUFFER.
+BUFFER may be a buffer or the name of one.
+Return nil if all processes associated with BUFFER have been
+deleted or killed.  */)
   (register Lisp_Object buffer)
 {
 #ifdef subprocesses
@@ -7286,7 +7294,7 @@ DEFUN ("process-attributes", Fprocess_attributes,
 
 Value is an alist where each element is a cons cell of the form
 
-    \(KEY . VALUE)
+    (KEY . VALUE)
 
 If this functionality is unsupported, the value is nil.
 

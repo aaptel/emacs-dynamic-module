@@ -891,22 +891,22 @@ Used when `whitespace-style' includes `lines' or `lines-tail'."
 ;; Hacked from `visible-whitespace-mappings' in visws.el
 (defcustom whitespace-display-mappings
   '(
-    (space-mark   ?\     [?\u00B7]     [?.])		; space - centered dot
-    (space-mark   ?\xA0  [?\u00A4]     [?_])		; hard space - currency
+    (space-mark   ?\     [?·]     [?.])		; space - middle dot
+    (space-mark   ?\xA0  [?¤]     [?_])		; hard space - currency sign
     ;; NEWLINE is displayed using the face `whitespace-newline'
     (newline-mark ?\n    [?$ ?\n])			; eol - dollar sign
-    ;; (newline-mark ?\n    [?\u21B5 ?\n] [?$ ?\n])	; eol - downwards arrow
-    ;; (newline-mark ?\n    [?\u00B6 ?\n] [?$ ?\n])	; eol - pilcrow
-    ;; (newline-mark ?\n    [?\u00AF ?\n]  [?$ ?\n])	; eol - overscore
-    ;; (newline-mark ?\n    [?\u00AC ?\n]  [?$ ?\n])	; eol - negation
-    ;; (newline-mark ?\n    [?\u00B0 ?\n]  [?$ ?\n])	; eol - degrees
+    ;; (newline-mark ?\n    [?↵ ?\n] [?$ ?\n])	; eol - downwards arrow
+    ;; (newline-mark ?\n    [?¶ ?\n] [?$ ?\n])	; eol - pilcrow
+    ;; (newline-mark ?\n    [?¯ ?\n]  [?$ ?\n])	; eol - overscore
+    ;; (newline-mark ?\n    [?¬ ?\n]  [?$ ?\n])	; eol - negation
+    ;; (newline-mark ?\n    [?° ?\n]  [?$ ?\n])	; eol - degrees
     ;;
     ;; WARNING: the mapping below has a problem.
     ;; When a TAB occupies exactly one column, it will display the
     ;; character ?\xBB at that column followed by a TAB which goes to
     ;; the next TAB column.
     ;; If this is a problem for you, please, comment the line below.
-    (tab-mark     ?\t    [?\u00BB ?\t] [?\\ ?\t])	; tab - left quote mark
+    (tab-mark     ?\t    [?» ?\t] [?\\ ?\t])	; tab - right guillemet
     )
   "Specify an alist of mappings for displaying characters.
 
@@ -1867,10 +1867,10 @@ cleaning up these problems."
 	      (when has-bogus
 		(goto-char (point-max))
 		(insert (substitute-command-keys
-                         " Type ‘\\[whitespace-cleanup]’")
+                         " Type `\\[whitespace-cleanup]'")
 			" to cleanup the buffer.\n\n"
 			(substitute-command-keys
-                         " Type ‘\\[whitespace-cleanup-region]’")
+                         " Type `\\[whitespace-cleanup-region]'")
 			" to cleanup a region.\n\n"))
 	      (whitespace-display-window (current-buffer)))))
 	has-bogus))))
@@ -1931,13 +1931,13 @@ cleaning up these problems."
 
 
 (defun whitespace-mark-x (nchars condition)
-  "Insert the mark (‘X’ or ‘ ’) after NCHARS depending on CONDITION."
+  "Insert the mark (`X' or ` ') after NCHARS depending on CONDITION."
   (forward-char nchars)
   (insert (if condition "X" " ")))
 
 
 (defun whitespace-insert-option-mark (the-list the-value)
-  "Insert the option mark (‘X’ or ‘ ’) in toggle options buffer."
+  "Insert the option mark (`X' or ` ') in toggle options buffer."
   (goto-char (point-min))
   (forward-line 2)
   (dolist (sym  the-list)

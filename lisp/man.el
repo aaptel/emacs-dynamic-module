@@ -1,4 +1,4 @@
-;;; man.el --- browse UNIX manual pages  -*- coding: utf-8 -*-
+;;; man.el --- browse UNIX manual pages
 
 ;; Copyright (C) 1993-1994, 1996-1997, 2001-2015 Free Software
 ;; Foundation, Inc.
@@ -104,7 +104,7 @@
   "Manpage cleaning filter command phrases.
 This variable contains a list of the following form:
 
-'((command-string phrase-string*)*)
+  ((command-string phrase-string*)*)
 
 Each phrase-string is concatenated onto the command-string to form a
 command filter.  The (standard) output (and standard error) of the Un*x
@@ -311,7 +311,7 @@ This regular expression should start with a `^' character.")
   "Regular expression describing a reference to another manpage.")
 
 (defvar Man-apropos-regexp
-  (concat "\\\[\\(" Man-name-regexp "\\)\\\][ \t]*(\\(" Man-section-regexp "\\))")
+  (concat "\\[\\(" Man-name-regexp "\\)\\][ \t]*(\\(" Man-section-regexp "\\))")
   "Regular expression describing a reference to manpages in \"man -k output\".")
 
 (defvar Man-synopsis-regexp "SYNOPSIS"

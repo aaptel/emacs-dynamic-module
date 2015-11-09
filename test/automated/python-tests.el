@@ -36,10 +36,11 @@ BODY is code to be executed within the temp buffer.  Point is
 always located at the beginning of buffer."
   (declare (indent 1) (debug t))
   `(with-temp-buffer
-     (python-mode)
-     (insert ,contents)
-     (goto-char (point-min))
-     ,@body))
+     (let ((python-indent-guess-indent-offset nil))
+       (python-mode)
+       (insert ,contents)
+       (goto-char (point-min))
+       ,@body)))
 
 (defmacro python-tests-with-temp-file (contents &rest body)
   "Create a `python-mode' enabled file with CONTENTS.
@@ -48,7 +49,8 @@ always located at the beginning of buffer."
   (declare (indent 1) (debug t))
   ;; temp-file never actually used for anything?
   `(let* ((temp-file (make-temp-file "python-tests" nil ".py"))
-          (buffer (find-file-noselect temp-file)))
+          (buffer (find-file-noselect temp-file))
+          (python-indent-guess-indent-offset nil))
      (unwind-protect
          (with-current-buffer buffer
            (python-mode)
@@ -560,6 +562,14 @@ CHOICES = (('some', 'choice'),
    (forward-line 1)
    (should (eq (car (python-indent-context)) :inside-paren))
    (should (= (python-indent-calculate-indentation) 11))))
+
+(ert-deftest python-indent-inside-paren-7 ()
+  "Test for Bug#21762."
+  (python-tests-with-temp-buffer
+   "import re as myre\nvar = [\n"
+   (goto-char (point-max))
+   ;; This signals an error if the test fails
+   (should (eq (car (python-indent-context)) :inside-paren-newline-start))))
 
 (ert-deftest python-indent-after-block-1 ()
   "The most simple after-block case that shouldn't fail."
@@ -2436,7 +2446,7 @@ Using `python-shell-interpreter' and
         (python-shell-interpreter-args "-B"))
     (should (string=
              (format "%s %s"
-                     python-shell-interpreter
+                     (shell-quote-argument python-shell-interpreter)
                      python-shell-interpreter-args)
              (python-shell-calculate-command)))))
 
@@ -2445,14 +2455,17 @@ Using `python-shell-interpreter' and
   (let ((process-environment '("PYTHONPATH=/path0"))
         (python-shell-extra-pythonpaths '("/path1" "/path2")))
     (should (string= (python-shell-calculate-pythonpath)
-                     "/path1:/path2:/path0"))))
+                     (concat "/path1" path-separator
+                             "/path2" path-separator "/path0")))))
 
 (ert-deftest python-shell-calculate-pythonpath-2 ()
   "Test existing paths are moved to front."
-  (let ((process-environment '("PYTHONPATH=/path0:/path1"))
+  (let ((process-environment
+         (list (concat "PYTHONPATH=/path0" path-separator "/path1")))
         (python-shell-extra-pythonpaths '("/path1" "/path2")))
     (should (string= (python-shell-calculate-pythonpath)
-                     "/path1:/path2:/path0"))))
+                     (concat "/path1" path-separator
+                             "/path2" path-separator "/path0")))))
 
 (ert-deftest python-shell-calculate-process-environment-1 ()
   "Test `python-shell-process-environment' modification."
@@ -2468,7 +2481,9 @@ Using `python-shell-interpreter' and
          (original-pythonpath (setenv "PYTHONPATH" "/path0"))
          (python-shell-extra-pythonpaths '("/path1" "/path2"))
          (process-environment (python-shell-calculate-process-environment)))
-    (should (equal (getenv "PYTHONPATH") "/path1:/path2:/path0"))))
+    (should (equal (getenv "PYTHONPATH")
+                   (concat "/path1" path-separator
+                           "/path2" path-separator "/path0")))))
 
 (ert-deftest python-shell-calculate-process-environment-3 ()
   "Test `python-shell-virtualenv-root' modification."
@@ -2545,7 +2560,8 @@ Using `python-shell-interpreter' and
   (let* ((exec-path '("/path0"))
          (python-shell-virtualenv-root "/env")
          (new-exec-path (python-shell-calculate-exec-path)))
-    (should (equal new-exec-path '("/env/bin" "/path0")))))
+    (should (equal new-exec-path
+                   (list (expand-file-name "/env/bin") "/path0")))))
 
 (ert-deftest python-shell-calculate-exec-path-3 ()
   "Test complete `python-shell-virtualenv-root' modification."
@@ -2553,7 +2569,9 @@ Using `python-shell-interpreter' and
          (python-shell-exec-path '("/path1" "/path2"))
          (python-shell-virtualenv-root "/env")
          (new-exec-path (python-shell-calculate-exec-path)))
-    (should (equal new-exec-path '("/env/bin" "/path1" "/path2" "/path0")))))
+    (should (equal new-exec-path
+                   (list (expand-file-name "/env/bin")
+                         "/path1" "/path2" "/path0")))))
 
 (ert-deftest python-shell-calculate-exec-path-4 ()
   "Test complete `python-shell-virtualenv-root' with remote."
@@ -2562,7 +2580,9 @@ Using `python-shell-interpreter' and
          (python-shell-exec-path '("/path1" "/path2"))
          (python-shell-virtualenv-root "/env")
          (new-exec-path (python-shell-calculate-exec-path)))
-    (should (equal new-exec-path '("/env/bin" "/path1" "/path2" "/path0")))))
+    (should (equal new-exec-path
+                   (list (expand-file-name "/env/bin")
+                         "/path1" "/path2" "/path0")))))
 
 (ert-deftest python-shell-calculate-exec-path-5 ()
   "Test no side-effects on `exec-path'."
@@ -2590,7 +2610,9 @@ Using `python-shell-interpreter' and
          (original-exec-path exec-path)
          (python-shell-virtualenv-root "/env"))
     (python-shell-with-environment
-      (should (equal exec-path '("/env/bin" "/path1" "/path2" "/path0")))
+     (should (equal exec-path
+                    (list (expand-file-name "/env/bin")
+                          "/path1" "/path2" "/path0")))
       (should (not (getenv "PYTHONHOME")))
       (should (string= (getenv "VIRTUAL_ENV") "/env")))
     (should (equal exec-path original-exec-path))))
@@ -2605,7 +2627,8 @@ Using `python-shell-interpreter' and
          (python-shell-virtualenv-root "/env"))
     (python-shell-with-environment
       (should (equal (python-shell-calculate-exec-path)
-                     '("/env/bin" "/path1" "/path2" "/remote1" "/remote2")))
+                     (list (expand-file-name "/env/bin")
+                           "/path1" "/path2" "/remote1" "/remote2")))
       (let ((process-environment (python-shell-calculate-process-environment)))
         (should (not (getenv "PYTHONHOME")))
         (should (string= (getenv "VIRTUAL_ENV") "/env"))
@@ -2907,7 +2930,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-input-regexps'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-input-regexps'")))))
 
 (ert-deftest python-shell-prompt-validate-regexps-2 ()
   "Check `python-shell-prompt-output-regexps' are validated."
@@ -2916,7 +2940,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-output-regexps'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-output-regexps'")))))
 
 (ert-deftest python-shell-prompt-validate-regexps-3 ()
   "Check `python-shell-prompt-regexp' is validated."
@@ -2925,7 +2950,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-regexp'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-regexp'")))))
 
 (ert-deftest python-shell-prompt-validate-regexps-4 ()
   "Check `python-shell-prompt-block-regexp' is validated."
@@ -2934,7 +2960,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-block-regexp'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-block-regexp'")))))
 
 (ert-deftest python-shell-prompt-validate-regexps-5 ()
   "Check `python-shell-prompt-pdb-regexp' is validated."
@@ -2943,7 +2970,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-pdb-regexp'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-pdb-regexp'")))))
 
 (ert-deftest python-shell-prompt-validate-regexps-6 ()
   "Check `python-shell-prompt-output-regexp' is validated."
@@ -2952,7 +2980,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-output-regexp'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-output-regexp'")))))
 
 (ert-deftest python-shell-prompt-validate-regexps-7 ()
   "Check default regexps are valid."
@@ -2969,7 +2998,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                    :type 'user-error)))
     (should
      (string= (cadr error-data)
-              "Invalid regexp \\( in `python-shell-prompt-output-regexp'"))))
+              (format-message
+               "Invalid regexp \\( in `python-shell-prompt-output-regexp'")))))
 
 (ert-deftest python-shell-prompt-set-calculated-regexps-2 ()
   "Check `python-shell-prompt-input-regexps' are set."
@@ -5196,7 +5226,6 @@ class SomeClass:
 (provide 'python-tests)
 
 ;; Local Variables:
-;; coding: utf-8
 ;; indent-tabs-mode: nil
 ;; End:
 

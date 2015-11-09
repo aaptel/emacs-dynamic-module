@@ -1785,7 +1785,7 @@ If point is on a group name, this function operates on that group."
      (let ((procs 0)
 	   (files 0))
        (dolist (string strings)
-	 (if (string-match "\\(\?:\\`(\[\[:ascii:\]\]\+)\\)" string)
+	 (if (string-match "\\(?:\\`([[:ascii:]]+)\\)" string)
 	     (progn (setq procs (1+ procs))
 		    (if (< (match-end 0) (length string))
 			(setq files (1+ files))))
@@ -2037,7 +2037,7 @@ the value of point at the beginning of the line for that buffer."
 (defun ibuffer-update-title-and-summary (format)
   (ibuffer-assert-ibuffer-mode)
   ;; Don't do funky font-lock stuff here
-  (let ((after-change-functions nil))
+  (let ((inhibit-modification-hooks t))
     (if (get-text-property (point-min) 'ibuffer-title)
 	(delete-region (point-min)
 		       (next-single-property-change
@@ -2244,7 +2244,7 @@ If optional arg SILENT is non-nil, do not display progress messages."
 	 (orig (count-lines (point-min) (point)))
 	 ;; Inhibit font-lock caching tricks, since we're modifying the
 	 ;; entire buffer at once
-	 (after-change-functions nil)
+	 (inhibit-modification-hooks t)
 	 (ext-loaded (featurep 'ibuf-ext))
 	 (bgroups (if ext-loaded
 		      (ibuffer-generate-filter-groups bmarklist)
@@ -2303,7 +2303,7 @@ buffers which are visiting a file."
 (defun ibuffer (&optional other-window-p name qualifiers noselect
 			  shrink filter-groups formats)
   "Begin using Ibuffer to edit a list of buffers.
-Type ‘h’ after entering ibuffer for more information.
+Type `h' after entering ibuffer for more information.
 
 All arguments are optional.
 OTHER-WINDOW-P says to use another window.
@@ -2493,14 +2493,17 @@ new filter onto the stack, and the filters combine to show just
 buffers which satisfy ALL criteria on the stack.  For example, suppose
 you only want to see buffers in `emacs-lisp' mode, whose names begin
 with \"gnus\".  You can accomplish this via:
-`\\[ibuffer-filter-by-mode] emacs-lisp-mode RET
-\\[ibuffer-filter-by-name] ^gnus RET'.
+
+  \\[ibuffer-filter-by-mode] emacs-lisp-mode RET
+  \\[ibuffer-filter-by-name] ^gnus RET
 
 Additionally, you can OR the top two filters together with
 `\\[ibuffer-or-filters]'.  To see all buffers in either
 `emacs-lisp-mode' or `lisp-interaction-mode', type:
 
-`\\[ibuffer-filter-by-mode] emacs-lisp-mode RET \\[ibuffer-filter-by-mode] lisp-interaction-mode RET \\[ibuffer-or-filters]'.
+  \\[ibuffer-filter-by-mode] emacs-lisp-mode RET
+  \\[ibuffer-filter-by-mode] lisp-interaction-mode RET
+  \\[ibuffer-or-filters]
 
 Filters can also be saved and restored using mnemonic names: see the
 functions `ibuffer-save-filters' and `ibuffer-switch-to-saved-filters'.
@@ -2518,9 +2521,10 @@ create a filter group, simply use the regular functions to create a
 filter, and then type `\\[ibuffer-filters-to-filter-group]'.
 
 A quick example will make things clearer.  Suppose that one wants to
-group all of one's Emacs Lisp buffers together.  To do this, type
+group all of one's Emacs Lisp buffers together.  To do this, type:
 
-`\\[ibuffer-filter-by-mode] emacs-lisp-mode RET \\[ibuffer-filters-to-filter-group] RET emacs lisp buffers RET'
+  \\[ibuffer-filter-by-mode] emacs-lisp-mode RET
+  \\[ibuffer-filters-to-filter-group] emacs lisp buffers RET
 
 You may, of course, name the group whatever you want; it doesn't have
 to be \"emacs lisp buffers\".  Filter groups may be composed of any
@@ -2973,9 +2977,5 @@ defaults to one.
 (provide 'ibuffer)
 
 (run-hooks 'ibuffer-load-hook)
-
-;; Local Variables:
-;; coding: utf-8
-;; End:
 
 ;;; ibuffer.el ends here

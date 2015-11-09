@@ -17,7 +17,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "systime.h"		/* for struct timespec, Time */
+#ifndef EMACS_KEYBOARD_H
+#define EMACS_KEYBOARD_H
+
 #include "coding.h"             /* for ENCODE_UTF_8 and ENCODE_SYSTEM */
 #include "termhooks.h"
 
@@ -175,9 +177,8 @@ struct kboard
     /* True means echo each character as typed.  */
     bool_bf immediate_echo : 1;
 
-    /* If we have echoed a prompt string specified by the user,
-       this is its length in characters.  Otherwise this is -1.  */
-    ptrdiff_t echo_after_prompt;
+    /* If we have a prompt string specified by the user, this is it.  */
+    Lisp_Object echo_prompt_;
   };
 
 INLINE void
@@ -484,3 +485,5 @@ extern const char *const lispy_function_keys[];
 #endif
 
 INLINE_HEADER_END
+
+#endif /* EMACS_KEYBOARD_H */

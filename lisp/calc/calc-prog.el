@@ -3,7 +3,6 @@
 ;; Copyright (C) 1990-1993, 2001-2015 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
-;; Maintainer: Jay Belanger <jay.p.belanger@gmail.com>
 
 ;; This file is part of GNU Emacs.
 
@@ -597,9 +596,9 @@
 	 ",")
 	((equal name "#")
 	 (search-backward "#")
-	 (error "Token ‘#’ is reserved"))
+	 (error "Token `#' is reserved"))
 	((and unquoted (string-match "#" name))
-	 (error "Tokens containing ‘#’ must be quoted"))
+	 (error "Tokens containing `#' must be quoted"))
 	((not (string-match "[^ ]" name))
 	 (search-backward "\"" nil t)
 	 (error "Blank tokens are not allowed"))
@@ -610,7 +609,7 @@
 	(quoted nil))
     (while (progn
 	     (skip-chars-forward "\n\t ")
-	     (if (eobp) (error "Expected ‘%s’" eterm))
+	     (if (eobp) (error "Expected `%s'" eterm))
 	     (not (looking-at term)))
       (cond ((looking-at "%%")
 	     (end-of-line))
@@ -618,7 +617,7 @@
 	     (forward-char 2)
 	     (let ((p (calc-read-parse-table-part "}" "}")))
 	       (or (looking-at "[+*?]")
-		   (error "Expected ‘+’, ‘*’, or ‘?’"))
+		   (error "Expected `+', `*', or `?'"))
 	       (let ((sym (intern (buffer-substring (point) (1+ (point))))))
 		 (forward-char 1)
 		 (looking-at "[^\n\t ]*")
@@ -650,7 +649,7 @@
 					      (match-end 1)))))))
 	     (goto-char (match-end 0)))
 	    ((looking-at ":=[\n\t ]")
-	     (error "Misplaced ‘:=’"))
+	     (error "Misplaced `:='"))
 	    (t
 	     (looking-at "[^\n\t ]*")
 	     (let ((end (match-end 0)))
@@ -673,7 +672,7 @@
   (or last-kbd-macro
       (error "No keyboard macro defined"))
   (setq calc-invocation-macro last-kbd-macro)
-  (message "Use ‘C-x * Z’ to invoke this macro"))
+  (message "Use `C-x * Z' to invoke this macro"))
 
 (defun calc-user-define-edit ()
   (interactive)  ; but no calc-wrapper!
@@ -1287,37 +1286,37 @@ Redefine the corresponding command."
   (setq rpt-count (if rpt-count (prefix-numeric-value rpt-count) 1000000))
   (let* ((count 0)
 	 (parts nil)
-	 (body "")
+	 (body (vector))
 	 (open last-command-event)
 	 (counter initial)
 	 ch)
     (or executing-kbd-macro
 	(message "Reading loop body..."))
     (while (>= count 0)
-      (setq ch (read-char))
-      (if (= ch -1)
+      (setq ch (read-event))
+      (if (eq ch -1)
 	  (error "Unterminated Z%c in keyboard macro" open))
-      (if (= ch ?Z)
+      (if (eq ch ?Z)
 	  (progn
-	    (setq ch (read-char)
-		  body (concat body "Z" (char-to-string ch)))
+	    (setq ch (read-event)
+		  body (vconcat body (vector ?Z ch)))
 	    (cond ((memq ch '(?\< ?\( ?\{))
 		   (setq count (1+ count)))
 		  ((memq ch '(?\> ?\) ?\}))
 		   (setq count (1- count)))
 		  ((and (= ch ?/)
 			(= count 0))
-		   (setq parts (nconc parts (list (concat (substring body 0 -2)
-							  "Z]")))
+		   (setq parts (nconc parts (list (vconcat (substring body 0 -2)
+							  (vector ?Z ?\])  )))
 			 body ""))
 		  ((eq ch 7)
 		   (keyboard-quit))))
-	(setq body (concat body (char-to-string ch)))))
+	(setq body (vconcat body (vector ch)))))
     (if (/= ch (cdr (assq open '( (?\< . ?\>) (?\( . ?\)) (?\{ . ?\}) ))))
 	(error "Mismatched Z%c and Z%c in keyboard macro" open ch))
     (or executing-kbd-macro
 	(message "Looping..."))
-    (setq body (concat (substring body 0 -2) "Z]"))
+    (setq body (vconcat (substring body 0 -2) (vector ?Z ?\])   ))
     (and (not executing-kbd-macro)
 	 (= rpt-count 1000000)
 	 (null parts)
@@ -1899,7 +1898,7 @@ Redefine the corresponding command."
 			  `((and
 			     (,chk ,var)
 			     (math-reject-arg ,var ',qual)))))
-	      (error "Unknown qualifier ‘%s’" qual-name))))))))
+	      (error "Unknown qualifier `%s'" qual-name))))))))
 
 (defun math-do-arg-list-check (args is-opt is-rest)
   (cond ((null args) nil)

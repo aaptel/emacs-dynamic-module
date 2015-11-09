@@ -7,9 +7,6 @@ import re
 
 EMACS = os.path.join('..', 'src', 'emacs')
 
-def test_module(modulepath):
-        return r == 0
-
 def find_modules():
     modpaths = []
     for (dirname, dirs, files) in os.walk('.'):
@@ -134,12 +131,9 @@ all: ${module}.so ${module}.doc
 
 int plugin_is_GPL_compatible;
 
-static emacs_value Qnil;
-static emacs_value Qt;
-
 static emacs_value ${c_func} (emacs_env *env, int nargs, emacs_value args[], void *data)
 {
-  return Qt;
+  return env->intern (env, "t");
 }
 
 /* Binds NAME to FUN */
@@ -165,8 +159,6 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  Qnil = env->intern (env, "nil");
-  Qt = env->intern (env, "t");
   bind_function (env, "${lisp_func}", env->make_function (env, 1, 1, ${c_func}, NULL));
   provide (env, "${module}");
   return 0;
@@ -180,7 +172,7 @@ int emacs_module_init (struct emacs_runtime *ert)
 (module-load (module-path (or #$$ (expand-file-name (buffer-file-name)))))
 
 (ert-deftest ${lisp_func}-test ()
-  (should (= (+ 1 1) 2)))
+  (should (eq (${lisp_func} 42) t)))
 ''')
 }
 

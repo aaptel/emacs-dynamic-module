@@ -490,8 +490,8 @@ The type returned can be `comment', `string' or `paren'."
 
 (defsubst python-syntax-closing-paren-p ()
   "Return non-nil if char after point is a closing paren."
-  (= (syntax-class (syntax-after (point)))
-     (syntax-class (string-to-syntax ")"))))
+  (eql (syntax-class (syntax-after (point)))
+       (syntax-class (string-to-syntax ")"))))
 
 (define-obsolete-function-alias
   'python-info-ppss-context #'python-syntax-context "24.3")
@@ -619,6 +619,11 @@ The type returned can be `comment', `string' or `paren'."
   (syntax-propertize-rules
    ((python-rx string-delimiter)
     (0 (ignore (python-syntax-stringify))))))
+
+(defconst python--prettify-symbols-alist
+  '(("lambda"  . ?λ)
+    ("and" . ?∧)
+    ("or" . ?∨)))
 
 (defsubst python-syntax-count-quotes (quote-char &optional point limit)
   "Count number of quotes around point (max is 3).
@@ -2819,7 +2824,7 @@ of `error' with a user-friendly message."
   (or (python-shell-get-process)
       (if interactivep
           (user-error
-           "Start a Python process first with ‘%s’ or ‘%s’."
+           "Start a Python process first with `%s' or `%s'."
            (substitute-command-keys "\\[run-python]")
            ;; Get the binding.
            (key-description
@@ -2979,7 +2984,7 @@ This is a wrapper over `buffer-substring' that takes care of
 different transformations for the code sent to be evaluated in
 the python shell:
   1. When optional argument NOMAIN is non-nil everything under an
-     \"if __name__ == '__main__'\" block will be removed.
+     \"if __name__ == \\='__main__\\='\" block will be removed.
   2. When a subregion of the buffer is sent, it takes care of
      appending extra empty lines so tracebacks are correct.
   3. When the region sent is a substring of the current buffer, a
@@ -3635,12 +3640,18 @@ Never set this variable directly, use
   "Set the buffer for FILE-NAME as the tracked buffer.
 Internally it uses the `python-pdbtrack-tracked-buffer' variable.
 Returns the tracked buffer."
-  (let ((file-buffer (get-file-buffer
-                      (concat (file-remote-p default-directory)
-                              file-name))))
+  (let* ((file-name-prospect (concat (file-remote-p default-directory)
+                              file-name))
+         (file-buffer (get-file-buffer file-name-prospect)))
     (if file-buffer
         (setq python-pdbtrack-tracked-buffer file-buffer)
-      (setq file-buffer (find-file-noselect file-name))
+      (cond
+       ((file-exists-p file-name-prospect)
+        (setq file-buffer (find-file-noselect file-name-prospect)))
+       ((and (not (equal file-name file-name-prospect))
+             (file-exists-p file-name))
+        ;; Fallback to a locally available copy of the file.
+        (setq file-buffer (find-file-noselect file-name-prospect))))
       (when (not (member file-buffer python-pdbtrack-buffers-to-kill))
         (add-to-list 'python-pdbtrack-buffers-to-kill file-buffer)))
     file-buffer))
@@ -4006,7 +4017,7 @@ The skeleton will be bound to python-skeleton-NAME."
   (let* ((name (symbol-name name))
          (function-name (intern (concat "python-skeleton--" name)))
          (msg (format-message
-               "Add ‘%s’ clause? " name)))
+               "Add `%s' clause? " name)))
     (when (not skel)
       (setq skel
             `(< ,(format "%s:" name) \n \n
@@ -5098,6 +5109,9 @@ returned as is."
            "`outline-level' function for Python mode."
            (1+ (/ (current-indentation) python-indent-offset))))
 
+  (set (make-local-variable 'prettify-symbols-alist)
+       python--prettify-symbols-alist)
+
   (python-skeleton-add-menu-items)
 
   (make-local-variable 'python-shell-internal-buffer)
@@ -5109,7 +5123,6 @@ returned as is."
 (provide 'python)
 
 ;; Local Variables:
-;; coding: utf-8
 ;; indent-tabs-mode: nil
 ;; End:
 

@@ -62,7 +62,7 @@ ine\\(?:-global\\)?-minor-mode\\|ine-compilation-mode\\|un-cvs-mode\\|\
 foo\\|\\(?:[^icfgv]\\|g[^r]\\)\\(\\w\\|\\s_\\)+\\*?\\)\\|easy-mmode-define-[a-z-]+\\|easy-menu-define\\|\
 menu-bar-make-toggle\\)"
    find-function-space-re
-   "\\('\\|\(quote \\)?%s\\(\\s-\\|$\\|\(\\|\)\\)")
+   "\\('\\|(quote \\)?%s\\(\\s-\\|$\\|[()]\\)")
   "The regexp used by `find-function' to search for a function definition.
 Note it must contain a `%s' at the place where `format'
 should insert the function name.  The default value avoids `defconst',
@@ -296,7 +296,7 @@ Otherwise, TYPE specifies the kind of definition,
 and it is interpreted via `find-function-regexp-alist'.
 The search is done in the source for library LIBRARY."
   (if (null library)
-      (error "Don't know where ‘%s’ is defined" symbol))
+      (error "Don't know where `%s' is defined" symbol))
   ;; Some functions are defined as part of the construct
   ;; that defines something else.
   (while (and (symbolp symbol) (get symbol 'definition-name))
@@ -368,9 +368,9 @@ message about the whole chain of aliases."
           (setq aliases (if aliases
                             (concat aliases
                                     (format-message
-                                     ", which is an alias for ‘%s’"
+                                     ", which is an alias for `%s'"
                                      (symbol-name def)))
-                          (format-message "‘%s’ is an alias for ‘%s’"
+                          (format-message "`%s' is an alias for `%s'"
                                           function (symbol-name def)))))
       (setq function (find-function-advised-original function)
             def (find-function-advised-original function)))

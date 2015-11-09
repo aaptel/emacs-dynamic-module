@@ -681,7 +681,7 @@
   '("\\`/\\(\\([^/:]*\\)@\\)?\\([^@/:]*[^@/:.]\\):\\(.*\\)" . (3 2 4))
   "Format of a fully expanded remote file name.
 
-This is a list of the form \(REGEXP HOST USER NAME\),
+This is a list of the form \(REGEXP HOST USER NAME),
 where REGEXP is a regular expression matching
 the full remote name, and HOST, USER, and NAME are the numbers of
 parenthesized expressions in REGEXP for the components (in that order)."
@@ -1366,8 +1366,8 @@ only return the directory part of FILE."
     (goto-char end)))
 
 ;; Read in ~/.netrc, if one exists.  If ~/.netrc file exists and has
-;; the correct permissions then extract the \`machine\', \`login\',
-;; \`password\' and \`account\' information from within.
+;; the correct permissions then extract the machine, login,
+;; password and account information from within.
 
 (defun ange-ftp-parse-netrc ()
   ;; We set this before actually doing it to avoid the possibility
@@ -2511,7 +2511,7 @@ Works by doing a pwd and examining the directory syntax."
 ;;;; Remote file and directory listing support.
 ;;;; ------------------------------------------------------------
 
-;; Returns whether HOST's FTP server doesn't like \'ls\' or \'dir\' commands
+;; Returns whether HOST's FTP server doesn't like 'ls' or 'dir' commands
 ;; to take switch arguments.
 (defun ange-ftp-dumb-unix-host (host)
   (and host ange-ftp-dumb-unix-host-regexp
@@ -4626,7 +4626,7 @@ NEWNAME should be the name to give the new compressed or uncompressed file.")
 	    (format  "%s %s \"%s\""	; remsh -l USER does not work well
 					; on a hp-ux machine I tried
 		     remote-shell-program host command))
-      (ange-ftp-message "Remote command ‘%s’ ..." command)
+      (ange-ftp-message "Remote command `%s' ..." command)
       ;; Cannot call ange-ftp-real-dired-run-shell-command here as it
       ;; would prepend "cd default-directory" --- which bombs because
       ;; default-directory is in ange-ftp syntax for remote file names.
@@ -5978,7 +5978,7 @@ Other orders of $ and _ seem to all work just fine.")
 
 (defcustom ange-ftp-bs2000-special-prefix
   "X"
-  "Prefix used for filenames starting with ‘#’ or ‘@’."
+  "Prefix used for filenames starting with `#' or `@'."
   :group 'ange-ftp
   :type 'string)
 

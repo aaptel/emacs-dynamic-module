@@ -32,9 +32,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "keyboard.h"
 #include "frame.h"
-#include "syssignal.h"
-#include "termhooks.h"  /* For FRAME_KBOARD reference in y-or-n-p.  */
-#include "font.h"
 #include "keymap.h"
 
 static void swap_in_symval_forwarding (struct Lisp_Symbol *,
@@ -230,8 +227,9 @@ for example, (type-of 1) returns `integer'.  */)
 	case Lisp_Misc_User_Ptr:
 	  return Quser_ptr;
 #endif
+	default:
+	  emacs_abort ();
 	}
-      emacs_abort ();
 
     case Lisp_Vectorlike:
       if (WINDOW_CONFIGURATIONP (object))
@@ -574,7 +572,7 @@ DEFUN ("setcar", Fsetcar, Ssetcar, 2, 2, 0,
   (register Lisp_Object cell, Lisp_Object newcar)
 {
   CHECK_CONS (cell);
-  CHECK_IMPURE (cell);
+  CHECK_IMPURE (cell, XCONS (cell));
   XSETCAR (cell, newcar);
   return newcar;
 }
@@ -584,7 +582,7 @@ DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
   (register Lisp_Object cell, Lisp_Object newcdr)
 {
   CHECK_CONS (cell);
-  CHECK_IMPURE (cell);
+  CHECK_IMPURE (cell, XCONS (cell));
   XSETCDR (cell, newcdr);
   return newcdr;
 }
@@ -805,7 +803,7 @@ SUBR must be a built-in function.  */)
 DEFUN ("interactive-form", Finteractive_form, Sinteractive_form, 1, 1, 0,
        doc: /* Return the interactive form of CMD or nil if none.
 If CMD is not a command, the return value is nil.
-Value, if non-nil, is a list \(interactive SPEC).  */)
+Value, if non-nil, is a list (interactive SPEC).  */)
   (Lisp_Object cmd)
 {
   Lisp_Object fun = indirect_function (cmd); /* Check cycles.  */
@@ -1257,6 +1255,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	return;
     }
 
+  maybe_set_redisplay (symbol);
   sym = XSYMBOL (symbol);
 
  start:
@@ -1674,8 +1673,8 @@ DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
        1, 1, "vMake Local Variable: ",
        doc: /* Make VARIABLE have a separate value in the current buffer.
 Other buffers will continue to share a common default value.
-\(The buffer-local value of VARIABLE starts out as the same value
-VARIABLE previously had.  If VARIABLE was void, it remains void.\)
+(The buffer-local value of VARIABLE starts out as the same value
+VARIABLE previously had.  If VARIABLE was void, it remains void.)
 Return VARIABLE.
 
 If the variable is already arranged to become local when set,
@@ -1683,7 +1682,7 @@ this function causes a local value to exist for this buffer,
 just as setting the variable would do.
 
 This function returns VARIABLE, and therefore
-  (set (make-local-variable 'VARIABLE) VALUE-EXP)
+  (set (make-local-variable \\='VARIABLE) VALUE-EXP)
 works.
 
 See also `make-variable-buffer-local'.
@@ -2229,10 +2228,10 @@ bool-vector.  IDX starts at 0.  */)
   CHECK_NUMBER (idx);
   idxval = XINT (idx);
   CHECK_ARRAY (array, Qarrayp);
-  CHECK_IMPURE (array);
 
   if (VECTORP (array))
     {
+      CHECK_IMPURE (array, XVECTOR (array));
       if (idxval < 0 || idxval >= ASIZE (array))
 	args_out_of_range (array, idx);
       ASET (array, idxval, newelt);
@@ -2252,6 +2251,7 @@ bool-vector.  IDX starts at 0.  */)
     {
       int c;
 
+      CHECK_IMPURE (array, XSTRING (array));
       if (idxval < 0 || idxval >= SCHARS (array))
 	args_out_of_range (array, idx);
       CHECK_CHARACTER (newelt);
@@ -2616,6 +2616,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args)
       accum = 0;
       break;
     case Amult:
+    case Adiv:
       accum = 1;
       break;
     case Alogand:
@@ -2671,7 +2672,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args)
 	    accum *= next;
 	  break;
 	case Adiv:
-	  if (!argnum)
+	  if (! (argnum || nargs == 1))
 	    accum = next;
 	  else
 	    {
@@ -2740,7 +2741,7 @@ float_arith_driver (double accum, ptrdiff_t argnum, enum arithop code,
 	  accum *= next;
 	  break;
 	case Adiv:
-	  if (!argnum)
+	  if (! (argnum || nargs == 1))
 	    accum = next;
 	  else
 	    {
@@ -2795,9 +2796,11 @@ usage: (* &rest NUMBERS-OR-MARKERS)  */)
 }
 
 DEFUN ("/", Fquo, Squo, 1, MANY, 0,
-       doc: /* Return first argument divided by all the remaining arguments.
+       doc: /* Divide number by divisors and return the result.
+With two or more arguments, return first argument divided by the rest.
+With one argument, return 1 divided by the argument.
 The arguments must be numbers or markers.
-usage: (/ DIVIDEND &rest DIVISORS)  */)
+usage: (/ NUMBER &rest DIVISORS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   ptrdiff_t argnum;

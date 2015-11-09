@@ -23,7 +23,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "character.h"
 #include "charset.h"
-#include "ccl.h"
 
 /* 64/16/32/128 */
 
@@ -534,7 +533,7 @@ DEFUN ("char-table-parent", Fchar_table_parent, Schar_table_parent,
 The value is either nil or another char-table.
 If CHAR-TABLE holds nil for a given character,
 then the actual applicable value is inherited from the parent char-table
-\(or from its parents, if necessary).  */)
+(or from its parents, if necessary).  */)
   (Lisp_Object char_table)
 {
   CHECK_CHAR_TABLE (char_table);

@@ -23,11 +23,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <stdio.h>
 
 #include "lisp.h"
-#include "character.h"
 #include "buffer.h"
 #include "keyboard.h"
 #include "keymap.h"
-#include "menu.h"
 #include "frame.h"
 #include "window.h"
 #include "commands.h"
@@ -36,7 +34,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "disptab.h"
 #include "dispextern.h"
 #include "blockinput.h"
-#include "intervals.h"
 #include "termhooks.h"		/* For FRAME_TERMINAL.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -206,6 +203,20 @@ wset_combination (struct window *w, bool horflag, Lisp_Object val)
      is meaningless.  */
   if (!NILP (val))
     w->horizontal = horflag;
+}
+
+static void
+wset_update_mode_line (struct window *w)
+{
+  /* If this window is the selected window on its frame, set the
+     global variable update_mode_lines, so that x_consider_frame_title
+     will consider this frame's title for rtedisplay.  */
+  Lisp_Object fselected_window = XFRAME (WINDOW_FRAME (w))->selected_window;
+
+  if (WINDOWP (fselected_window) && XWINDOW (fselected_window) == w)
+    update_mode_lines = 42;
+  else
+    w->update_mode_line = true;
 }
 
 /* True if leaf window W doesn't reflect the actual state
@@ -641,7 +652,7 @@ DEFUN ("window-combination-limit", Fwindow_combination_limit, Swindow_combinatio
 WINDOW must be a valid window used in horizontal or vertical combination.
 If the return value is nil, child windows of WINDOW can be recombined with
 WINDOW's siblings.  A return value of t means that child windows of
-WINDOW are never \(re-)combined with WINDOW's siblings.  */)
+WINDOW are never (re-)combined with WINDOW's siblings.  */)
   (Lisp_Object window)
 {
   struct window *w;
@@ -658,7 +669,7 @@ DEFUN ("set-window-combination-limit", Fset_window_combination_limit, Sset_windo
 WINDOW must be a valid window used in horizontal or vertical combination.
 If LIMIT is nil, child windows of WINDOW can be recombined with WINDOW's
 siblings.  LIMIT t means that child windows of WINDOW are never
-\(re-)combined with WINDOW's siblings.  Other values are reserved for
+(re-)combined with WINDOW's siblings.  Other values are reserved for
 future use.  */)
   (Lisp_Object window, Lisp_Object limit)
 {
@@ -1291,10 +1302,18 @@ window_relative_x_coord (struct window *w, enum window_part part, int x)
 	      + window_box_width (w, RIGHT_MARGIN_AREA)
 	      + ((WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w))
 		 ? WINDOW_RIGHT_FRINGE_WIDTH (w) : 0));
-    }
 
-  /* ON_SCROLL_BAR, ON_NOTHING, and ON_VERTICAL_BORDER:  */
-  return 0;
+    case ON_NOTHING:
+    case ON_VERTICAL_BORDER:
+    case ON_VERTICAL_SCROLL_BAR:
+    case ON_HORIZONTAL_SCROLL_BAR:
+    case ON_RIGHT_DIVIDER:
+    case ON_BOTTOM_DIVIDER:
+      return 0;
+
+    default:
+      emacs_abort ();
+    }
 }
 
 
@@ -1304,7 +1323,7 @@ DEFUN ("coordinates-in-window-p", Fcoordinates_in_window_p,
 WINDOW must be a live window and defaults to the selected one.
 COORDINATES is a cons of the form (X . Y), X and Y being distances
 measured in characters from the upper-left corner of the frame.
-\(0 . 0) denotes the character in the upper left corner of the
+(0 . 0) denotes the character in the upper left corner of the
 frame.
 If COORDINATES are in the text portion of WINDOW,
    the coordinates relative to the window are returned.
@@ -1661,7 +1680,7 @@ overriding motion of point in order to display at this exact start.  */)
   w->start_at_line_beg = false;
   if (NILP (noforce))
     w->force_start = true;
-  w->update_mode_line = true;
+  wset_update_mode_line (w);
   /* Bug#15957.  */
   w->window_end_valid = false;
   wset_redisplay (w);
@@ -1678,8 +1697,10 @@ Return nil if that position is scrolled vertically out of view.  If a
 character is only partially visible, nil is returned, unless the
 optional argument PARTIALLY is non-nil.  If POS is only out of view
 because of horizontal scrolling, return non-nil.  If POS is t, it
-specifies the position of the last visible glyph in WINDOW.  POS
-defaults to point in WINDOW; WINDOW defaults to the selected window.
+specifies either the first position displayed on the last visible
+screen line in WINDOW, or the end-of-buffer position, whichever comes
+first.  POS defaults to point in WINDOW; WINDOW defaults to the
+selected window.
 
 If POS is visible, return t if PARTIALLY is nil; if PARTIALLY is non-nil,
 the return value is a list of 2 or 6 elements (X Y [RTOP RBOT ROWH VPOS]),
@@ -1688,7 +1709,7 @@ of the window.  The remaining elements are omitted if the character after
 POS is fully visible; otherwise, RTOP and RBOT are the number of pixels
 off-window at the top and bottom of the screen line ("row") containing
 POS, ROWH is the visible height of that row, and VPOS is the row number
-\(zero-based).  */)
+(zero-based).  */)
   (Lisp_Object pos, Lisp_Object window, Lisp_Object partially)
 {
   struct window *w;
@@ -3264,7 +3285,8 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
   /* Maybe we could move this into the `if' but it's not obviously safe and
      I doubt it's worth the trouble.  */
   wset_redisplay (w);
-  w->update_mode_line = true;
+
+  wset_update_mode_line (w);
 
   /* We must select BUFFER to run the window-scroll-functions and to look up
      the buffer-local value of Vwindow_point_insertion_type.  */
@@ -3961,7 +3983,6 @@ resize_frame_windows (struct frame *f, int size, bool horflag, bool pixelwise)
   /* old_size is the old size of the frame's root window.  */
   int old_size = horflag ? r->total_cols : r->total_lines;
   int old_pixel_size = horflag ? r->pixel_width : r->pixel_height;
-  int old_pixel_top = r->pixel_top;
   /* new_size is the new size of the frame's root window.  */
   int new_size, new_pixel_size;
   int unit = horflag ? FRAME_COLUMN_WIDTH (f) : FRAME_LINE_HEIGHT (f);
@@ -3991,11 +4012,8 @@ resize_frame_windows (struct frame *f, int size, bool horflag, bool pixelwise)
       new_pixel_size = new_size * unit;
     }
 
-  r->top_line = FRAME_TOP_MARGIN (f);
-  r->pixel_top = FRAME_TOP_MARGIN_HEIGHT (f);
-
   if (new_pixel_size == old_pixel_size
-      && r->pixel_top == old_pixel_top)
+      && (horflag || r->pixel_top == FRAME_TOP_MARGIN_HEIGHT (f)))
     ;
   else if (WINDOW_LEAF_P (r))
     /* For a leaf root window just set the size.  */
@@ -4006,12 +4024,21 @@ resize_frame_windows (struct frame *f, int size, bool horflag, bool pixelwise)
       }
     else
       {
+	r->top_line = FRAME_TOP_MARGIN (f);
+	r->pixel_top = FRAME_TOP_MARGIN_HEIGHT (f);
+
 	r->total_lines = new_size;
 	r->pixel_height = new_pixel_size;
       }
   else
     {
       Lisp_Object delta;
+
+      if (!horflag)
+	{
+	  r->top_line = FRAME_TOP_MARGIN (f);
+	  r->pixel_top = FRAME_TOP_MARGIN_HEIGHT (f);
+	}
 
       if (pixelwise)
 	XSETINT (delta, new_pixel_size - old_pixel_size);
@@ -4810,7 +4837,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		  set_marker_restricted (w->start, make_number (spos),
 					 w->contents);
 		  w->start_at_line_beg = true;
-		  w->update_mode_line = true;
+		  wset_update_mode_line (w);
 		  /* Set force_start so that redisplay_window will run the
 		     window-scroll-functions.  */
 		  w->force_start = true;
@@ -4958,7 +4985,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 				  IT_BYTEPOS (it));
       bytepos = marker_byte_position (w->start);
       w->start_at_line_beg = (pos == BEGV || FETCH_BYTE (bytepos - 1) == '\n');
-      w->update_mode_line = true;
+      wset_update_mode_line (w);
       /* Set force_start so that redisplay_window will run the
 	 window-scroll-functions.  */
       w->force_start = true;
@@ -5192,7 +5219,7 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 
       set_marker_restricted_both (w->start, w->contents, pos, pos_byte);
       w->start_at_line_beg = !NILP (bolp);
-      w->update_mode_line = true;
+      wset_update_mode_line (w);
       /* Set force_start so that redisplay_window will run
 	 the window-scroll-functions.  */
       w->force_start = true;
@@ -6599,7 +6626,6 @@ apply_window_adjustment (struct window *w)
   eassert (w);
   clear_glyph_matrix (w->current_matrix);
   w->window_end_valid = false;
-  windows_or_buffers_changed = 30;
   wset_redisplay (w);
   adjust_frame_glyphs (XFRAME (WINDOW_FRAME (w)));
 }

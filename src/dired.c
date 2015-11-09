@@ -39,10 +39,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "systime.h"
-#include "character.h"
 #include "buffer.h"
-#include "commands.h"
-#include "charset.h"
 #include "coding.h"
 #include "regex.h"
 #include "blockinput.h"
@@ -397,8 +394,10 @@ Returns nil if DIRECTORY contains no name starting with FILE.
 If PREDICATE is non-nil, call PREDICATE with each possible
 completion (in absolute form) and ignore it if PREDICATE returns nil.
 
-This function ignores some of the possible completions as
-determined by the variable `completion-ignored-extensions', which see.  */)
+This function ignores some of the possible completions as determined
+by the variables `completion-regexp-list' and
+`completion-ignored-extensions', which see.  `completion-regexp-list'
+is matched against file and directory names relative to DIRECTORY.  */)
   (Lisp_Object file, Lisp_Object directory, Lisp_Object predicate)
 {
   Lisp_Object handler;
@@ -422,7 +421,12 @@ determined by the variable `completion-ignored-extensions', which see.  */)
 DEFUN ("file-name-all-completions", Ffile_name_all_completions,
        Sfile_name_all_completions, 2, 2, 0,
        doc: /* Return a list of all completions of file name FILE in directory DIRECTORY.
-These are all file names in directory DIRECTORY which begin with FILE.  */)
+These are all file names in directory DIRECTORY which begin with FILE.
+
+This function ignores some of the possible completions as determined
+by the variables `completion-regexp-list' and
+`completion-ignored-extensions', which see.  `completion-regexp-list'
+is matched against file and directory names relative to DIRECTORY.  */)
   (Lisp_Object file, Lisp_Object directory)
 {
   Lisp_Object handler;
@@ -816,7 +820,7 @@ DEFUN ("file-attributes", Ffile_attributes, Sfile_attributes, 1, 2, 0,
 Value is nil if specified file cannot be opened.
 
 ID-FORMAT specifies the preferred format of attributes uid and gid (see
-below) - valid values are 'string and 'integer.  The latter is the
+below) - valid values are `string' and `integer'.  The latter is the
 default, but we plan to change that, so you should specify a non-nil value
 for ID-FORMAT if you use the returned uid or gid.
 

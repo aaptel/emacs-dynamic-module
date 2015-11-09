@@ -74,7 +74,7 @@ truenames (those with the extension \".toda\")."
   (let ((files (if (file-exists-p todo-directory)
 		   (mapcar 'file-truename
 		    (directory-files todo-directory t
-				     (if archives "\.toda$" "\.todo$") t)))))
+				     (if archives "\\.toda$" "\\.todo$") t)))))
     (sort files (lambda (s1 s2) (let ((cis1 (upcase s1))
 				      (cis2 (upcase s2)))
 				  (string< cis1 cis2))))))
@@ -238,7 +238,7 @@ The final element is \"*\", indicating an unspecified month.")
 		     (widget-put
 		      widget :error
 		      (format-message
-		       "Invalid value: must be distinct from ‘todo-item-mark’"))
+		       "Invalid value: must be distinct from `todo-item-mark'"))
 		     widget)))
   :initialize 'custom-initialize-default
   :set 'todo-reset-prefix
@@ -1112,7 +1112,7 @@ these files, also rename them accordingly."
 	 (snname (todo-short-file-name nname))
 	 (files (directory-files todo-directory t
 				 (concat ".*" (regexp-quote soname)
-					 ".*\.tod[aorty]$") t)))
+					 ".*\\.tod[aorty]$") t)))
     (dolist (f files)
       (let* ((sfname (todo-short-file-name f))
 	     (fext (file-name-extension f t))
@@ -1343,12 +1343,13 @@ todo or done items."
 			    "deleting it will also delete the file.\n"
 			    "Do you want to proceed? ")))
 		  ((> archived 0)
-		   (todo-y-or-n-p (concat "This category has archived items; "
+		   (todo-y-or-n-p (format-message
+				   (concat "This category has archived items; "
 				     "the archived category will remain\n"
 				     "after deleting the todo category.  "
 				     "Do you still want to delete it\n"
-				     "(see ‘todo-skip-archived-categories’ "
-				     "for another option)? ")))
+				     "(see `todo-skip-archived-categories' "
+				     "for another option)? "))))
 		  (t
 		   (todo-y-or-n-p (concat "Permanently remove category \"" cat
 				     "\"" (and arg " and all its entries")
@@ -1696,7 +1697,7 @@ only when no items are marked."
 		     (widget-put
 		      widget :error
 		      (format-message
-		       "Invalid value: must be distinct from ‘todo-prefix’"))
+		       "Invalid value: must be distinct from `todo-prefix'"))
 		     widget)))
   :set (lambda (symbol value)
 	 (custom-set-default symbol (propertize value 'face 'todo-mark)))
@@ -3962,7 +3963,7 @@ regexp items."
 (defun todo-find-filtered-items-file ()
   "Choose a filtered items file and visit it."
   (interactive)
-  (let ((files (directory-files todo-directory t "\.tod[rty]$" t))
+  (let ((files (directory-files todo-directory t "\\.tod[rty]$" t))
 	falist file)
     (dolist (f files)
       (let ((type (cond ((equal (file-name-extension f) "todr") "regexp")
@@ -4891,7 +4892,7 @@ With nil or omitted CATEGORY, default to the current category."
 	(widen)
 	(goto-char (point-min))
 	(setq todo-categories
-	      (if (looking-at "\(\(\"")
+	      (if (looking-at "((\"")
 		  (read (buffer-substring-no-properties
 			 (line-beginning-position)
 			 (line-end-position)))
@@ -5036,7 +5037,7 @@ but the categories sexp differs from the current value of
 	;; Warn user if categories sexp has changed.
 	(unless (string= ssexp cats)
 	  (message (concat "The sexp at the beginning of the file differs "
-			   "from the value of ‘todo-categories’.\n"
+			   "from the value of `todo-categories'.\n"
 			   "If the sexp is wrong, you can fix it with "
 			   "M-x todo-repair-categories-sexp,\n"
 			   "but note this reverts any changes you have "
@@ -5533,7 +5534,7 @@ already entered and those still available."
 			 (todo-insert-item--this-key)
 			 todo-insert-item--argsleft)))))))))
       (setq todo-insert-item--argsleft todo-insert-item--newargsleft))
-    (when prompt (message "Press a key (so far ‘%s’): %s"
+    (when prompt (message "Press a key (so far `%s'): %s"
 			  todo-insert-item--keys-so-far prompt))
     (set-transient-map map)
     (setq todo-insert-item--argsleft argsleft)))
@@ -5576,7 +5577,8 @@ already entered and those still available."
 							'(add/edit delete))
 					      " comment"))))
 			  params " "))
-	 (this-key (let ((key (read-key (concat todo-edit-item--prompt p->k))))
+	 (key-prompt (substitute-command-keys todo-edit-item--prompt))
+	 (this-key (let ((key (read-key (concat key-prompt p->k))))
 		     (and (characterp key) (char-to-string key))))
 	 (this-param (car (rassoc this-key params))))
     (pcase this-param
@@ -5587,7 +5589,7 @@ already entered and those still available."
       (`delete (todo-edit-item--text 'comment-delete))
       (`diary (todo-edit-item--diary-inclusion))
       (`nonmarking (todo-edit-item--diary-inclusion 'nonmarking))
-      (`date (let ((todo-edit-item--prompt "Press a key (so far ‘e d’): "))
+      (`date (let ((todo-edit-item--prompt "Press a key (so far `e d'): "))
 	       (todo-edit-item--next-key
 		todo-edit-item--date-param-key-alist arg)))
       (`full (progn (todo-edit-item--header 'date)
@@ -5641,9 +5643,10 @@ have been removed."
     (when deleted
       (let ((pl (> (length deleted) 1))
 	    (names (mapconcat (lambda (f) (concat "\"" f "\"")) deleted ", ")))
-	(message (concat "File" (if pl "s" "") " " names " ha" (if pl "ve" "s")
+	(message (concat "File" (if pl "s" "") " %s ha" (if pl "ve" "s")
 			 " been deleted and removed from\n"
-			 "the list of category completion files")))
+			 "the list of category completion files")
+		 names))
       (todo-reevaluate-category-completions-files-defcustom)
       (custom-set-default 'todo-category-completions-files
 			  (symbol-value 'todo-category-completions-files))
@@ -6020,7 +6023,7 @@ the empty string (i.e., no time string)."
   "The :set function for user option `todo-nondiary-marker'."
   (let* ((oldvalue (symbol-value symbol))
 	 (files (append todo-files todo-archives
-			(directory-files todo-directory t "\.tod[rty]$" t))))
+			(directory-files todo-directory t "\\.tod[rty]$" t))))
     (custom-set-default symbol value)
     ;; Need to reset these to get font-locking right.
     (setq todo-nondiary-start (nth 0 todo-nondiary-marker)
@@ -6073,7 +6076,7 @@ the empty string (i.e., no time string)."
   "The :set function for user option `todo-done-string'."
   (let ((oldvalue (symbol-value symbol))
 	(files (append todo-files todo-archives
-		       (directory-files todo-directory t "\.todr$" t))))
+		       (directory-files todo-directory t "\\.todr$" t))))
     (custom-set-default symbol value)
     ;; Need to reset this to get font-locking right.
     (setq todo-done-string-start
@@ -6102,7 +6105,7 @@ the empty string (i.e., no time string)."
   "The :set function for user option `todo-comment-string'."
   (let ((oldvalue (symbol-value symbol))
   	(files (append todo-files todo-archives
-		       (directory-files todo-directory t "\.todr$" t))))
+		       (directory-files todo-directory t "\\.todr$" t))))
     (custom-set-default symbol value)
     (when (not (equal value oldvalue))
       (dolist (f files)
@@ -6128,7 +6131,7 @@ the empty string (i.e., no time string)."
   "The :set function for user option `todo-highlight-item'."
   (let ((oldvalue (symbol-value symbol))
 	(files (append todo-files todo-archives
-		       (directory-files todo-directory t "\.tod[rty]$" t))))
+		       (directory-files todo-directory t "\\.tod[rty]$" t))))
     (custom-set-default symbol value)
     (when (not (equal value oldvalue))
       (dolist (f files)
@@ -6602,7 +6605,7 @@ Added to `window-configuration-change-hook' in Todo mode."
   (if (called-interactively-p 'any)
       (message "%s"
                (substitute-command-keys
-                "Type ‘\\[todo-show]’ to enter Todo mode"))
+                "Type `\\[todo-show]' to enter Todo mode"))
     (todo-modes-set-1)
     (todo-modes-set-2)
     (todo-modes-set-3)

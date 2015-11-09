@@ -118,7 +118,7 @@ This can be either \"inline\" or \"attachment\".")
      mm-uu-shar-extract)
     (forward
      ;; Thanks to Edward J. Sabol <sabol@alderaan.gsfc.nasa.gov> and
-     ;; Peter von der Ah\'e <pahe@daimi.au.dk>
+     ;; Peter von der Ahé <pahe@daimi.au.dk>
      "^-+ \\(Start of \\)?Forwarded message"
      "^-+ End \\(of \\)?forwarded message"
      mm-uu-forward-extract
@@ -523,7 +523,8 @@ apply the face `mm-uu-extract'."
 	(when (and mml2015-use (null (mml2015-clear-verify-function)))
 	  (mm-set-handle-multipart-parameter
 	   mm-security-handle 'gnus-details
-	   (format "Clear verification not supported by `%s'.\n" mml2015-use)))
+	   (gnus-format-message
+	    "Clear verification not supported by `%s'.\n" mml2015-use)))
 	(mml2015-extract-cleartext-signature))
       (list (mm-make-handle buf mm-uu-text-plain-type)))))
 
@@ -769,5 +770,9 @@ Assume text has been decoded if DECODED is non-nil."
 	     (mm-uu-dissect-text-parts elem decoded))))))
 
 (provide 'mm-uu)
+
+;; Local Variables:
+;; coding: utf-8
+;; End:
 
 ;;; mm-uu.el ends here

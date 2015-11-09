@@ -458,18 +458,27 @@ A non-nil INTERACTIVE argument means to run the `post-self-insert-hook'."
 	(put-text-property from (point) 'rear-nonsticky
 			   (cons 'hard sticky)))))
 
-(defun open-line (n)
+(declare-function electric-indent-just-newline "electric")
+(defun open-line (n &optional interactive)
   "Insert a newline and leave point before it.
-If there is a fill prefix and/or a `left-margin', insert them
-on the new line if the line would have been blank.
-With arg N, insert N newlines."
-  (interactive "*p")
+If `electric-indent-mode' is enabled, indent the new line if it's
+not empty.
+If there is a fill prefix and/or a `left-margin', insert them on
+the new line.  If the old line would have been blank, insert them
+on the old line as well.
+
+With arg N, insert N newlines.
+A non-nil INTERACTIVE argument means to run the `post-self-insert-hook'."
+  (interactive "*p\np")
   (let* ((do-fill-prefix (and fill-prefix (bolp)))
 	 (do-left-margin (and (bolp) (> (current-left-margin) 0)))
 	 (loc (point-marker))
-	 ;; Don't expand an abbrev before point.
+         ;; Don't expand an abbrev before point.
 	 (abbrev-mode nil))
-    (newline n)
+    (if (and interactive
+             (looking-at-p "[[:space:]]*$"))
+        (electric-indent-just-newline n)
+      (newline n interactive))
     (goto-char loc)
     (while (> n 0)
       (cond ((bolp)
@@ -478,6 +487,7 @@ With arg N, insert N newlines."
       (forward-line 1)
       (setq n (1- n)))
     (goto-char loc)
+    ;; Necessary in case a margin or prefix was inserted.
     (end-of-line)))
 
 (defun split-line (&optional arg)
@@ -895,8 +905,8 @@ With numeric arg N, put point N/10 of the way from the beginning.
 If the buffer is narrowed, this command uses the beginning of the
 accessible part of the buffer.
 
-If Transient Mark mode is disabled, leave mark at previous
-position, unless a \\[universal-argument] prefix is supplied."
+Push mark at previous position, unless either a \\[universal-argument] prefix
+is supplied, or Transient Mark mode is enabled and the mark is active."
   (declare (interactive-only "use `(goto-char (point-min))' instead."))
   (interactive "^P")
   (or (consp arg)
@@ -919,8 +929,8 @@ With numeric arg N, put point N/10 of the way from the end.
 If the buffer is narrowed, this command uses the end of the
 accessible part of the buffer.
 
-If Transient Mark mode is disabled, leave mark at previous
-position, unless a \\[universal-argument] prefix is supplied."
+Push mark at previous position, unless either a \\[universal-argument] prefix
+is supplied, or Transient Mark mode is enabled and the mark is active."
   (declare (interactive-only "use `(goto-char (point-max))' instead."))
   (interactive "^P")
   (or (consp arg) (region-active-p) (push-mark))
@@ -1655,7 +1665,7 @@ invoking, give a prefix argument to `execute-extended-command'."
 		       (not executing-kbd-macro)
 		       (where-is-internal function overriding-local-map t))))
     (unless (commandp function)
-      (error "‘%s’ is not a valid command name" command-name))
+      (error "`%s' is not a valid command name" command-name))
     (setq this-command function)
     ;; Normally `real-this-command' should never be changed, but here we really
     ;; want to pretend that M-x <cmd> RET is nothing more than a "key
@@ -1689,7 +1699,7 @@ invoking, give a prefix argument to `execute-extended-command'."
                            (symbol-name function) typed))))
         (when binding
           (with-temp-message
-              (format-message "You can run the command ‘%s’ with %s"
+              (format-message "You can run the command `%s' with %s"
                               function
                               (if (stringp binding)
                                   (concat "M-x " binding " RET")
@@ -1711,9 +1721,13 @@ The argument SPECIAL, if non-nil, means that this command is executing
 a special event, so ignore the prefix argument and don't clear it."
   (setq debug-on-next-call nil)
   (let ((prefixarg (unless special
+                     ;; FIXME: This should probably be done around
+                     ;; pre-command-hook rather than here!
                      (prog1 prefix-arg
                        (setq current-prefix-arg prefix-arg)
-                       (setq prefix-arg nil)))))
+                       (setq prefix-arg nil)
+                       (when current-prefix-arg
+                         (prefix-command-update))))))
     (if (and (symbolp cmd)
              (get cmd 'disabled)
              disabled-command-function)
@@ -2797,7 +2811,7 @@ This variable only matters if `undo-ask-before-discard' is non-nil.")
 	(setq undo-extra-outer-limit (+ size 50000))
 	(if (let (use-dialog-box track-mouse executing-kbd-macro )
 	      (yes-or-no-p (format-message
-                            "Buffer ‘%s’ undo info is %d bytes long; discard it? "
+                            "Buffer `%s' undo info is %d bytes long; discard it? "
                             (buffer-name) size)))
 	    (progn (setq buffer-undo-list nil)
 		   (setq undo-extra-outer-limit nil)
@@ -2806,7 +2820,7 @@ This variable only matters if `undo-ask-before-discard' is non-nil.")
     (display-warning '(undo discard-info)
 		     (concat
 		      (format-message
-                       "Buffer ‘%s’ undo info was %d bytes long.\n"
+                       "Buffer `%s' undo info was %d bytes long.\n"
                        (buffer-name) size)
 		      "The undo info was discarded because it exceeded \
 `undo-outer-limit'.
@@ -3566,7 +3580,7 @@ Also, delete any process that is exited or signaled."
 				 `(,(buffer-name buf)
 				   face link
 				   help-echo ,(format-message
-					       "Visit buffer ‘%s’"
+					       "Visit buffer `%s'"
 					       (buffer-name buf))
 				   follow-link t
 				   process-buffer ,buf
@@ -3626,6 +3640,73 @@ see other processes running on the system, use `list-system-processes'."
   (display-buffer buffer)
   nil)
 
+;;;; Prefix commands
+
+(setq prefix-command--needs-update nil)
+(setq prefix-command--last-echo nil)
+
+(defun internal-echo-keystrokes-prefix ()
+  ;; BEWARE: Called directly from the C code.
+  (if (not prefix-command--needs-update)
+      prefix-command--last-echo
+    (setq prefix-command--last-echo
+          (let ((strs nil))
+            (run-hook-wrapped 'prefix-command-echo-keystrokes-functions
+                              (lambda (fun) (push (funcall fun) strs)))
+            (setq strs (delq nil strs))
+            (when strs (mapconcat #'identity strs " "))))))
+
+(defvar prefix-command-echo-keystrokes-functions nil
+  "Abnormal hook which constructs the description of the current prefix state.
+Each function is called with no argument, should return a string or nil.")
+
+(defun prefix-command-update ()
+  "Update state of prefix commands.
+Call it whenever you change the \"prefix command state\"."
+  (setq prefix-command--needs-update t))
+
+(defvar prefix-command-preserve-state-hook nil
+  "Normal hook run when a command needs to preserve the prefix.")
+
+(defun prefix-command-preserve-state ()
+  "Pass the current prefix command state to the next command.
+Should be called by all prefix commands.
+Runs `prefix-command-preserve-state-hook'."
+  (run-hooks 'prefix-command-preserve-state-hook)
+  ;; If the current command is a prefix command, we don't want the next (real)
+  ;; command to have `last-command' set to, say, `universal-argument'.
+  (setq this-command last-command)
+  (setq real-this-command real-last-command)
+  (prefix-command-update))
+
+(defun reset-this-command-lengths ()
+  (declare (obsolete prefix-command-preserve-state "25.1"))
+  nil)
+
+;;;;; The main prefix command.
+
+;; FIXME: Declaration of `prefix-arg' should be moved here!?
+
+(add-hook 'prefix-command-echo-keystrokes-functions
+          #'universal-argument--description)
+(defun universal-argument--description ()
+  (when prefix-arg
+    (concat "C-u"
+            (pcase prefix-arg
+              (`(-) " -")
+              (`(,(and (pred integerp) n))
+               (let ((str ""))
+                 (while (and (> n 4) (= (mod n 4) 0))
+                   (setq str (concat str " C-u"))
+                   (setq n (/ n 4)))
+                 (if (= n 4) str (format " %s" prefix-arg))))
+              (_ (format " %s" prefix-arg))))))
+
+(add-hook 'prefix-command-preserve-state-hook
+          #'universal-argument--preserve)
+(defun universal-argument--preserve ()
+  (setq prefix-arg current-prefix-arg))
+
 (defvar universal-argument-map
   (let ((map (make-sparse-keymap))
         (universal-argument-minus
@@ -3664,7 +3745,8 @@ see other processes running on the system, use `list-system-processes'."
   "Keymap used while processing \\[universal-argument].")
 
 (defun universal-argument--mode ()
-  (set-transient-map universal-argument-map))
+  (prefix-command-update)
+  (set-transient-map universal-argument-map nil))
 
 (defun universal-argument ()
   "Begin a numeric argument for the following command.
@@ -3677,6 +3759,7 @@ For some commands, just \\[universal-argument] by itself serves as a flag
 which is different in effect from any particular numeric argument.
 These commands include \\[set-mark-command] and \\[start-kbd-macro]."
   (interactive)
+  (prefix-command-preserve-state)
   (setq prefix-arg (list 4))
   (universal-argument--mode))
 
@@ -3684,6 +3767,7 @@ These commands include \\[set-mark-command] and \\[start-kbd-macro]."
   ;; A subsequent C-u means to multiply the factor by 4 if we've typed
   ;; nothing but C-u's; otherwise it means to terminate the prefix arg.
   (interactive "P")
+  (prefix-command-preserve-state)
   (setq prefix-arg (if (consp arg)
                        (list (* 4 (car arg)))
                      (if (eq arg '-)
@@ -3695,6 +3779,7 @@ These commands include \\[set-mark-command] and \\[start-kbd-macro]."
   "Begin a negative numeric argument for the next command.
 \\[universal-argument] following digits or minus sign ends the argument."
   (interactive "P")
+  (prefix-command-preserve-state)
   (setq prefix-arg (cond ((integerp arg) (- arg))
                          ((eq arg '-) nil)
                          (t '-)))
@@ -3704,6 +3789,7 @@ These commands include \\[set-mark-command] and \\[start-kbd-macro]."
   "Part of the numeric argument for the next command.
 \\[universal-argument] following digits or minus sign ends the argument."
   (interactive "P")
+  (prefix-command-preserve-state)
   (let* ((char (if (integerp last-command-event)
 		   last-command-event
 		 (get last-command-event 'ascii-character)))
@@ -7272,11 +7358,11 @@ buffer buried."
 		(push var warn-vars)))
 	 (when warn-vars
 	   (display-warning 'mail
-			    (format "\
+			    (format-message "\
 The default mail mode is now Message mode.
 You have the following Mail mode variable%s customized:
-\n  %s\n\nTo use Mail mode, set ‘mail-user-agent’ to sendmail-user-agent.
-To disable this warning, set ‘compose-mail-user-agent-warnings’ to nil."
+\n  %s\n\nTo use Mail mode, set `mail-user-agent' to sendmail-user-agent.
+To disable this warning, set `compose-mail-user-agent-warnings' to nil."
 				    (if (> (length warn-vars) 1) "s" "")
 				    (mapconcat 'symbol-name
 					       warn-vars " "))))))
@@ -7347,8 +7433,8 @@ With a prefix argument, set VARIABLE to VALUE buffer-locally."
 				(t "globally"))))
 	  (val (progn
                  (when obsolete
-                   (message (concat "‘%S’ is obsolete; "
-                                    (if (symbolp obsolete) "use ‘%S’ instead" "%s"))
+                   (message (concat "`%S' is obsolete; "
+                                    (if (symbolp obsolete) "use `%S' instead" "%s"))
                             var obsolete)
                    (sit-for 3))
                  (if prop
@@ -7372,7 +7458,7 @@ With a prefix argument, set VARIABLE to VALUE buffer-locally."
       (require 'cus-edit)
       (setq type (widget-convert type))
       (unless (widget-apply type :match value)
-	(user-error "Value ‘%S’ does not match type %S of %S"
+	(user-error "Value `%S' does not match type %S of %S"
 		    value (car type) variable))))
 
   (if make-local
@@ -7583,7 +7669,7 @@ back on `completion-list-insert-choice-function' when nil."
   ;; `base-position'.  It's difficult to make any use of `base-size',
   ;; so we just ignore it.
   (unless (consp base-position)
-    (message "Obsolete ‘base-size’ passed to choose-completion-string")
+    (message "Obsolete `base-size' passed to choose-completion-string")
     (setq base-position nil))
 
   (let* ((buffer (or buffer completion-reference-buffer))
@@ -8308,7 +8394,7 @@ CUSTOMIZATIONS, if non-nil, should be composed of alternating
     `(progn
 
        (defcustom ,varalt-sym nil
-         ,(format "Alist of alternative implementations for the ‘%s’ command.
+         ,(format "Alist of alternative implementations for the `%s' command.
 
 Each entry must be a pair (ALTNAME . ALTFUN), where:
 ALTNAME - The name shown at user to describe the alternative implementation.
@@ -8321,22 +8407,22 @@ ALTFUN  - The function called to implement this alternative."
        (defvar ,varimp-sym nil "Internal use only.")
 
        (defun ,command (&optional arg)
-         ,(format "Run generic command ‘%s’.
+         ,(format "Run generic command `%s'.
 If used for the first time, or with interactive ARG, ask the user which
-implementation to use for ‘%s’.  The variable ‘%s’
+implementation to use for `%s'.  The variable `%s'
 contains the list of implementations currently supported for this command."
                   command-name command-name varalt-name)
          (interactive "P")
          (when (or arg (null ,varimp-sym))
            (let ((val (completing-read
 		       ,(format-message
-                         "Select implementation for command ‘%s’: "
+                         "Select implementation for command `%s': "
                          command-name)
 		       ,varalt-sym nil t)))
              (unless (string-equal val "")
 	       (when (null ,varimp-sym)
 		 (message
-		  "Use ‘C-u M-x %s RET’ to select another implementation"
+		  "Use C-u M-x %s RET`to select another implementation"
 		  ,command-name)
 		 (sit-for 3))
 	       (customize-save-variable ',varimp-sym
@@ -8344,8 +8430,40 @@ contains the list of implementations currently supported for this command."
          (if ,varimp-sym
              (call-interactively ,varimp-sym)
            (message "%s" ,(format-message
-                           "No implementation selected for command ‘%s’"
+                           "No implementation selected for command `%s'"
                            command-name)))))))
+
+
+;;; Functions for changing capitalization that Do What I Mean
+(defun upcase-dwim (arg)
+  "Upcase words in the region, if active; if not, upcase word at point.
+If the region is active, this function calls `upcase-region'.
+Otherwise, it calls `upcase-word', with prefix argument passed to it
+to upcase ARG words."
+  (interactive "*p")
+  (if (use-region-p)
+      (upcase-region (region-beginning) (region-end))
+    (upcase-word arg)))
+
+(defun downcase-dwim (arg)
+    "Downcase words in the region, if active; if not, downcase word at point.
+If the region is active, this function calls `downcase-region'.
+Otherwise, it calls `downcase-word', with prefix argument passed to it
+to downcase ARG words."
+  (interactive "*p")
+  (if (use-region-p)
+      (downcase-region (region-beginning) (region-end))
+    (downcase-word arg)))
+
+(defun capitalize-dwim (arg)
+  "Capitalize words in the region, if active; if not, capitalize word at point.
+If the region is active, this function calls `capitalize-region'.
+Otherwise, it calls `capitalize-word', with prefix argument passed to it
+to capitalize ARG words."
+  (interactive "*p")
+  (if (use-region-p)
+      (capitalize-region (region-beginning) (region-end))
+    (capitalize-word arg)))
 
 
 
