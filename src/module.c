@@ -733,7 +733,7 @@ static emacs_value module_vec_get (emacs_env *env,
   if (! VECTORP (lvec))
     {
       module_wrong_type (env, Qvectorp, lvec);
-      return lisp_to_value (env, Qnil);
+      return NULL;
     }
   /* Prevent error-prone comparison between types of different signedness. */
   const size_t size = ASIZE (lvec);
@@ -742,7 +742,7 @@ static emacs_value module_vec_get (emacs_env *env,
     {
       if (i > MOST_POSITIVE_FIXNUM) i = MOST_POSITIVE_FIXNUM;
       module_args_out_of_range (env, lvec, make_number (i));
-      return lisp_to_value (env, Qnil);
+      return NULL;
     }
   return lisp_to_value (env, AREF (lvec, i));
 }
