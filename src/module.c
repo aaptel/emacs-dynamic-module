@@ -944,8 +944,13 @@ static void initialize_storage (struct emacs_value_storage *storage)
 
 static void finalize_storage (struct emacs_value_storage *storage)
 {
-  for (struct emacs_value_frame *frame = &storage->initial; frame->next != NULL; frame = frame->next)
-    free (frame->next);
+  struct emacs_value_frame *next = storage->initial.next;
+  while (next != NULL)
+    {
+      struct emacs_value_frame *const current = next;
+      next = current->next;
+      free (current);
+    }
 }
 
 static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_storage *storage,
