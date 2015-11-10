@@ -469,6 +469,9 @@ static emacs_value module_make_function (emacs_env *env,
   eassert (module_error_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
 
+  if (min_arity > MOST_POSITIVE_FIXNUM || max_arity > MOST_POSITIVE_FIXNUM)
+    xsignal0 (Qoverflow_error);
+
   if (min_arity < 0 ||
       (max_arity >= 0 && max_arity < min_arity) ||
       (max_arity < 0 && max_arity != emacs_variadic_function))
@@ -708,6 +711,11 @@ static void module_vec_set (emacs_env *env,
 {
   check_main_thread ();
   eassert (module_error_check (env) == emacs_funcall_exit_return);
+  if (i > MOST_POSITIVE_FIXNUM)
+    {
+      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      return;
+    }
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
@@ -730,6 +738,11 @@ static emacs_value module_vec_get (emacs_env *env,
   verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
   eassert (module_error_check (env) == emacs_funcall_exit_return);
+  if (i > MOST_POSITIVE_FIXNUM)
+    {
+      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      return NULL;
+    }
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
@@ -805,7 +818,13 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   finalize_environment (&runtime.priv.environment);
 
   if (r != 0)
-    xsignal2 (Qmodule_load_failed, file, make_number (r));
+    {
+      if (r < MOST_NEGATIVE_FIXNUM)
+        xsignal0 (Qunderflow_error);
+      if (r > MOST_POSITIVE_FIXNUM)
+        xsignal0 (Qoverflow_error);
+      xsignal2 (Qmodule_load_failed, file, make_number (r));
+    }
 
   return Qt;
 }
@@ -819,6 +838,9 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
   const struct module_fun_env *const envptr =
     (const struct module_fun_env *) XSAVE_POINTER (envobj, 0);
   const EMACS_INT len = XINT (Flength (arglist));
+  eassert (len >= 0);
+  if (len > MOST_POSITIVE_FIXNUM)
+    xsignal0 (Qoverflow_error);
   if (len > INT_MAX || len < envptr->min_arity || (envptr->max_arity >= 0 && len > envptr->max_arity))
     xsignal2 (Qwrong_number_of_arguments, module_format_fun_env (envptr), make_number (len));
 
