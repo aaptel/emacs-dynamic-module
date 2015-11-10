@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <config.h>
 #include "lisp.h"
@@ -1046,13 +1047,22 @@ static Lisp_Object module_format_fun_env (const struct module_fun_env *const env
   const char *path, *sym;
   if (dynlib_addr (env->subr, &path, &sym))
     {
-      AUTO_STRING (format, "#<module function %s from %s>");
-      return CALLN (Fformat, format, build_string (sym), build_string (path));
+      const char *const format = "#<module function %s from %s>";
+      const int size = snprintf (NULL, 0, format, sym, path);
+      eassert (size > 0);
+      char buffer[size + 1];
+      snprintf (buffer, sizeof buffer, format, sym, path);
+      return make_unibyte_string (buffer, size);
     }
   else
     {
-      AUTO_STRING (format, "#<module function at %#x>");
-      return CALLN (Fformat, format, make_number ((intptr_t) env->subr));
+      const char *const format = "#<module function at %p>";
+      const void *const subr = env->subr;
+      const int size = snprintf (NULL, 0, format, subr);
+      eassert (size > 0);
+      char buffer[size + 1];
+      snprintf (buffer, sizeof buffer, format, subr);
+      return make_unibyte_string (buffer, size);
     }
 }
 
