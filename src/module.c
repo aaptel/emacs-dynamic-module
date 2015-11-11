@@ -976,6 +976,19 @@ static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_stor
   return value;
 }
 
+/* Mark all objects allocated from local environments so that they
+   don't get garbage-collected. */
+void mark_modules (void)
+{
+  for (Lisp_Object tem = Vmodule_environments; CONSP (tem); tem = XCDR (tem))
+    {
+      const struct env_storage *const env = XSAVE_POINTER (tem, 0);
+      for (const struct emacs_value_frame *frame = &env->priv.storage.initial; frame != NULL; frame = frame->next)
+        for (size_t i = 0; i < frame->offset; ++i)
+          mark_object (frame->objects[i].v);
+    }
+}
+
 
 /* Environment lifetime management */
 
@@ -1012,11 +1025,13 @@ static void initialize_environment (struct env_storage *env)
   env->pub.vec_set = module_vec_set;
   env->pub.vec_get = module_vec_get;
   env->pub.vec_size = module_vec_size;
+  Vmodule_environments = Fcons (make_save_ptr (env), Vmodule_environments);
 }
 
 static void finalize_environment (struct env_storage *env)
 {
   finalize_storage (&env->priv.storage);
+  Vmodule_environments = XCDR (Vmodule_environments);
 }
 
 
@@ -1070,6 +1085,14 @@ void syms_of_module (void)
                                        make_float (DEFAULT_REHASH_THRESHOLD),
                                        Qnil);
   Funintern (Qmodule_refs_hash, Qnil);
+
+  DEFSYM (Qmodule_environments, "module-environments");
+  DEFVAR_LISP ("module-environments", Vmodule_environments,
+               doc: /* List of active module environments. */);
+  Vmodule_environments = Qnil;
+  /* Unintern `module-environments' because it is only used
+     internally. */
+  Funintern (Qmodule_environments, Qnil);
 
   DEFSYM (Qmodule_load_failed, "module-load-failed");
   Fput (Qmodule_load_failed, Qerror_conditions,
