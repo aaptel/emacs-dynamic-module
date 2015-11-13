@@ -108,22 +108,22 @@ struct emacs_env_25 {
                           emacs_value global_reference);
 
   /*
-   * Error handling
+   * Non-local exit handling
    */
 
-  enum emacs_funcall_exit (*error_check)(emacs_env *env);
+  enum emacs_funcall_exit (*non_local_exit_check)(emacs_env *env);
 
-  void (*error_clear)(emacs_env *env);
+  void (*non_local_exit_clear)(emacs_env *env);
 
-  enum emacs_funcall_exit (*error_get)(emacs_env *env,
-                                       emacs_value *error_symbol_out,
-                                       emacs_value *error_data_out);
+  enum emacs_funcall_exit (*non_local_exit_get)(emacs_env *env,
+                                       emacs_value *non_local_exit_symbol_out,
+                                       emacs_value *non_local_exit_data_out);
 
-  void (*error_signal)(emacs_env *env,
-                       emacs_value error_symbol,
-                       emacs_value error_data);
+  void (*non_local_exit_signal)(emacs_env *env,
+                       emacs_value non_local_exit_symbol,
+                       emacs_value non_local_exit_data);
 
-  void (*error_throw)(emacs_env *env,
+  void (*non_local_exit_throw)(emacs_env *env,
                       emacs_value tag,
                       emacs_value value);
 
@@ -156,14 +156,14 @@ struct emacs_env_25 {
 
   bool (*eq)(emacs_env *env, emacs_value a, emacs_value b);
 
-  int64_t (*fixnum_to_int)(emacs_env *env,
-                           emacs_value value);
+  int64_t (*extract_integer)(emacs_env *env,
+                             emacs_value value);
 
-  emacs_value (*make_fixnum)(emacs_env *env,
-                             int64_t value);
+  emacs_value (*make_integer)(emacs_env *env,
+                              int64_t value);
 
-  double (*float_to_c_double)(emacs_env *env,
-                              emacs_value value);
+  double (*extract_float)(emacs_env *env,
+                          emacs_value value);
 
   emacs_value (*make_float)(emacs_env *env,
                             double value);
@@ -200,13 +200,13 @@ struct emacs_env_25 {
                                void (*fin)(void *) EMACS_NOEXCEPT,
                                void *ptr);
 
-  void* (*get_user_ptr_ptr)(emacs_env *env, emacs_value uptr);
-  void (*set_user_ptr_ptr)(emacs_env *env, emacs_value uptr, void *ptr);
+  void* (*get_user_ptr)(emacs_env *env, emacs_value uptr);
+  void (*set_user_ptr)(emacs_env *env, emacs_value uptr, void *ptr);
 
-  void (*(*get_user_ptr_finalizer)(emacs_env *env, emacs_value uptr))(void *) EMACS_NOEXCEPT;
-  void (*set_user_ptr_finalizer)(emacs_env *env,
-                                 emacs_value uptr,
-                                 void (*fin)(void *) EMACS_NOEXCEPT);
+  void (*(*get_user_finalizer)(emacs_env *env, emacs_value uptr))(void *) EMACS_NOEXCEPT;
+  void (*set_user_finalizer)(emacs_env *env,
+                             emacs_value uptr,
+                             void (*fin)(void *) EMACS_NOEXCEPT);
 
   /*
    * Vector functions

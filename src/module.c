@@ -67,11 +67,11 @@ static emacs_value module_make_global_ref (emacs_env *env,
                                            emacs_value ref);
 static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref);
-static enum emacs_funcall_exit module_error_check (emacs_env *env);
-static void module_error_clear (emacs_env *env);
-static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data);
-static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data);
-static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value value);
+static enum emacs_funcall_exit module_non_local_exit_check (emacs_env *env);
+static void module_non_local_exit_clear (emacs_env *env);
+static enum emacs_funcall_exit module_non_local_exit_get (emacs_env *env, emacs_value *sym, emacs_value *data);
+static void module_non_local_exit_signal (emacs_env *env, emacs_value sym, emacs_value data);
+static void module_non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value);
 static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
@@ -85,10 +85,10 @@ static emacs_value module_intern (emacs_env *env, const char *name);
 static emacs_value module_type_of (emacs_env *env, emacs_value value);
 static bool module_is_not_nil (emacs_env *env, emacs_value value);
 static bool module_eq (emacs_env *env, emacs_value a, emacs_value b);
-static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n);
-static emacs_value module_make_fixnum (emacs_env *env, int64_t n);
+static int64_t module_extract_integer (emacs_env *env, emacs_value n);
+static emacs_value module_make_integer (emacs_env *env, int64_t n);
 static emacs_value module_make_float (emacs_env *env, double d);
-static double module_float_to_c_double (emacs_env *env, emacs_value f);
+static double module_extract_float (emacs_env *env, emacs_value f);
 static bool module_copy_string_contents (emacs_env *env,
                                          emacs_value value,
                                          char *buffer,
@@ -97,12 +97,12 @@ static emacs_value module_make_string (emacs_env *env, const char *str, size_t l
 static emacs_value module_make_user_ptr (emacs_env *env,
                                          emacs_finalizer_function fin,
                                          void *ptr);
-static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr);
-static void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr);
-static emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr);
-static void module_set_user_ptr_finalizer (emacs_env *env,
-                                           emacs_value uptr,
-                                           emacs_finalizer_function fin);
+static void* module_get_user_ptr (emacs_env *env, emacs_value uptr);
+static void module_set_user_ptr (emacs_env *env, emacs_value uptr, void *ptr);
+static emacs_finalizer_function module_get_user_finalizer (emacs_env *env, emacs_value uptr);
+static void module_set_user_finalizer (emacs_env *env,
+                                       emacs_value uptr,
+                                       emacs_finalizer_function fin);
 
 
 /* Helper functions */
@@ -111,9 +111,9 @@ static void module_set_user_ptr_finalizer (emacs_env *env,
    Emacs main thread. */
 static void check_main_thread (void);
 
-/* Internal versions of `module_error_signal' and `module_error_throw'. */
-static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data);
-static void module_error_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value);
+/* Internal versions of `module_non_local_exit_signal' and `module_non_local_exit_throw'. */
+static void module_non_local_exit_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data);
+static void module_non_local_exit_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value);
 
 /* Module version of `wrong_type_argument'. */
 static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value);
@@ -183,23 +183,23 @@ static void initialize_storage (struct emacs_value_storage *storage);
 static void finalize_storage (struct emacs_value_storage *storage);
 
 /* Allocates a new value from STORAGE and stores OBJ in it.  Returns
-   NULL if allocations fails and uses ENV for error reporting. */
+   NULL if allocations fails and uses ENV for non local exit reporting. */
 static emacs_value allocate_emacs_value (emacs_env *env, struct emacs_value_storage *storage,
                                          Lisp_Object obj);
 
 
 /* Private runtime and environment members */
 
-/* The private part of an environment stores the current error state
+/* The private part of an environment stores the current non local exit state
    and holds the `emacs_value' objects allocated during the lifetime
    of the environment. */
 struct emacs_env_private {
-  enum emacs_funcall_exit pending_error;
+  enum emacs_funcall_exit pending_non_local_exit;
 
-  /* Dedicated storage for error symbol and data so that we always
+  /* Dedicated storage for non-local exit symbol and data so that we always
      have storage available for them, even in an out-of-memory
      situation. */
-  struct emacs_value_tag error_symbol, error_data;
+  struct emacs_value_tag non_local_exit_symbol, non_local_exit_data;
 
   struct emacs_value_storage storage;
 };
@@ -225,7 +225,7 @@ struct emacs_runtime_private {
 };
 
 
-/* Convenience macros for error handling */
+/* Convenience macros for non-local exit handling */
 
 /* Emacs uses setjmp(3) and longjmp(3) for non-local exits, but we
    can't allow module frames to be skipped because they are in general
@@ -239,11 +239,11 @@ struct emacs_runtime_private {
    handler functions. */
 
 /* Called on `signal'.  ERR will be a cons cell (SYMBOL . DATA), which
-   gets stored in the environment.  Sets the pending error flag. */
+   gets stored in the environment.  Sets the pending non-local exit flag. */
 static void module_handle_signal (emacs_env *env, Lisp_Object err);
 
 /* Called on `throw'.  TAG_VAL will be a cons cell (TAG . VALUE),
-   which gets stored in the environment.  Sets the pending error
+   which gets stored in the environment.  Sets the pending non-local exit
    flag. */
 static void module_handle_throw (emacs_env *env, Lisp_Object tag_val);
 
@@ -279,7 +279,7 @@ static void module_reset_handlerlist (const int *dummy);
                   internal_cleanup_##handlertype)
 
 #define MODULE_SETJMP_1(handlertype, handlerfunc, retval, c, dummy)            \
-  eassert (module_error_check (env) == emacs_funcall_exit_return);             \
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);    \
   struct handler *c;                                                           \
   /* It is very important that pushing the handler doesn't itself raise a      \
      signal. */                                                                \
@@ -289,7 +289,7 @@ static void module_reset_handlerlist (const int *dummy);
   }                                                                            \
   verify(module_has_cleanup);                                                  \
   /* We can install the cleanup only after the handler has been pushed.  Use   \
-     __attribute__((cleanup)) to avoid error-prone manual cleanup. */          \
+     __attribute__((cleanup)) to avoid non-local-exit-prone manual cleanup. */ \
   const int dummy __attribute__((cleanup(module_reset_handlerlist)));          \
   if (sys_setjmp(c->jmp)) {                                                    \
     (handlerfunc)(env, c->val);                                                \
@@ -345,7 +345,7 @@ static emacs_value module_make_global_ref (emacs_env *env,
                                            emacs_value ref)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   eassert (HASH_TABLE_P (Vmodule_refs_hash));
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
@@ -360,7 +360,7 @@ static emacs_value module_make_global_ref (emacs_env *env,
       const EMACS_UINT refcount = XFASTINT (value);
       if (refcount >= MOST_POSITIVE_FIXNUM)
         {
-          module_error_signal_1 (env, Qoverflow_error, Qnil);
+          module_non_local_exit_signal_1 (env, Qoverflow_error, Qnil);
           return NULL;
         }
       XSETFASTINT (value, refcount + 1);
@@ -378,7 +378,7 @@ static void module_free_global_ref (emacs_env *env,
                                     emacs_value ref)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   /* TODO: This probably never signals. */
   MODULE_HANDLE_SIGNALS_VOID;
   eassert (HASH_TABLE_P (Vmodule_refs_hash));
@@ -405,45 +405,45 @@ static void module_free_global_ref (emacs_env *env,
     }
 }
 
-static enum emacs_funcall_exit module_error_check (emacs_env *env)
+static enum emacs_funcall_exit module_non_local_exit_check (emacs_env *env)
 {
   check_main_thread ();
-  return env->private_members->pending_error;
+  return env->private_members->pending_non_local_exit;
 }
 
-static void module_error_clear (emacs_env *env)
+static void module_non_local_exit_clear (emacs_env *env)
 {
   check_main_thread ();
-  env->private_members->pending_error = emacs_funcall_exit_return;
+  env->private_members->pending_non_local_exit = emacs_funcall_exit_return;
 }
 
-static enum emacs_funcall_exit module_error_get (emacs_env *env, emacs_value *sym, emacs_value *data)
+static enum emacs_funcall_exit module_non_local_exit_get (emacs_env *env, emacs_value *sym, emacs_value *data)
 {
   check_main_thread ();
   struct emacs_env_private *const p = env->private_members;
-  if (p->pending_error != emacs_funcall_exit_return)
+  if (p->pending_non_local_exit != emacs_funcall_exit_return)
     {
-      *sym = &p->error_symbol;
-      *data = &p->error_data;
+      *sym = &p->non_local_exit_symbol;
+      *data = &p->non_local_exit_data;
     }
-  return p->pending_error;
+  return p->pending_non_local_exit;
 }
 
 /*
  * Like for `signal', DATA must be a list
  */
-static void module_error_signal (emacs_env *env, emacs_value sym, emacs_value data)
+static void module_non_local_exit_signal (emacs_env *env, emacs_value sym, emacs_value data)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
-  module_error_signal_1 (env, value_to_lisp (sym), value_to_lisp (data));
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
+  module_non_local_exit_signal_1 (env, value_to_lisp (sym), value_to_lisp (data));
 }
 
-static void module_error_throw (emacs_env *env, emacs_value tag, emacs_value value)
+static void module_non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
-  module_error_throw_1 (env, value_to_lisp (tag), value_to_lisp (value));
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
+  module_non_local_exit_throw_1 (env, value_to_lisp (tag), value_to_lisp (value));
 }
 
 /*
@@ -466,7 +466,7 @@ static emacs_value module_make_function (emacs_env *env,
                                          void *data)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
 
   if (min_arity > MOST_POSITIVE_FIXNUM || max_arity > MOST_POSITIVE_FIXNUM)
@@ -502,7 +502,7 @@ static emacs_value module_funcall (emacs_env *env,
                                    emacs_value args[])
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   MODULE_HANDLE_THROW;
 
@@ -520,7 +520,7 @@ static emacs_value module_funcall (emacs_env *env,
 static emacs_value module_intern (emacs_env *env, const char *name)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, intern (name));
 }
@@ -528,30 +528,30 @@ static emacs_value module_intern (emacs_env *env, const char *name)
 static emacs_value module_type_of (emacs_env *env, emacs_value value)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   return lisp_to_value (env, Ftype_of (value_to_lisp (value)));
 }
 
 static bool module_is_not_nil (emacs_env *env, emacs_value value)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   return ! NILP (value_to_lisp (value));
 }
 
 static bool module_eq (emacs_env *env, emacs_value a, emacs_value b)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   return EQ (value_to_lisp (a), value_to_lisp (b));
 }
 
-static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
+static int64_t module_extract_integer (emacs_env *env, emacs_value n)
 {
   verify (INT64_MIN <= MOST_NEGATIVE_FIXNUM);
   verify (INT64_MAX >= MOST_POSITIVE_FIXNUM);
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   const Lisp_Object l = value_to_lisp (n);
   if (! INTEGERP (l))
     {
@@ -561,27 +561,27 @@ static int64_t module_fixnum_to_int (emacs_env *env, emacs_value n)
   return XINT (l);
 }
 
-static emacs_value module_make_fixnum (emacs_env *env, int64_t n)
+static emacs_value module_make_integer (emacs_env *env, int64_t n)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   if (n < MOST_NEGATIVE_FIXNUM)
     {
-      module_error_signal_1 (env, Qunderflow_error, Qnil);
+      module_non_local_exit_signal_1 (env, Qunderflow_error, Qnil);
       return NULL;
     }
   if (n > MOST_POSITIVE_FIXNUM)
     {
-      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      module_non_local_exit_signal_1 (env, Qoverflow_error, Qnil);
       return NULL;
     }
   return lisp_to_value (env, make_number (n));
 }
 
-static double module_float_to_c_double (emacs_env *env, emacs_value f)
+static double module_extract_float (emacs_env *env, emacs_value f)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (f);
   if (! FLOATP (lisp))
     {
@@ -594,7 +594,7 @@ static double module_float_to_c_double (emacs_env *env, emacs_value f)
 static emacs_value module_make_float (emacs_env *env, double d)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   return lisp_to_value (env, make_float (d));
 }
@@ -605,7 +605,7 @@ static bool module_copy_string_contents (emacs_env *env,
                                          size_t* length)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   Lisp_Object lisp_str = value_to_lisp (value);
   if (! STRINGP (lisp_str))
@@ -639,11 +639,11 @@ static bool module_copy_string_contents (emacs_env *env,
 static emacs_value module_make_string (emacs_env *env, const char *str, size_t length)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   MODULE_HANDLE_SIGNALS;
   if (length > PTRDIFF_MAX)
     {
-      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      module_non_local_exit_signal_1 (env, Qoverflow_error, Qnil);
       return NULL;
     }
   /* Assume STR is utf8 encoded */
@@ -658,10 +658,10 @@ static emacs_value module_make_user_ptr (emacs_env *env,
   return lisp_to_value (env, make_user_ptr (fin, ptr));
 }
 
-static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
+static void* module_get_user_ptr (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp))
     {
@@ -671,19 +671,19 @@ static void* module_get_user_ptr_ptr (emacs_env *env, emacs_value uptr)
   return XUSER_PTR (lisp)->p;
 }
 
-static void module_set_user_ptr_ptr (emacs_env *env, emacs_value uptr, void *ptr)
+static void module_set_user_ptr (emacs_env *env, emacs_value uptr, void *ptr)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp)) module_wrong_type (env, Quser_ptr, lisp);
   XUSER_PTR (lisp)->p = ptr;
 }
 
-static emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, emacs_value uptr)
+static emacs_finalizer_function module_get_user_finalizer (emacs_env *env, emacs_value uptr)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp))
     {
@@ -693,12 +693,12 @@ static emacs_finalizer_function module_get_user_ptr_finalizer (emacs_env *env, e
   return XUSER_PTR (lisp)->finalizer;
 }
 
-static void module_set_user_ptr_finalizer (emacs_env *env,
+static void module_set_user_finalizer (emacs_env *env,
                                            emacs_value uptr,
                                            emacs_finalizer_function fin)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   const Lisp_Object lisp = value_to_lisp (uptr);
   if (! USER_PTRP (lisp)) module_wrong_type (env, Quser_ptr, lisp);
   XUSER_PTR (lisp)->finalizer = fin;
@@ -710,10 +710,10 @@ static void module_vec_set (emacs_env *env,
 			    emacs_value val)
 {
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   if (i > MOST_POSITIVE_FIXNUM)
     {
-      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      module_non_local_exit_signal_1 (env, Qoverflow_error, Qnil);
       return;
     }
   Lisp_Object lvec = value_to_lisp (vec);
@@ -737,10 +737,10 @@ static emacs_value module_vec_get (emacs_env *env,
   /* Type of ASIZE (lvec) is ptrdiff_t, make sure it fits */
   verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   if (i > MOST_POSITIVE_FIXNUM)
     {
-      module_error_signal_1 (env, Qoverflow_error, Qnil);
+      module_non_local_exit_signal_1 (env, Qoverflow_error, Qnil);
       return NULL;
     }
   Lisp_Object lvec = value_to_lisp (vec);
@@ -767,7 +767,7 @@ static size_t module_vec_size (emacs_env *env,
   /* Type of ASIZE (lvec) is ptrdiff_t, make sure it fits */
   verify (PTRDIFF_MAX <= SIZE_MAX);
   check_main_thread ();
-  eassert (module_error_check (env) == emacs_funcall_exit_return);
+  eassert (module_non_local_exit_check (env) == emacs_funcall_exit_return);
   Lisp_Object lvec = value_to_lisp (vec);
   if (! VECTORP (lvec))
     {
@@ -860,7 +860,7 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
   emacs_value ret = envptr->subr (&env.pub, len, args, envptr->data);
   xfree (args);
 
-  switch (env.priv.pending_error)
+  switch (env.priv.pending_non_local_exit)
     {
     case emacs_funcall_exit_return:
       finalize_environment (&env);
@@ -868,15 +868,15 @@ ARGLIST is a list of arguments passed to SUBRPTR. */)
       return value_to_lisp (ret);
     case emacs_funcall_exit_signal:
       {
-        const Lisp_Object symbol = value_to_lisp (&env.priv.error_symbol);
-        const Lisp_Object data = value_to_lisp (&env.priv.error_data);
+        const Lisp_Object symbol = value_to_lisp (&env.priv.non_local_exit_symbol);
+        const Lisp_Object data = value_to_lisp (&env.priv.non_local_exit_data);
         finalize_environment (&env);
         xsignal (symbol, data);
       }
     case emacs_funcall_exit_throw:
       {
-        const Lisp_Object tag = value_to_lisp (&env.priv.error_symbol);
-        const Lisp_Object value = value_to_lisp (&env.priv.error_data);
+        const Lisp_Object tag = value_to_lisp (&env.priv.non_local_exit_symbol);
+        const Lisp_Object value = value_to_lisp (&env.priv.non_local_exit_data);
         finalize_environment (&env);
         Fthrow (tag, value);
       }
@@ -901,38 +901,38 @@ static void check_main_thread (void)
 #endif
 }
 
-static void module_error_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data)
+static void module_non_local_exit_signal_1 (emacs_env *env, Lisp_Object sym, Lisp_Object data)
 {
   struct emacs_env_private *const p = env->private_members;
-  eassert (p->pending_error == emacs_funcall_exit_return);
-  p->pending_error = emacs_funcall_exit_signal;
-  p->error_symbol.v = sym;
-  p->error_data.v = data;
+  eassert (p->pending_non_local_exit == emacs_funcall_exit_return);
+  p->pending_non_local_exit = emacs_funcall_exit_signal;
+  p->non_local_exit_symbol.v = sym;
+  p->non_local_exit_data.v = data;
 }
 
-static void module_error_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value)
+static void module_non_local_exit_throw_1 (emacs_env *env, Lisp_Object tag, Lisp_Object value)
 {
   struct emacs_env_private *const p = env->private_members;
-  eassert (p->pending_error == emacs_funcall_exit_return);
-  p->pending_error = emacs_funcall_exit_throw;
-  p->error_symbol.v = tag;
-  p->error_data.v = value;
+  eassert (p->pending_non_local_exit == emacs_funcall_exit_return);
+  p->pending_non_local_exit = emacs_funcall_exit_throw;
+  p->non_local_exit_symbol.v = tag;
+  p->non_local_exit_data.v = value;
 }
 
 static void module_wrong_type (emacs_env *env, Lisp_Object predicate, Lisp_Object value)
 {
-  module_error_signal_1 (env, Qwrong_type_argument, list2 (predicate, value));
+  module_non_local_exit_signal_1 (env, Qwrong_type_argument, list2 (predicate, value));
 }
 
 static void module_out_of_memory (emacs_env *env)
 {
   // TODO: Reimplement this so it works even if memory-signal-data has been modified.
-  module_error_signal_1 (env, XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
+  module_non_local_exit_signal_1 (env, XCAR (Vmemory_signal_data), XCDR (Vmemory_signal_data));
 }
 
 static void module_args_out_of_range (emacs_env *env, Lisp_Object a1, Lisp_Object a2)
 {
-  module_error_signal_1 (env, Qargs_out_of_range, list2 (a1, a2));
+  module_non_local_exit_signal_1 (env, Qargs_out_of_range, list2 (a1, a2));
 }
 
 
@@ -946,7 +946,7 @@ static Lisp_Object value_to_lisp (emacs_value v)
 static emacs_value lisp_to_value (emacs_env *env, Lisp_Object o)
 {
   struct emacs_env_private *const p = env->private_members;
-  if (p->pending_error != emacs_funcall_exit_return) return NULL;
+  if (p->pending_non_local_exit != emacs_funcall_exit_return) return NULL;
   return allocate_emacs_value (env, &p->storage, o);
 }
 
@@ -1017,34 +1017,34 @@ void mark_modules (void)
 
 static void initialize_environment (struct env_storage *env)
 {
-  env->priv.pending_error = emacs_funcall_exit_return;
+  env->priv.pending_non_local_exit = emacs_funcall_exit_return;
   initialize_storage (&env->priv.storage);
   env->pub.size            = sizeof env->pub;
   env->pub.private_members = &env->priv;
   env->pub.make_global_ref = module_make_global_ref;
   env->pub.free_global_ref = module_free_global_ref;
-  env->pub.error_check     = module_error_check;
-  env->pub.error_clear     = module_error_clear;
-  env->pub.error_get       = module_error_get;
-  env->pub.error_signal    = module_error_signal;
-  env->pub.error_throw     = module_error_throw;
+  env->pub.non_local_exit_check     = module_non_local_exit_check;
+  env->pub.non_local_exit_clear     = module_non_local_exit_clear;
+  env->pub.non_local_exit_get       = module_non_local_exit_get;
+  env->pub.non_local_exit_signal    = module_non_local_exit_signal;
+  env->pub.non_local_exit_throw     = module_non_local_exit_throw;
   env->pub.make_function   = module_make_function;
   env->pub.funcall         = module_funcall;
   env->pub.intern          = module_intern;
   env->pub.type_of         = module_type_of;
   env->pub.is_not_nil      = module_is_not_nil;
   env->pub.eq              = module_eq;
-  env->pub.fixnum_to_int   = module_fixnum_to_int;
-  env->pub.make_fixnum     = module_make_fixnum;
-  env->pub.float_to_c_double = module_float_to_c_double;
+  env->pub.extract_integer   = module_extract_integer;
+  env->pub.make_integer     = module_make_integer;
+  env->pub.extract_float = module_extract_float;
   env->pub.make_float      = module_make_float;
   env->pub.copy_string_contents = module_copy_string_contents;
   env->pub.make_string     = module_make_string;
   env->pub.make_user_ptr = module_make_user_ptr;
-  env->pub.get_user_ptr_ptr = module_get_user_ptr_ptr;
-  env->pub.set_user_ptr_ptr = module_set_user_ptr_ptr;
-  env->pub.get_user_ptr_finalizer = module_get_user_ptr_finalizer;
-  env->pub.set_user_ptr_finalizer = module_set_user_ptr_finalizer;
+  env->pub.get_user_ptr = module_get_user_ptr;
+  env->pub.set_user_ptr = module_set_user_ptr;
+  env->pub.get_user_finalizer = module_get_user_finalizer;
+  env->pub.set_user_finalizer = module_set_user_finalizer;
   env->pub.vec_set = module_vec_set;
   env->pub.vec_get = module_vec_get;
   env->pub.vec_size = module_vec_size;
@@ -1058,7 +1058,7 @@ static void finalize_environment (struct env_storage *env)
 }
 
 
-/* Error handling */
+/* Non-local exit handling */
 
 static void module_reset_handlerlist(const int *dummy)
 {
@@ -1067,12 +1067,12 @@ static void module_reset_handlerlist(const int *dummy)
 
 static void module_handle_signal (emacs_env *const env, const Lisp_Object err)
 {
-  module_error_signal_1 (env, XCAR (err), XCDR (err));
+  module_non_local_exit_signal_1 (env, XCAR (err), XCDR (err));
 }
 
 static void module_handle_throw (emacs_env *const env, const Lisp_Object tag_val)
 {
-  module_error_throw_1 (env, XCAR (tag_val), XCDR (tag_val));
+  module_non_local_exit_throw_1 (env, XCAR (tag_val), XCDR (tag_val));
 }
 
 

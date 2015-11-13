@@ -24,12 +24,12 @@ static int64_t sum (int64_t a, int64_t b)
 /* Proper module function that wraps the C function */
 static emacs_value Fsum (emacs_env *env, int nargs, emacs_value args[], void* data)
 {
-  int64_t a = env->fixnum_to_int (env, args[0]);
-  int64_t b = env->fixnum_to_int (env, args[1]);
+  int64_t a = env->extract_integer (env, args[0]);
+  int64_t b = env->extract_integer (env, args[1]);
 
   int64_t r = sum(a, b);
 
-  return env->make_fixnum (env, r);
+  return env->make_integer (env, r);
 }
 
 /* Binds NAME to FUN */
