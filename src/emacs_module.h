@@ -135,6 +135,7 @@ struct emacs_env_25 {
                                int min_arity,
                                int max_arity,
                                emacs_value (*function)(emacs_env*, int, emacs_value*, void*) EMACS_NOEXCEPT,
+                               const char *documentation,
                                void *data);
 
   emacs_value (*funcall)(emacs_env *env,

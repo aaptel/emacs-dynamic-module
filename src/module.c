@@ -76,6 +76,7 @@ static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
                                          emacs_subr subr,
+                                         const char *documentation,
                                          void *data);
 static emacs_value module_funcall (emacs_env *env,
                                    emacs_value fun,
@@ -463,6 +464,7 @@ static emacs_value module_make_function (emacs_env *env,
                                          int min_arity,
                                          int max_arity,
                                          emacs_subr subr,
+                                         const char *const documentation,
                                          void *data)
 {
   check_main_thread ();
@@ -487,8 +489,9 @@ static emacs_value module_make_function (emacs_env *env,
   envptr->data = data;
   envobj = make_save_ptr (envptr);
 
-  Lisp_Object ret = list3 (Qlambda,
+  Lisp_Object ret = list4 (Qlambda,
                            list2 (Qand_rest, Qargs),
+                           build_string (documentation),
                            list3 (module_call_func,
                                   envobj,
                                   Qargs));
