@@ -7,3 +7,6 @@
 
 (ert-deftest modt-basic-sum-test ()
   (should (= (modt-basic-sum 1 2) 3)))
+
+(ert-deftest modt-basic-docstring-test ()
+  (should (string= (documentation 'modt-basic-sum) "Return A + B")))

@@ -55,7 +55,7 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  emacs_value Ssum = env->make_function (env, 2, 2, Fsum, NULL, NULL);
+  emacs_value Ssum = env->make_function (env, 2, 2, Fsum, "Return A + B", NULL);
 
   bind_function (env, "modt-basic-sum", Ssum);
   provide (env, "modt-basic");
