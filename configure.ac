@@ -3296,9 +3296,13 @@ if test "${with_modules}" != "no"; then
     MODULES_SUFFIX=".dll"
     HAVE_MODULES=yes
   else
-    # XXX: compile test program using dlopen and see whether it
-    # needs a particular lib/flag
-    true # fail?
+    # BSD system have dlopen in the libc
+    AC_CHECK_FUNC(dlopen, [MODULES_SUFFIX=".so"]
+                          [HAVE_MODULES=yes], [])
+  fi
+
+  if test "${HAVE_MODULES}" = no; then
+    AC_MSG_ERROR([Dynamic modules are not supported on your system])
   fi
 fi
 
