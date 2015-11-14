@@ -491,7 +491,7 @@ static emacs_value module_make_function (emacs_env *env,
 
   Lisp_Object ret = list4 (Qlambda,
                            list2 (Qand_rest, Qargs),
-                           build_string (documentation),
+                           documentation ? build_string (documentation) : Qnil,
                            list3 (module_call_func,
                                   envobj,
                                   Qargs));
