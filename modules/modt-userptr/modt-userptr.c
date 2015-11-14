@@ -53,8 +53,8 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  bind_function (env, "modt-userptr-make", env->make_function (env, 1, 1, Fmodt_userptr_make, NULL));
-  bind_function (env, "modt-userptr-get", env->make_function (env, 1, 1, Fmodt_userptr_get, NULL));
+  bind_function (env, "modt-userptr-make", env->make_function (env, 1, 1, Fmodt_userptr_make, NULL, NULL));
+  bind_function (env, "modt-userptr-get", env->make_function (env, 1, 1, Fmodt_userptr_get, NULL, NULL));
   provide (env, "modt-userptr");
   return 0;
 }

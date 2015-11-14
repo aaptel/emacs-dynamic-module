@@ -71,9 +71,9 @@ int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
 
-  bind_function (env, "modt-non-local-exit-signal", env->make_function (env, 0, 0, Fmodt_non_local_exit_signal, NULL));
-  bind_function (env, "modt-non-local-exit-throw", env->make_function (env, 0, 0, Fmodt_non_local_exit_throw, NULL));
-  bind_function (env, "modt-non-local-exit-funcall", env->make_function (env, 1, 1, Fmodt_non_local_exit_funcall, NULL));
+  bind_function (env, "modt-non-local-exit-signal", env->make_function (env, 0, 0, Fmodt_non_local_exit_signal, NULL, NULL));
+  bind_function (env, "modt-non-local-exit-throw", env->make_function (env, 0, 0, Fmodt_non_local_exit_throw, NULL, NULL));
+  bind_function (env, "modt-non-local-exit-funcall", env->make_function (env, 1, 1, Fmodt_non_local_exit_funcall, NULL, NULL));
   provide (env, "modt-error");
   return 0;
 }

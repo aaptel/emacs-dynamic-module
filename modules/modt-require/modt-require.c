@@ -31,7 +31,7 @@ int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
 
-  bind_function (env, "modt-require-fun", env->make_function (env, 0, 0, Fmodt_require_fun, NULL));
+  bind_function (env, "modt-require-fun", env->make_function (env, 0, 0, Fmodt_require_fun, NULL, NULL));
   provide (env, "modt-require");
 
   return 0;

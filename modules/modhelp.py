@@ -159,7 +159,7 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  bind_function (env, "${lisp_func}", env->make_function (env, 1, 1, ${c_func}, NULL));
+  bind_function (env, "${lisp_func}", env->make_function (env, 1, 1, ${c_func}, "doc", NULL));
   provide (env, "${module}");
   return 0;
 }

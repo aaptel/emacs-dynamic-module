@@ -44,7 +44,7 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  bind_function (env, "modt-string-a-to-b", env->make_function (env, 1, 1, Fmodt_string_a_to_b, NULL));
+  bind_function (env, "modt-string-a-to-b", env->make_function (env, 1, 1, Fmodt_string_a_to_b, NULL, NULL));
   provide (env, "modt-string");
   return 0;
 }

@@ -49,8 +49,8 @@ static void provide (emacs_env *env, const char *feature)
 int emacs_module_init (struct emacs_runtime *ert)
 {
   emacs_env *env = ert->get_environment (ert);
-  bind_function (env, "modt-vector-fill", env->make_function (env, 2, 2, Fmodt_vector_fill, NULL));
-  bind_function (env, "modt-vector-eq", env->make_function (env, 2, 2, Fmodt_vector_eq, NULL));
+  bind_function (env, "modt-vector-fill", env->make_function (env, 2, 2, Fmodt_vector_fill, NULL, NULL));
+  bind_function (env, "modt-vector-eq", env->make_function (env, 2, 2, Fmodt_vector_eq, NULL, NULL));
   provide (env, "modt-vector");
   return 0;
 }
